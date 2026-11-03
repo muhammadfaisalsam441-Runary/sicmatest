@@ -2,15 +2,21 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Enums\UserRole;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['name', 'email', 'password'])]
+/**
+ * Pengguna SICMA: super admin, admin, atau Keti. Login memakai email atau NIM.
+ */
+#[Fillable(['name', 'nim', 'email', 'password', 'role', 'can_publish', 'is_active', 'last_login_at'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -27,6 +33,82 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'role' => UserRole::class,
+            'can_publish' => 'boolean',
+            'is_active' => 'boolean',
+            'last_login_at' => 'datetime',
         ];
+    }
+
+    /**
+     * @return HasMany<KetiApplication, $this>
+     */
+    public function ketiApplications(): HasMany
+    {
+        return $this->hasMany(KetiApplication::class);
+    }
+
+    /**
+     * @return HasOne<KetiApplication, $this>
+     */
+    public function latestKetiApplication(): HasOne
+    {
+        return $this->hasOne(KetiApplication::class)->latestOfMany();
+    }
+
+    /**
+     * @return HasMany<ClassRepresentative, $this>
+     */
+    public function classRepresentatives(): HasMany
+    {
+        return $this->hasMany(ClassRepresentative::class);
+    }
+
+    /**
+     * @return HasMany<Reservation, $this>
+     */
+    public function reservations(): HasMany
+    {
+        return $this->hasMany(Reservation::class, 'created_by');
+    }
+
+    /**
+     * @return BelongsToMany<Room, $this>
+     */
+    public function favoriteRooms(): BelongsToMany
+    {
+        return $this->belongsToMany(Room::class, 'favorites')->withTimestamps();
+    }
+
+    /**
+     * @return HasMany<AppNotification, $this>
+     */
+    public function appNotifications(): HasMany
+    {
+        return $this->hasMany(AppNotification::class);
+    }
+
+    /**
+     * @return HasMany<EmailVerificationCode, $this>
+     */
+    public function verificationCodes(): HasMany
+    {
+        return $this->hasMany(EmailVerificationCode::class);
+    }
+
+    /**
+     * Pengguna boleh membuka Panel Admin.
+     */
+    public function isAdmin(): bool
+    {
+        return $this->role->isAdmin();
+    }
+
+    /**
+     * Pengguna berperan Keti.
+     */
+    public function isKeti(): bool
+    {
+        return $this->role === UserRole::Keti;
     }
 }

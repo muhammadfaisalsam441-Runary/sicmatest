@@ -1,72 +1,58 @@
-<!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
+@use('App\Support\Nav')
+@extends('layouts.public')
 
-        <title>{{ config('app.name') }}</title>
+@section('title', 'Beranda')
 
-        @fonts
-        @vite(['resources/css/app.css', 'resources/js/app.js'])
-    </head>
-    <body class="min-h-screen">
-        {{-- Halaman awal Fase 0 (cek token & font). Layout publik dibuat di Fase 2, isi Beranda di Fase 5. --}}
-        <header class="border-b border-border bg-surface">
-            <div class="mx-auto flex h-16 max-w-[1100px] items-center justify-between px-8">
-                <span class="text-xl font-extrabold tracking-tight text-primary">SICMA</span>
-                <nav class="flex gap-8 text-sm font-medium text-muted">
-                    <span class="border-b-2 border-primary pb-1 text-primary">Beranda</span>
-                    <span>Ruangan</span>
-                    <span>Panduan</span>
-                    <span>Bantuan</span>
-                </nav>
-                <span class="rounded-control bg-primary px-5 py-2 text-sm font-semibold text-white">Masuk</span>
+@section('content')
+    <div class="flex flex-col gap-14">
+        <section class="flex flex-col items-center gap-6 pt-10 text-center">
+            <span class="rounded-full bg-primary-soft px-16 py-2 text-[11px] font-semibold tracking-wide text-primary uppercase">Layanan ruang kelas JTIK</span>
+            <h1 class="max-w-3xl text-[56px] leading-[1.1] font-bold tracking-tight text-primary">Temukan ruangan yang tepat untuk kelasmu.</h1>
+            <p class="max-w-xl text-lg leading-relaxed text-muted">Lihat ketersediaan ruang kelas JTIK tanpa akun. Masuk sebagai Keti untuk memesan dan mengelola penggunaan.</p>
+            <div class="flex gap-3">
+                <x-button :href="Nav::url('login')" class="w-52 py-4">Masuk ke SICMA</x-button>
+                <x-button variant="secondary" :href="route('public.rooms', ['status' => 'tersedia'])" class="w-52 py-4">Lihat ruang tersedia</x-button>
             </div>
-        </header>
+            <p class="text-xs text-muted">Terbuka untuk semua • Pemesanan khusus ketua tingkat yang terdaftar</p>
+        </section>
 
-        <main class="mx-auto flex max-w-[1100px] flex-col gap-10 px-8 py-16">
-            <section class="flex flex-col items-center gap-5 text-center">
-                <span class="rounded-full bg-primary-soft px-4 py-1 text-xs font-semibold text-primary">Layanan ruang kelas JTIK</span>
-                <h1 class="max-w-xl text-5xl leading-tight font-extrabold text-ink">Temukan ruangan yang tepat untuk kelasmu.</h1>
-                <p class="max-w-lg text-muted">Lihat ketersediaan ruang kelas JTIK tanpa akun. Masuk sebagai Keti untuk memesan dan mengelola penggunaan.</p>
-            </section>
-
-            <section class="flex flex-col gap-4 rounded-card border border-border bg-surface p-6">
-                <div class="flex items-center justify-between">
-                    <h2 class="text-lg font-bold">Pemeriksaan setup (Fase 0)</h2>
-                    <span class="flex items-center gap-2 text-xs text-muted">
-                        <i data-lucide="clock" class="size-4"></i>
-                        {{ now()->translatedFormat('j M Y') }} • {{ now()->format('H.i') }} {{ config('sicma.timezone_label') }}
-                    </span>
+        <section class="flex flex-col gap-4">
+            <div class="flex items-start justify-between gap-6">
+                <div class="flex flex-col gap-2">
+                    <h2 class="text-3xl font-semibold text-ink">{{ $availableCount }} ruang tersedia sekarang</h2>
+                    <p class="text-sm text-ink">Tersedia berarti ruangan dapat digunakan. Digunakan berarti ruangan sedang dipakai.</p>
+                    <p class="text-xs text-ink">Pratinjau {{ count($preview) }} dari {{ $availableCount }} ruang tersedia</p>
                 </div>
-                <div class="grid grid-cols-6 gap-3 text-xs">
-                    @foreach ([
-                        'primary' => 'bg-primary',
-                        'primary-soft' => 'bg-primary-soft',
-                        'page' => 'bg-page',
-                        'surface' => 'bg-surface',
-                        'ink' => 'bg-ink',
-                        'muted' => 'bg-muted',
-                        'border' => 'bg-border',
-                        'success' => 'bg-success',
-                        'success-soft' => 'bg-success-soft',
-                        'danger' => 'bg-danger',
-                        'danger-soft' => 'bg-danger-soft',
-                    ] as $token => $swatchClass)
-                        <div class="flex flex-col gap-2">
-                            <div class="h-12 rounded-control border border-border {{ $swatchClass }}"></div>
-                            <span class="font-medium text-muted">{{ $token }}</span>
-                        </div>
+                @include('public.partials.sim-label-button')
+            </div>
+
+            @if ($preview === [])
+                <x-empty-state title="Belum ada ruang tersedia saat ini" message="Semua ruangan sedang digunakan atau di luar jam operasional. Lihat daftar lengkap untuk memeriksa status lainnya." icon="clock" />
+            @else
+                <div class="grid grid-cols-3 gap-4">
+                    @foreach ($preview as $room)
+                        <x-room-card :name="$room['name']" :badge="$room['badge']" :location="$room['location']" :capacity="$room['capacity']"
+                                     :time-label="$room['time_label']" :time="$room['time']" :note="$room['note']" />
                     @endforeach
                 </div>
-                <div class="flex items-center gap-3">
-                    <span class="rounded-full bg-success-soft px-3 py-1 text-xs font-semibold text-success">Tersedia</span>
-                    <span class="rounded-full bg-danger-soft px-3 py-1 text-xs font-semibold text-danger">Digunakan</span>
-                    <span class="rounded-full bg-primary-soft px-3 py-1 text-xs font-semibold text-primary">Data simulasi</span>
-                </div>
-            </section>
-        </main>
+            @endif
 
-        <footer class="py-8 text-center text-xs text-muted">SICMA • Jurusan Teknik Informatika dan Komputer</footer>
-    </body>
-</html>
+            <div class="flex items-center justify-between gap-6 pt-2">
+                <p class="text-sm text-ink">Lihat daftar lengkap untuk mencari ruangan, memilih gedung, dan memeriksa status lainnya.</p>
+                <x-button variant="secondary" :href="route('public.rooms')" class="px-10">Lihat semua ruangan</x-button>
+            </div>
+        </section>
+
+        <section class="flex items-center justify-between gap-6 rounded-card border border-border bg-surface px-6 py-6">
+            <div class="flex flex-col gap-2">
+                <h2 class="text-lg font-semibold text-ink">Mau menggunakan ruangan untuk kelasmu?</h2>
+                <p class="text-sm text-ink">Masuk dengan akun Keti yang terdaftar untuk memesan dan mengelola penggunaan ruangan.</p>
+            </div>
+            <x-button :href="Nav::url('login')" class="shrink-0 px-9">Masuk sebagai Keti untuk memesan</x-button>
+        </section>
+    </div>
+@endsection
+
+@push('dialogs')
+    @include('public.partials.dialogs')
+@endpush

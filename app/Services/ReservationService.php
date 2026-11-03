@@ -10,6 +10,7 @@ use App\Models\Reservation;
 use App\Models\Room;
 use App\Models\RoomBlock;
 use App\Models\User;
+use App\Support\AvailabilityCache;
 use App\Support\Wita;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -81,6 +82,8 @@ class ReservationService
                     'is_active' => true,
                 ]);
 
+                AvailabilityCache::bust();
+
                 $this->audit->log('reservation.created', $reservation, null, $reservation->only(['room_id', 'class_group_id', 'start_at', 'end_at', 'purpose', 'status']));
 
                 $this->notifications->notify(
@@ -134,6 +137,8 @@ class ReservationService
                 'lock_version' => $reservation->lock_version + 1,
             ])->save();
 
+            AvailabilityCache::bust();
+
             $this->audit->log('reservation.started', $reservation, $before, $reservation->only(['status', 'actual_start_at']));
 
             return $reservation;
@@ -168,6 +173,8 @@ class ReservationService
             if ($block !== null && $now->lessThan($block->end_at)) {
                 $block->update(['end_at' => $now->max($block->start_at)]);
             }
+
+            AvailabilityCache::bust();
 
             $this->audit->log('reservation.finished', $reservation, $before, $reservation->only(['status', 'actual_end_at']));
 
@@ -211,6 +218,8 @@ class ReservationService
             ])->save();
 
             $reservation->block()->update(['is_active' => false]);
+
+            AvailabilityCache::bust();
 
             $this->audit->log('reservation.cancelled', $reservation, $before, $reservation->only(['status', 'cancelled_at', 'cancelled_by']), $reason);
 

@@ -29,12 +29,13 @@
             </div>
         </header>
 
-        <main class="mx-auto w-full max-w-[1168px] flex-1 px-8 py-12">
+        <main class="mx-auto w-full max-w-[1168px] flex-1 px-8 py-8">
             @yield('content')
         </main>
 
-        <footer class="border-t border-border py-8 text-center text-xs text-muted">
-            SICMA • Jurusan Teknik Informatika dan Komputer
+        <footer class="mx-auto flex w-full max-w-[1168px] items-center justify-between px-8 pt-4 pb-10 text-xs text-muted">
+            <span>SICMA • Jurusan Teknik Informatika dan Komputer</span>
+            <span>Ruangan tepat untuk kelasmu.</span>
         </footer>
 
         <x-toast />

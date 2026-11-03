@@ -3,6 +3,9 @@
 namespace Database\Factories;
 
 use App\Enums\UserRole;
+use App\Models\ClassGroup;
+use App\Models\ClassRepresentative;
+use App\Models\KetiApplication;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
@@ -69,5 +72,28 @@ class UserFactory extends Factory
             'role' => UserRole::SuperAdmin,
             'can_publish' => true,
         ]);
+    }
+
+    /**
+     * Keti yang sudah disetujui dan terhubung ke kelas aktif (boleh memesan, B20).
+     */
+    public function approvedKeti(?ClassGroup $classGroup = null): static
+    {
+        return $this->afterCreating(function (User $user) use ($classGroup): void {
+            $classGroup ??= ClassGroup::factory()->create();
+
+            KetiApplication::factory()->for($user)->for($classGroup)->approved()->create();
+            ClassRepresentative::factory()->for($user)->for($classGroup)->create();
+        });
+    }
+
+    /**
+     * Keti dengan pengajuan yang masih menunggu pemeriksaan admin.
+     */
+    public function pendingKeti(?ClassGroup $classGroup = null): static
+    {
+        return $this->afterCreating(function (User $user) use ($classGroup): void {
+            KetiApplication::factory()->for($user)->for($classGroup ?? ClassGroup::factory())->create();
+        });
     }
 }

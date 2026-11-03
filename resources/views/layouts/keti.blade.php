@@ -14,14 +14,14 @@
                 </div>
 
                 <nav class="flex flex-col gap-3" aria-label="Menu Portal Keti">
-                    @foreach ([['Cari Ruangan', 'keti.search', 'keti.search'], ['Ruangan JTIK', 'keti.rooms.index', 'keti.rooms.*'], ['Favorit', 'keti.favorites.index', 'keti.favorites.*'], ['Aktivitas', 'keti.activity', 'keti.activity']] as [$label, $routeName, $pattern])
+                    @foreach ([['Cari Ruangan', 'keti.search', ['keti.search', 'keti.my-class']], ['Ruangan JTIK', 'keti.rooms.index', ['keti.rooms.*']], ['Favorit', 'keti.favorites.index', ['keti.favorites.*']], ['Aktivitas', 'keti.activity', ['keti.activity', 'keti.reservations.*']]] as [$label, $routeName, $patterns])
                         <a href="{{ Nav::url($routeName) }}"
                            @class([
                                'rounded-control border px-4 py-3 text-center text-sm font-semibold text-primary',
-                               'border-primary-soft bg-primary-soft' => Nav::active($pattern),
-                               'border-border bg-surface hover:bg-primary-soft/60' => ! Nav::active($pattern),
+                               'border-primary-soft bg-primary-soft' => Nav::active(...$patterns),
+                               'border-border bg-surface hover:bg-primary-soft/60' => ! Nav::active(...$patterns),
                            ])
-                           @if (Nav::active($pattern)) aria-current="page" @endif>{{ $label }}</a>
+                           @if (Nav::active(...$patterns)) aria-current="page" @endif>{{ $label }}</a>
                     @endforeach
                 </nav>
             </aside>

@@ -238,6 +238,55 @@ class ReservationService
     }
 
     /**
+     * Perpanjang pemakaian yang sedang berlangsung selama tidak bentrok dan masih dalam batas durasi/jam operasional.
+     */
+    public function extend(Reservation $reservation, User $actor, ?int $minutes = null): Reservation
+    {
+        $minutes ??= (int) config('sicma.reservation.extend_minutes');
+
+        return DB::transaction(function () use ($reservation, $minutes): Reservation {
+            Room::query()->whereKey($reservation->room_id)->lockForUpdate()->first();
+            $reservation = Reservation::query()->whereKey($reservation->id)->lockForUpdate()->firstOrFail();
+
+            if ($reservation->status !== ReservationStatus::InUse) {
+                throw new DomainException('INVALID_STATUS_TRANSITION', 'Hanya pemakaian yang sedang berlangsung yang bisa diperpanjang.');
+            }
+
+            $start = CarbonImmutable::instance($reservation->start_at);
+            $currentEnd = CarbonImmutable::instance($reservation->end_at);
+            $newEnd = $currentEnd->addMinutes($minutes);
+            $max = (int) config('sicma.reservation.max_minutes');
+            [, $close] = $this->availability->operatingWindow($start);
+
+            if ((int) $start->diffInMinutes($newEnd) > $max) {
+                throw new DomainException('INVALID_DURATION', "Total pemakaian maksimal {$max} menit.");
+            }
+
+            if ($newEnd->greaterThan($close)) {
+                throw new DomainException('OUTSIDE_OPERATING_HOURS', 'Perpanjangan melewati jam operasional ('.Wita::clock($close).').');
+            }
+
+            $conflicts = $this->availability->blocksFor([$reservation->room_id], $currentEnd, $newEnd, lock: true)
+                ->get($reservation->room_id, collect())
+                ->reject(fn (RoomBlock $block): bool => $block->source_type === RoomBlockSource::Reservation && $block->source_id === $reservation->id);
+
+            if ($conflicts->isNotEmpty()) {
+                throw new DomainException('ROOM_CONFLICT', 'Tidak bisa diperpanjang: ruangan dipakai mulai '.Wita::clock($conflicts->min('start_at')).'.');
+            }
+
+            $before = ['end_at' => $currentEnd->toDateTimeString()];
+            $reservation->forceFill(['end_at' => $newEnd, 'lock_version' => $reservation->lock_version + 1])->save();
+            $reservation->block()->update(['end_at' => $newEnd]);
+
+            AvailabilityCache::bust();
+
+            $this->audit->log('reservation.extended', $reservation, $before, ['end_at' => $newEnd->toDateTimeString()]);
+
+            return $reservation;
+        });
+    }
+
+    /**
      * Kelas aktif Keti dari server, bukan dari request (B02, B20).
      */
     private function assertCanReserve(User $keti): ClassGroup

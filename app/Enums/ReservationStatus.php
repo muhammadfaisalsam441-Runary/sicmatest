@@ -32,4 +32,17 @@ enum ReservationStatus: string
     {
         return in_array($this, [self::Booked, self::InUse], true);
     }
+
+    /**
+     * Varian badge di UI: Dipesan (biru), Digunakan (merah), Selesai (hijau), Dibatalkan (netral).
+     */
+    public function badgeVariant(): string
+    {
+        return match ($this) {
+            self::Booked => 'primary',
+            self::InUse => 'danger',
+            self::Finished => 'success',
+            self::Cancelled => 'neutral',
+        };
+    }
 }

@@ -32,7 +32,16 @@ return [
         'checkin_open_minutes_before' => 15, // BELUM DITETAPKAN
         'checkin_grace_minutes' => 15, // BELUM DITETAPKAN
         'auto_expire_no_show' => false, // BELUM DITETAPKAN
+        'extend_minutes' => 30, // desain: "+30 menit"
     ],
+
+    'privacy' => [
+        // Keterlihatan nama pemesan kelas lain di Aktivitas Portal Keti. BELUM DITETAPKAN (keputusan K).
+        'show_booker_name_to_keti' => false,
+    ],
+
+    // Pilihan "Lapor kendala" di halaman penggunaan aktif.
+    'facility_issues' => ['AC tidak dingin', 'Proyektor tidak menyala', 'Stopkontak tidak berfungsi', 'Kursi atau meja kurang', 'Ruang kotor', 'Lainnya'],
 
     'verification' => [
         'code_ttl_minutes' => 15,

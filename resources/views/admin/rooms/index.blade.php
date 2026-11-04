@@ -39,83 +39,127 @@
         </x-page-header>
 
         {{-- Ringkasan Metrik Cepat Ruangan --}}
-        <div class="grid grid-cols-2 gap-4 sm:grid-cols-5">
-            <x-card class="flex flex-col gap-1 p-4">
-                <span class="text-xs font-medium text-muted">Total Ruangan</span>
-                <span class="text-2xl font-bold text-ink">{{ number_format($totalRooms) }}</span>
-                <span class="text-xs text-muted">Semua unit terdata</span>
-            </x-card>
+        <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            <a href="{{ route('admin.rooms.index') }}"
+               @class([
+                   'group relative flex flex-col justify-between rounded-xl border p-4 transition-all duration-150',
+                   'border-primary bg-primary-soft/30 shadow-xs ring-1 ring-primary/40' => $filter === 'semua',
+                   'border-border bg-surface hover:border-primary/50 hover:bg-page hover:shadow-xs' => $filter !== 'semua',
+               ])>
+                <div class="flex items-center justify-between gap-2">
+                    <span class="text-xs font-semibold text-muted group-hover:text-ink transition">Semua Ruangan</span>
+                    <div class="flex size-7 items-center justify-center rounded-lg bg-page border border-border text-muted group-hover:text-primary group-hover:border-primary/40 transition">
+                        <i data-lucide="layout-grid" class="size-4"></i>
+                    </div>
+                </div>
+                <div class="mt-3 flex flex-col">
+                    <span class="text-2xl font-bold tracking-tight text-ink">{{ number_format($totalRooms) }}</span>
+                    <span class="text-[11px] text-muted">Semua unit terdata</span>
+                </div>
+            </a>
 
             <a href="{{ route('admin.rooms.index', ['filter' => 'verifikasi']) }}"
                @class([
-                   'rounded-card border p-4 transition flex flex-col gap-1',
-                   'border-warning/50 bg-warning-soft/30 hover:bg-warning-soft/50' => $unverifiedCount > 0,
-                   'border-border bg-surface hover:bg-page' => $unverifiedCount === 0,
+                   'group relative flex flex-col justify-between rounded-xl border p-4 transition-all duration-150',
+                   'border-warning bg-warning-soft/40 shadow-xs ring-1 ring-warning/50' => $filter === 'verifikasi',
+                   'border-warning/40 bg-warning-soft/20 hover:border-warning hover:bg-warning-soft/30 hover:shadow-xs' => $filter !== 'verifikasi' && $unverifiedCount > 0,
+                   'border-border bg-surface hover:border-warning/50 hover:bg-page hover:shadow-xs' => $filter !== 'verifikasi' && $unverifiedCount === 0,
                ])>
-                <span class="text-xs font-medium text-warning-ink">⚠️ Perlu Verifikasi</span>
-                <span class="text-2xl font-bold text-ink">{{ number_format($unverifiedCount) }}</span>
-                <span class="text-xs text-muted">Kapasitas / lokasi belum lengkap</span>
+                <div class="flex items-center justify-between gap-2">
+                    <span class="text-xs font-semibold text-warning-ink">Perlu Verifikasi</span>
+                    <div class="flex size-7 items-center justify-center rounded-lg bg-warning-soft border border-warning/30 text-warning-ink">
+                        <i data-lucide="triangle-alert" class="size-4"></i>
+                    </div>
+                </div>
+                <div class="mt-3 flex flex-col">
+                    <span class="text-2xl font-bold tracking-tight text-warning-ink">{{ number_format($unverifiedCount) }}</span>
+                    <span class="text-[11px] text-muted">Kapasitas / gedung kosong</span>
+                </div>
             </a>
 
             <a href="{{ route('admin.rooms.index', ['filter' => 'kuliah']) }}"
                @class([
-                   'rounded-card border p-4 transition flex flex-col gap-1',
-                   'border-primary/40 bg-primary-soft/20' => $filter === 'kuliah',
-                   'border-border bg-surface hover:bg-page' => $filter !== 'kuliah',
+                   'group relative flex flex-col justify-between rounded-xl border p-4 transition-all duration-150',
+                   'border-primary bg-primary-soft/30 shadow-xs ring-1 ring-primary/40' => $filter === 'kuliah',
+                   'border-border bg-surface hover:border-primary/50 hover:bg-page hover:shadow-xs' => $filter !== 'kuliah',
                ])>
-                <span class="text-xs font-medium text-muted">Ruang Kuliah</span>
-                <span class="text-2xl font-bold text-ink">{{ number_format($classroomCount) }}</span>
-                <span class="text-xs text-muted">Kelas teori & umum</span>
+                <div class="flex items-center justify-between gap-2">
+                    <span class="text-xs font-semibold text-muted group-hover:text-ink transition">Ruang Kuliah</span>
+                    <div class="flex size-7 items-center justify-center rounded-lg bg-page border border-border text-muted group-hover:text-primary group-hover:border-primary/40 transition">
+                        <i data-lucide="door-closed" class="size-4"></i>
+                    </div>
+                </div>
+                <div class="mt-3 flex flex-col">
+                    <span class="text-2xl font-bold tracking-tight text-ink">{{ number_format($classroomCount) }}</span>
+                    <span class="text-[11px] text-muted">Kelas teori & umum</span>
+                </div>
             </a>
 
             <a href="{{ route('admin.rooms.index', ['filter' => 'lab']) }}"
                @class([
-                   'rounded-card border p-4 transition flex flex-col gap-1',
-                   'border-primary/40 bg-primary-soft/20' => $filter === 'lab',
-                   'border-border bg-surface hover:bg-page' => $filter !== 'lab',
+                   'group relative flex flex-col justify-between rounded-xl border p-4 transition-all duration-150',
+                   'border-indigo-400 bg-indigo-50/60 shadow-xs ring-1 ring-indigo-300' => $filter === 'lab',
+                   'border-border bg-surface hover:border-indigo-300 hover:bg-page hover:shadow-xs' => $filter !== 'lab',
                ])>
-                <span class="text-xs font-medium text-muted">Laboratorium</span>
-                <span class="text-2xl font-bold text-ink">{{ number_format($labCount) }}</span>
-                <span class="text-xs text-muted">Komputer & praktikum</span>
+                <div class="flex items-center justify-between gap-2">
+                    <span class="text-xs font-semibold text-muted group-hover:text-ink transition">Laboratorium</span>
+                    <div class="flex size-7 items-center justify-center rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700">
+                        <i data-lucide="wrench" class="size-4"></i>
+                    </div>
+                </div>
+                <div class="mt-3 flex flex-col">
+                    <span class="text-2xl font-bold tracking-tight text-ink">{{ number_format($labCount) }}</span>
+                    <span class="text-[11px] text-muted">Komputer & praktikum</span>
+                </div>
             </a>
 
             <a href="{{ route('admin.rooms.index', ['filter' => 'ditutup']) }}"
                @class([
-                   'rounded-card border p-4 transition flex flex-col gap-1',
-                   'border-danger/40 bg-danger-soft/30 hover:bg-danger-soft/40' => $closedRoomsCount > 0,
-                   'border-border bg-surface hover:bg-page' => $closedRoomsCount === 0,
+                   'group relative flex flex-col justify-between rounded-xl border p-4 transition-all duration-150',
+                   'border-danger bg-danger-soft/50 shadow-xs ring-1 ring-danger/40' => $filter === 'ditutup',
+                   'border-danger/40 bg-danger-soft/20 hover:border-danger hover:bg-danger-soft/30 hover:shadow-xs' => $filter !== 'ditutup' && $closedRoomsCount > 0,
+                   'border-border bg-surface hover:border-danger/50 hover:bg-page hover:shadow-xs' => $filter !== 'ditutup' && $closedRoomsCount === 0,
                ])>
-                <span class="text-xs font-medium text-danger">Sedang Ditutup</span>
-                <span class="text-2xl font-bold text-danger">{{ number_format($closedRoomsCount) }}</span>
-                <span class="text-xs text-danger/80">Pemeliharaan / ditutup</span>
+                <div class="flex items-center justify-between gap-2">
+                    <span class="text-xs font-semibold text-danger">Sedang Ditutup</span>
+                    <div class="flex size-7 items-center justify-center rounded-lg bg-danger-soft border border-danger/30 text-danger">
+                        <i data-lucide="lock" class="size-4"></i>
+                    </div>
+                </div>
+                <div class="mt-3 flex flex-col">
+                    <span class="text-2xl font-bold tracking-tight text-danger">{{ number_format($closedRoomsCount) }}</span>
+                    <span class="text-[11px] text-danger/80">Pemeliharaan / nonaktif</span>
+                </div>
             </a>
         </div>
 
         {{-- Pemberitahuan Penutupan Ruang Aktif --}}
         @if ($closures->isNotEmpty())
-            <div class="rounded-xl border border-danger/30 bg-danger-soft/20 p-4">
-                <div class="flex items-center justify-between pb-3 border-b border-danger/20">
+            <div class="rounded-xl border border-danger/30 bg-danger-soft/15 p-4 shadow-xs">
+                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-danger/20 pb-3">
                     <div class="flex items-center gap-2">
-                        <i data-lucide="lock" class="size-4 text-danger"></i>
-                        <h2 class="text-sm font-bold text-danger">{{ $closures->count() }} Penutupan Ruang Aktif</h2>
+                        <div class="flex size-6 items-center justify-center rounded-full bg-danger text-white">
+                            <i data-lucide="lock" class="size-3.5"></i>
+                        </div>
+                        <h2 class="text-sm font-bold text-danger">{{ $closures->count() }} Ruangan Sedang Ditutup Sementara</h2>
                     </div>
-                    <span class="text-xs text-muted">Ruang ditutup tidak dapat dipesan</span>
+                    <span class="text-xs text-muted">Ruangan ditutup tidak dapat dipesan atau dijadwalkan</span>
                 </div>
                 <div class="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
                     @foreach ($closures as $closure)
-                        <div class="flex items-center justify-between rounded-lg border border-border bg-surface p-3 shadow-xs">
+                        <div class="flex items-center justify-between rounded-lg border border-border bg-surface p-3 shadow-2xs">
                             <div class="flex flex-col gap-0.5">
                                 <div class="flex items-center gap-1.5">
-                                    <span class="font-bold text-ink">{{ $closure->room->name }}</span>
-                                    <x-status-badge variant="danger">Ditutup</x-status-badge>
+                                    <span class="font-bold text-ink text-sm">{{ $closure->room->name }}</span>
+                                    <span class="inline-flex items-center rounded bg-danger-soft px-1.5 py-0.5 text-[10px] font-bold text-danger border border-danger/20">Ditutup</span>
                                 </div>
                                 <span class="text-[11px] text-muted">{{ Wita::stamp($closure->start_at) }} – {{ Wita::stamp($closure->end_at) }}</span>
-                                <span class="text-xs text-ink/80 italic font-medium">"{{ $closure->reason }}"</span>
+                                <span class="text-xs text-ink/80 italic font-medium truncate max-w-[200px]" title="{{ $closure->reason }}">"{{ $closure->reason }}"</span>
                             </div>
-                            <form method="POST" action="{{ route('admin.closures.destroy', $closure) }}" class="ml-2">
+                            <form method="POST" action="{{ route('admin.closures.destroy', $closure) }}" class="ml-2 shrink-0">
                                 @csrf
                                 @method('DELETE')
-                                <button type="submit" class="inline-flex items-center gap-1 rounded-md border border-danger/40 bg-surface px-2.5 py-1 text-xs font-semibold text-danger hover:bg-danger hover:text-white transition" title="Buka kembali ruang ini sekarang">
+                                <button type="submit" class="inline-flex items-center gap-1 rounded-lg border border-danger/40 bg-surface px-2.5 py-1 text-xs font-semibold text-danger hover:bg-danger hover:text-white transition shadow-2xs" title="Buka kembali ruang ini sekarang">
                                     <i data-lucide="lock-open" class="size-3.5"></i>
                                     <span>Buka</span>
                                 </button>
@@ -127,50 +171,63 @@
         @endif
 
         {{-- Toolbar Filter & Pencarian Cepat --}}
-        <x-card class="flex flex-col gap-4">
-            <div class="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-4">
+        <x-card class="flex flex-col gap-4 p-5 shadow-xs">
+            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3.5">
                 {{-- Tabs Filter Status --}}
-                <div class="flex flex-wrap items-center gap-2">
+                <div class="flex flex-wrap items-center gap-1.5">
                     <a href="{{ route('admin.rooms.index', array_filter(['filter' => null, 'q' => $keyword, 'gedung' => $buildingFilter, 'per_page' => $perPage])) }}"
                        @class([
-                           'rounded-full px-3.5 py-1.5 text-xs font-semibold transition',
-                           'bg-primary text-white' => $filter === 'semua',
+                           'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition',
+                           'bg-primary text-white shadow-2xs' => $filter === 'semua',
                            'bg-page text-muted hover:text-ink hover:bg-border' => $filter !== 'semua',
                        ])>
-                        Semua ({{ $totalRooms }})
+                        <span>Semua</span>
+                        <span class="rounded-full px-1.5 py-0.2 text-[10px] {{ $filter === 'semua' ? 'bg-white/20 text-white' : 'bg-surface text-muted' }}">{{ $totalRooms }}</span>
                     </a>
                     <a href="{{ route('admin.rooms.index', array_filter(['filter' => 'verifikasi', 'q' => $keyword, 'gedung' => $buildingFilter, 'per_page' => $perPage])) }}"
                        @class([
-                           'rounded-full px-3.5 py-1.5 text-xs font-semibold transition',
-                           'bg-warning-ink text-white' => $filter === 'verifikasi',
+                           'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition',
+                           'bg-warning-ink text-white shadow-2xs' => $filter === 'verifikasi',
                            'bg-warning-soft/60 text-warning-ink hover:bg-warning-soft' => $filter !== 'verifikasi',
                        ])>
-                        ⚠️ Perlu Verifikasi ({{ $unverifiedCount }})
+                        <i data-lucide="triangle-alert" class="size-3.5"></i>
+                        <span>Perlu Verifikasi</span>
+                        <span class="rounded-full px-1.5 py-0.2 text-[10px] {{ $filter === 'verifikasi' ? 'bg-white/20 text-white' : 'bg-warning-soft text-warning-ink' }}">{{ $unverifiedCount }}</span>
                     </a>
                     <a href="{{ route('admin.rooms.index', array_filter(['filter' => 'kuliah', 'q' => $keyword, 'gedung' => $buildingFilter, 'per_page' => $perPage])) }}"
                        @class([
-                           'rounded-full px-3.5 py-1.5 text-xs font-semibold transition',
-                           'bg-primary text-white' => $filter === 'kuliah',
+                           'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition',
+                           'bg-primary text-white shadow-2xs' => $filter === 'kuliah',
                            'bg-page text-muted hover:text-ink hover:bg-border' => $filter !== 'kuliah',
                        ])>
-                        Ruang Kuliah ({{ $classroomCount }})
+                        <i data-lucide="door-closed" class="size-3.5"></i>
+                        <span>Ruang Kuliah</span>
+                        <span class="rounded-full px-1.5 py-0.2 text-[10px] {{ $filter === 'kuliah' ? 'bg-white/20 text-white' : 'bg-surface text-muted' }}">{{ $classroomCount }}</span>
                     </a>
                     <a href="{{ route('admin.rooms.index', array_filter(['filter' => 'lab', 'q' => $keyword, 'gedung' => $buildingFilter, 'per_page' => $perPage])) }}"
                        @class([
-                           'rounded-full px-3.5 py-1.5 text-xs font-semibold transition',
-                           'bg-primary text-white' => $filter === 'lab',
-                           'bg-page text-muted hover:text-ink hover:bg-border' => $filter !== 'lab',
+                           'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition',
+                           'bg-indigo-600 text-white shadow-2xs' => $filter === 'lab',
+                           'bg-indigo-50 text-indigo-700 hover:bg-indigo-100' => $filter !== 'lab',
                        ])>
-                        Laboratorium ({{ $labCount }})
+                        <i data-lucide="wrench" class="size-3.5"></i>
+                        <span>Laboratorium</span>
+                        <span class="rounded-full px-1.5 py-0.2 text-[10px] {{ $filter === 'lab' ? 'bg-white/20 text-white' : 'bg-indigo-100 text-indigo-700' }}">{{ $labCount }}</span>
                     </a>
                     <a href="{{ route('admin.rooms.index', array_filter(['filter' => 'ditutup', 'q' => $keyword, 'gedung' => $buildingFilter, 'per_page' => $perPage])) }}"
                        @class([
-                           'rounded-full px-3.5 py-1.5 text-xs font-semibold transition',
-                           'bg-danger text-white' => $filter === 'ditutup',
+                           'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition',
+                           'bg-danger text-white shadow-2xs' => $filter === 'ditutup',
                            'bg-danger-soft/60 text-danger hover:bg-danger-soft' => $filter !== 'ditutup',
                        ])>
-                        Ditutup ({{ $closedRoomsCount }})
+                        <i data-lucide="lock" class="size-3.5"></i>
+                        <span>Ditutup</span>
+                        <span class="rounded-full px-1.5 py-0.2 text-[10px] {{ $filter === 'ditutup' ? 'bg-white/20 text-white' : 'bg-danger-soft text-danger' }}">{{ $closedRoomsCount }}</span>
                     </a>
+                </div>
+
+                <div class="text-xs text-muted">
+                    Menampilkan <span class="font-semibold text-ink">{{ $rooms->total() }}</span> ruangan
                 </div>
             </div>
 
@@ -181,17 +238,17 @@
                 @endif
 
                 <div class="sm:col-span-5">
-                    <label class="mb-1 block text-xs font-medium text-muted">Cari Nama Ruang / Kode / Fasilitas</label>
+                    <label class="mb-1.5 block text-xs font-medium text-muted">Cari Nama Ruang / Kode / Fasilitas</label>
                     <div class="relative">
                         <i data-lucide="search" class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted"></i>
                         <input type="text" name="q" value="{{ $keyword }}" placeholder="Ketik nama ruang (contoh: AE 107, ICT)..."
-                               class="w-full rounded-control border border-border bg-surface pl-9 pr-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary">
+                               class="w-full rounded-control border border-border bg-surface pl-9 pr-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs">
                     </div>
                 </div>
 
                 <div class="sm:col-span-3">
-                    <label class="mb-1 block text-xs font-medium text-muted">Filter Gedung</label>
-                    <select name="gedung" @change="$el.form.requestSubmit()" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
+                    <label class="mb-1.5 block text-xs font-medium text-muted">Filter Gedung</label>
+                    <select name="gedung" @change="$el.form.requestSubmit()" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs">
                         <option value="">Semua Gedung</option>
                         @foreach ($buildings as $b)
                             <option value="{{ $b->name }}" @selected($buildingFilter === $b->name)>Gedung {{ $b->name }}</option>
@@ -201,8 +258,8 @@
                 </div>
 
                 <div class="sm:col-span-2">
-                    <label class="mb-1 block text-xs font-medium text-muted">Baris / Halaman</label>
-                    <select name="per_page" @change="$el.form.requestSubmit()" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
+                    <label class="mb-1.5 block text-xs font-medium text-muted">Baris / Halaman</label>
+                    <select name="per_page" @change="$el.form.requestSubmit()" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs">
                         @foreach ([15, 30, 50, 100] as $n)
                             <option value="{{ $n }}" @selected($perPage == $n)>{{ $n }} baris</option>
                         @endforeach
@@ -210,12 +267,12 @@
                 </div>
 
                 <div class="flex gap-2 sm:col-span-2">
-                    <button type="submit" class="flex h-[38px] flex-1 items-center justify-center gap-1.5 rounded-control bg-primary px-3 text-xs font-semibold text-white hover:bg-primary/90 transition" title="Terapkan Filter">
+                    <button type="submit" class="flex h-[38px] flex-1 items-center justify-center gap-1.5 rounded-control bg-primary px-3 text-xs font-semibold text-white hover:bg-primary/90 transition shadow-2xs" title="Terapkan Filter">
                         <i data-lucide="filter" class="size-3.5"></i>
                         <span>Filter</span>
                     </button>
                     @if ($keyword !== '' || $filter !== 'semua' || $buildingFilter !== '')
-                        <a href="{{ route('admin.rooms.index') }}" class="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-control border border-border text-muted hover:text-ink hover:bg-page transition" title="Reset Filter">
+                        <a href="{{ route('admin.rooms.index') }}" class="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-control border border-border bg-surface text-muted hover:text-ink hover:bg-page transition shadow-2xs" title="Reset Filter">
                             <i data-lucide="rotate-ccw" class="size-4"></i>
                         </a>
                     @endif
@@ -224,34 +281,32 @@
         </x-card>
 
         {{-- TABEL DATA RUANG --}}
-        <div class="overflow-hidden rounded-card border border-border bg-surface shadow-sm">
+        <div class="overflow-hidden rounded-card border border-border bg-surface shadow-xs">
             <div class="overflow-x-auto">
                 <table class="w-full text-left text-sm">
-                    <thead class="border-b border-border bg-page text-xs font-medium text-muted">
+                    <thead class="border-b border-border bg-page/80 text-[11px] font-semibold uppercase tracking-wider text-muted">
                         <tr>
-                            <th class="w-10 px-4 py-3 text-center">
+                            <th class="w-12 px-4 py-3.5 text-center">
                                 <input type="checkbox"
                                        @change="toggleSelectAll($event.target.checked)"
                                        :checked="isAllSelected()"
                                        class="size-4 rounded border-border text-primary focus:ring-primary cursor-pointer"
                                        title="Pilih semua di halaman ini">
                             </th>
-                            <th class="px-4 py-3 font-semibold">Nama Ruang & Jenis</th>
-                            <th class="px-4 py-3 font-semibold">Lokasi Gedung</th>
-                            <th class="px-4 py-3 font-semibold text-center">Kapasitas</th>
-                            <th class="px-4 py-3 font-semibold">Fasilitas</th>
-                            <th class="px-4 py-3 font-semibold">Status Data</th>
-                            <th class="px-4 py-3 text-right font-semibold">Aksi</th>
+                            <th class="px-4 py-3.5">Nama Ruang & Jenis</th>
+                            <th class="px-4 py-3.5">Lokasi Gedung & Lantai</th>
+                            <th class="px-4 py-3.5 text-center">Kapasitas</th>
+                            <th class="px-4 py-3.5">Fasilitas</th>
+                            <th class="px-4 py-3.5 text-right">Aksi</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-border">
                         @forelse ($rooms as $room)
                             @php($isClosed = $closures->firstWhere('room_id', $room->id))
-                            @php($needsVerification = $room->capacity === null || $room->building_id === null)
 
-                            <tr class="transition hover:bg-primary-soft/20" :class="{ 'bg-primary-soft/30': selectedIds.includes({{ $room->id }}) }">
+                            <tr class="transition hover:bg-page/70" :class="{ 'bg-primary-soft/25': selectedIds.includes({{ $room->id }}) }">
                                 {{-- Checkbox --}}
-                                <td class="px-4 py-3 text-center">
+                                <td class="px-4 py-3.5 text-center">
                                     <input type="checkbox"
                                            value="{{ $room->id }}"
                                            x-model.number="selectedIds"
@@ -259,108 +314,107 @@
                                 </td>
 
                                 {{-- Nama Ruang & Jenis --}}
-                                <td class="px-4 py-3">
-                                    <div class="flex flex-col">
-                                        <div class="flex items-center gap-2">
-                                            <span class="font-bold text-ink text-base">{{ $room->name }}</span>
+                                <td class="px-4 py-3.5">
+                                    <div class="flex flex-col gap-1">
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <span class="font-bold text-ink text-sm sm:text-base tracking-tight">{{ $room->name }}</span>
                                             @if ($room->type === RoomType::Classroom)
-                                                <span class="inline-flex items-center gap-1 rounded bg-page px-1.5 py-0.5 text-[10px] font-medium text-muted border border-border">
+                                                <span class="inline-flex items-center gap-1 rounded-md bg-page px-2 py-0.5 text-[11px] font-medium text-muted border border-border">
                                                     <i data-lucide="door-closed" class="size-3 text-primary"></i>
-                                                    Kelas
+                                                    Kuliah
                                                 </span>
                                             @else
-                                                <span class="inline-flex items-center gap-1 rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 border border-indigo-200">
+                                                <span class="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-700 border border-indigo-200">
                                                     <i data-lucide="wrench" class="size-3 text-indigo-600"></i>
                                                     Lab
                                                 </span>
                                             @endif
 
                                             @if ($isClosed)
-                                                <span class="inline-flex items-center gap-1 rounded bg-danger-soft px-1.5 py-0.5 text-[10px] font-semibold text-danger">
+                                                <span class="inline-flex items-center gap-1 rounded-md bg-danger-soft px-2 py-0.5 text-[11px] font-semibold text-danger border border-danger/30">
                                                     <i data-lucide="lock" class="size-3"></i>
                                                     Ditutup
                                                 </span>
                                             @endif
                                         </div>
-                                        <span class="font-mono text-[11px] text-muted mt-0.5">Kode: {{ $room->code }}</span>
+                                        <span class="font-mono text-xs text-muted">Kode: {{ $room->code }}</span>
                                     </div>
                                 </td>
 
                                 {{-- Lokasi Gedung & Lantai --}}
-                                <td class="px-4 py-3">
+                                <td class="px-4 py-3.5">
                                     @if ($room->building)
-                                        <div class="flex items-center gap-1.5 text-xs text-ink">
-                                            <i data-lucide="building-2" class="size-3.5 text-primary shrink-0"></i>
-                                            <span class="font-semibold">{{ $room->building->name }}</span>
-                                            <span class="text-muted">• Lantai {{ $room->floor ?? '—' }}</span>
+                                        <div class="flex items-center gap-2.5">
+                                            <div class="flex size-7 items-center justify-center rounded-lg bg-page border border-border text-primary shrink-0">
+                                                <i data-lucide="building-2" class="size-4"></i>
+                                            </div>
+                                            <div class="flex flex-col">
+                                                <span class="font-semibold text-ink text-sm">Gedung {{ $room->building->name }}</span>
+                                                <span class="text-xs text-muted">Lantai {{ $room->floor ?? '—' }}</span>
+                                            </div>
                                         </div>
                                     @else
-                                        <span class="inline-flex items-center gap-1 text-xs font-medium text-warning-ink">
-                                            <i data-lucide="circle-alert" class="size-3.5 text-warning-ink"></i>
+                                        <span class="inline-flex items-center gap-1.5 rounded-md bg-warning-soft/70 px-2.5 py-1 text-xs font-medium text-warning-ink border border-warning/30">
+                                            <i data-lucide="triangle-alert" class="size-3.5 shrink-0"></i>
                                             Gedung belum didata
                                         </span>
                                     @endif
                                 </td>
 
                                 {{-- Kapasitas Kursi --}}
-                                <td class="px-4 py-3 text-center">
+                                <td class="px-4 py-3.5 text-center">
                                     @if ($room->capacity)
-                                        <span class="inline-flex items-center gap-1.5 rounded-full bg-page px-2.5 py-1 text-xs font-semibold text-ink border border-border">
-                                            <i data-lucide="users" class="size-3 text-muted"></i>
+                                        <span class="inline-flex items-center gap-1.5 rounded-full bg-page px-3 py-1 text-xs font-semibold text-ink border border-border">
+                                            <i data-lucide="users" class="size-3.5 text-muted"></i>
                                             {{ $room->capacity }} kursi
                                         </span>
                                     @else
-                                        <span class="text-xs text-muted/70 italic">Belum diisi</span>
+                                        <span class="text-xs text-muted/60 italic">Belum diisi</span>
                                     @endif
                                 </td>
 
                                 {{-- Fasilitas (Tags) --}}
-                                <td class="px-4 py-3">
+                                <td class="px-4 py-3.5">
                                     @if ($room->facilities->isNotEmpty())
                                         <div class="flex flex-wrap gap-1 max-w-xs">
                                             @foreach ($room->facilities->take(3) as $facility)
-                                                <span class="rounded bg-page px-1.5 py-0.5 text-[11px] font-medium text-ink border border-border">
+                                                <span class="inline-flex items-center rounded-md bg-page px-2 py-0.5 text-xs font-medium text-ink border border-border">
                                                     {{ $facility->name }}
                                                 </span>
                                             @endforeach
                                             @if ($room->facilities->count() > 3)
-                                                <span class="rounded bg-page px-1 py-0.5 text-[10px] text-muted border border-border" title="{{ $room->facilities->pluck('name')->implode(', ') }}">
+                                                <span class="inline-flex items-center rounded-md bg-page px-1.5 py-0.5 text-[11px] font-semibold text-muted border border-border" title="{{ $room->facilities->pluck('name')->implode(', ') }}">
                                                     +{{ $room->facilities->count() - 3 }}
                                                 </span>
                                             @endif
                                         </div>
                                     @else
-                                        <span class="text-xs text-muted/60 italic">Tidak ada fasilitas</span>
-                                    @endif
-                                </td>
-
-                                {{-- Status Data --}}
-                                <td class="px-4 py-3">
-                                    @if ($needsVerification)
-                                        <x-status-badge variant="warning">Perlu verifikasi</x-status-badge>
-                                    @else
-                                        <x-status-badge variant="primary">Data simulasi</x-status-badge>
+                                        <span class="text-xs text-muted/50 italic">—</span>
                                     @endif
                                 </td>
 
                                 {{-- Aksi Cepat --}}
-                                <td class="px-4 py-3 text-right">
+                                <td class="px-4 py-3.5 text-right">
                                     <div class="flex items-center justify-end gap-1.5">
-                                        {{-- Tombol Tutup Ruang Cepat --}}
+                                        {{-- Tombol Tutup / Buka Ruang Cepat --}}
                                         @if ($isClosed)
                                             <form method="POST" action="{{ route('admin.closures.destroy', $isClosed) }}" class="inline">
                                                 @csrf
                                                 @method('DELETE')
-                                                <button type="submit" class="inline-flex items-center gap-1 rounded p-1.5 text-danger hover:bg-danger-soft transition" title="Buka kembali ruang ini sekarang">
-                                                    <i data-lucide="lock-open" class="size-4"></i>
+                                                <button type="submit"
+                                                        class="inline-flex items-center gap-1 rounded-lg border border-danger/40 bg-danger-soft/60 px-2.5 py-1 text-xs font-semibold text-danger hover:bg-danger hover:text-white transition shadow-2xs"
+                                                        title="Buka kembali ruang ini sekarang">
+                                                    <i data-lucide="lock-open" class="size-3.5"></i>
+                                                    <span>Buka</span>
                                                 </button>
                                             </form>
                                         @else
                                             <button type="button"
                                                     @click="openClosureModal({{ $room->id }})"
-                                                    class="rounded p-1.5 text-muted hover:bg-page hover:text-danger transition"
+                                                    class="inline-flex items-center gap-1 rounded-lg border border-border bg-surface px-2.5 py-1 text-xs font-medium text-muted hover:border-danger/50 hover:bg-danger-soft/20 hover:text-danger transition shadow-2xs"
                                                     title="Tutup ruang sementara">
-                                                <i data-lucide="lock" class="size-4"></i>
+                                                <i data-lucide="lock" class="size-3.5"></i>
+                                                <span>Tutup</span>
                                             </button>
                                         @endif
 
@@ -377,31 +431,34 @@
                                                     'facilities' => $room->facilities->pluck('name')->implode(', '),
                                                     'is_bookable' => $room->is_bookable,
                                                 ]) }})"
-                                                class="rounded p-1.5 text-muted hover:bg-page hover:text-primary transition"
+                                                class="inline-flex items-center gap-1 rounded-lg border border-border bg-surface px-2.5 py-1 text-xs font-semibold text-ink hover:border-primary hover:bg-page hover:text-primary transition shadow-2xs"
                                                 title="Ubah data ruang">
-                                            <i data-lucide="pencil" class="size-4"></i>
+                                            <i data-lucide="pencil" class="size-3.5"></i>
+                                            <span>Edit</span>
                                         </button>
 
                                         {{-- Tombol Hapus --}}
                                         <button type="button"
                                                 @click="openDeleteModal({{ $room->id }}, '{{ addslashes($room->name) }}')"
-                                                class="rounded p-1.5 text-muted hover:bg-page hover:text-danger transition"
+                                                class="inline-flex items-center justify-center size-7 rounded-lg border border-border bg-surface text-muted hover:border-danger hover:bg-danger-soft/20 hover:text-danger transition shadow-2xs"
                                                 title="Hapus ruang">
-                                            <i data-lucide="trash-2" class="size-4"></i>
+                                            <i data-lucide="trash-2" class="size-3.5"></i>
                                         </button>
                                     </div>
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="py-12 text-center text-muted">
-                                    <i data-lucide="door-closed" class="mx-auto size-8 text-muted/60 mb-2"></i>
-                                    <p class="font-medium text-ink">Tidak ada ruang yang sesuai dengan filter.</p>
+                                <td colspan="6" class="py-12 text-center text-muted">
+                                    <div class="mx-auto flex size-12 items-center justify-center rounded-full bg-page border border-border text-muted mb-3">
+                                        <i data-lucide="door-closed" class="size-6 text-muted/70"></i>
+                                    </div>
+                                    <p class="font-medium text-ink text-sm">Tidak ada ruang yang sesuai dengan filter.</p>
                                     <p class="text-xs text-muted mt-1">Coba gunakan kata kunci pencarian atau filter lain.</p>
                                     <div class="mt-4">
-                                        <a href="{{ route('admin.rooms.index') }}" class="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline">
+                                        <a href="{{ route('admin.rooms.index') }}" class="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-primary hover:bg-page transition shadow-2xs">
                                             <i data-lucide="rotate-ccw" class="size-3.5"></i>
-                                            Hapus semua filter
+                                            Reset semua filter
                                         </a>
                                     </div>
                                 </td>

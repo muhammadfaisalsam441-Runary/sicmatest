@@ -3,49 +3,26 @@
 namespace Database\Seeders;
 
 use App\Enums\CalendarExceptionType;
-use App\Enums\LecturerHomebase;
 use App\Enums\LecturerProfileStatus;
 use App\Models\ClassGroup;
 use App\Models\Course;
 use App\Models\Lecturer;
 use App\Models\Period;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Str;
 
 /**
- * DATA DEMO — periode Ganjil 2026/2027, slot jam, hari libur, kelas, mata kuliah, dan dosen fiktif.
- * Tanggal semester, UTS/UAS, slot jam, dan hari libur di sini adalah contoh, BELUM DITETAPKAN jurusan.
+ * Periode Ganjil 2026/2027 beserta kelas, mata kuliah, dan dosen dari Jadwal TA Ganjil JTIK 26-27.
+ *
+ * BELUM DITETAPKAN: tanggal semester, UTS/UAS, dan hari libur di bawah masih contoh (tidak ada di PDF).
+ * Jumlah mahasiswa per kelas, NIDN, dan homebase dosen tidak ada di sumber sehingga disimpan NULL.
  */
 class AcademicSeeder extends Seeder
 {
     /**
-     * Nama dosen fiktif, dirujuk ScheduleSeeder dengan kunci pendek.
-     *
-     * @var array<string, string>
+     * Ketua Jurusan menurut lembar pengesahan jadwal ("Mengetahui, Ketua Jurusan").
      */
-    public const LECTURERS = [
-        'hendra' => 'Dr. Hendra Saputra, M.T.',
-        'rina' => 'Rina Kartika, S.Kom., M.Kom.',
-        'ahmad' => 'Ahmad Fauzi, S.T., M.T.',
-        'dewi' => 'Dewi Lestari, S.Pd., M.Pd.',
-        'bayu' => 'Bayu Nugroho, S.Kom., M.T.',
-        'fitri' => 'Fitri Handayani, S.T., M.Eng.',
-        'irfan' => 'Irfan Hakim, S.Kom., M.Cs.',
-        'maya' => 'Maya Sari, S.Pd., M.T.',
-        'yusuf' => 'Yusuf Habibi, S.T., M.T.',
-        'lina' => 'Lina Marlina, S.Si., M.Si.',
-        'rudi' => 'Rudi Hartono, S.Kom., M.Kom.',
-        'sinta' => 'Sinta Amelia, S.T., M.T.',
-        'arman' => 'Bpk. Arman',
-        'nurul' => 'Ibu Nurul H.',
-        'taufik' => 'Bpk. Taufik',
-    ];
-
-    /**
-     * Kunci dosen yang berasal dari sumber jadwal dan belum terverifikasi.
-     *
-     * @var list<string>
-     */
-    public const UNVERIFIED_LECTURERS = ['arman', 'nurul', 'taufik'];
+    public const HEAD_OF_DEPARTMENT = 'Dr. Ir. Abd. Muis Mappalotteng, S.Pd., M.Pd., M.T., IPM.';
 
     /**
      * Run the database seeds.
@@ -68,25 +45,29 @@ class AcademicSeeder extends Seeder
         $this->seedCalendarExceptions($period);
         $this->seedClassGroups();
         $this->seedCourses();
-        $this->seedLecturers();
+        $this->seedLecturers($period);
     }
 
     private function seedTimeSlots(Period $period): void
     {
-        // [label, mulai, selesai] dalam menit sejak 00.00 — jeda 15.30–15.40 meniru "15.40 vs 15.45" di desain.
+        // Diturunkan dari kolom "JAM" & "WITA" pada PDF (mis. "III - IV 09.15 - 10.55").
+        // Awal slot I, VI, dan XI tidak tertulis langsung; diambil dari akhir slot sebelumnya.
         $slots = [
-            ['I', 450, 500], ['II', 500, 550], ['III', 550, 600], ['IV', 600, 650],
-            ['V', 650, 700], ['VI', 700, 750], ['VII', 780, 830], ['VIII', 830, 880],
-            ['IX', 880, 930], ['X', 940, 990], ['XI', 990, 1040],
+            ['I', '07.30', '08.20'], ['II', '08.20', '09.10'], ['III', '09.15', '10.05'], ['IV', '10.05', '10.55'],
+            ['V', '11.00', '11.50'], ['VI', '11.50', '12.40'], ['VII', '13.10', '14.00'], ['VIII', '14.00', '14.50'],
+            ['IX', '14.50', '15.40'], ['X', '15.40', '16.35'], ['XI', '16.35', '17.30'],
         ];
 
+        $minutes = fn (string $clock): int => (int) substr($clock, 0, 2) * 60 + (int) substr($clock, 3, 2);
+
         foreach ($slots as [$label, $start, $end]) {
-            $period->timeSlots()->create(['label' => $label, 'start_minute' => $start, 'end_minute' => $end]);
+            $period->timeSlots()->create(['label' => $label, 'start_minute' => $minutes($start), 'end_minute' => $minutes($end)]);
         }
     }
 
     private function seedCalendarExceptions(Period $period): void
     {
+        // BELUM DITETAPKAN — contoh hari libur, belum dari kalender akademik resmi.
         $exceptions = [
             ['2026-12-24', CalendarExceptionType::Holiday, 'Cuti bersama Natal'],
             ['2026-12-25', CalendarExceptionType::Holiday, 'Hari Raya Natal'],
@@ -100,22 +81,17 @@ class AcademicSeeder extends Seeder
 
     private function seedClassGroups(): void
     {
-        $classGroups = [
-            ['TEKOM-A-2025', 'Tekom A', 'Teknik Komputer', 2025, 40],
-            ['TEKOM-B-2025', 'Tekom B', 'Teknik Komputer', 2025, 38],
-            ['TEKOM-C-2025', 'Tekom C', 'Teknik Komputer', 2025, 42],
-            ['PTIK-A-2025', 'PTIK A', 'Pendidikan Teknik Informatika dan Komputer', 2025, 36],
-            ['PTIK-B-2025', 'PTIK B', 'Pendidikan Teknik Informatika dan Komputer', 2025, null],
-            ['TEKOM-A-2024', 'Tekom A 2024', 'Teknik Komputer', 2024, 35],
-        ];
+        $names = ScheduleSourceData::rows()->pluck('class')->unique()->sort(SORT_NATURAL)->values();
 
-        foreach ($classGroups as [$code, $name, $program, $cohort, $students]) {
+        foreach ($names as $name) {
+            preg_match('/(\d{4})$/', $name, $year);
+
             ClassGroup::create([
-                'code' => $code,
+                'code' => ScheduleSourceData::classCode($name),
                 'name' => $name,
-                'study_program' => $program,
-                'cohort_year' => $cohort,
-                'student_count' => $students,
+                'study_program' => Str::startsWith($name, 'PTIK') ? 'Pendidikan Teknik Informatika dan Komputer' : 'Teknik Komputer',
+                'cohort_year' => isset($year[1]) ? (int) $year[1] : null,
+                'student_count' => null,
                 'is_active' => true,
             ]);
         }
@@ -123,47 +99,38 @@ class AcademicSeeder extends Seeder
 
     private function seedCourses(): void
     {
-        $courses = [
-            ['TKM2301', 'Pemrograman Web', 3],
-            ['TKM2302', 'Struktur Data', 3],
-            ['TKM2303', 'Jaringan Komputer', 3],
-            ['TKM2304', 'Basis Data', 3],
-            ['TKM2305', 'Sistem Operasi', 2],
-            ['TKM2306', 'Kecerdasan Buatan', 3],
-            ['TKM2307', 'Desain Antarmuka Pengguna', 2],
-            ['TKM2308', 'Mikroprosesor', 3],
-            ['TKM2309', 'Matematika Diskrit', 2],
-            ['TKM2310', 'Praktikum Jaringan', 1],
-        ];
-
-        foreach ($courses as [$code, $name, $sks]) {
-            Course::create(['code' => $code, 'name' => $name, 'sks' => $sks, 'curriculum' => 'Kurikulum 2025']);
-        }
+        ScheduleSourceData::rows()
+            ->unique('course_code')
+            ->sortBy('course_code')
+            ->each(fn (array $row) => Course::create([
+                'code' => $row['course_code'],
+                'name' => $row['course_name'],
+                'sks' => $row['sks'],
+                'curriculum' => null,
+            ]));
     }
 
-    private function seedLecturers(): void
+    private function seedLecturers(Period $period): void
     {
-        foreach (self::LECTURERS as $key => $name) {
-            $isUnverified = in_array($key, self::UNVERIFIED_LECTURERS, true);
+        $names = ScheduleSourceData::rows()->pluck('lecturers')->flatten()->unique()->sort()->values();
 
+        foreach ($names as $name) {
             $lecturer = Lecturer::create([
                 'name' => $name,
-                'nidn' => $isUnverified ? null : sprintf('09%08d', crc32($key) % 100000000),
-                'homebase' => match (true) {
-                    $isUnverified => null,
-                    $key === 'lina' => LecturerHomebase::External,
-                    default => LecturerHomebase::Jtik,
-                },
-                'profile_status' => $isUnverified ? LecturerProfileStatus::Unverified : LecturerProfileStatus::Verified,
+                'nidn' => null,
+                'homebase' => null,
+                // Nama tercantum di jadwal resmi jurusan; NIDN & homebase dilengkapi di Data Dosen.
+                'profile_status' => LecturerProfileStatus::Verified,
                 'is_active' => true,
-                'source_name' => $isUnverified ? $name : null,
+                'source_name' => $name,
             ]);
 
-            if ($key === 'hendra') {
+            if ($name === self::HEAD_OF_DEPARTMENT) {
+                // BELUM DITETAPKAN: tanggal SK masa jabatan tidak ada di sumber; sementara mulai awal semester.
                 $lecturer->leadershipTerms()->create([
                     'position' => 'Ketua Jurusan',
-                    'valid_from' => '2025-01-01',
-                    'valid_to' => '2028-12-31',
+                    'valid_from' => $period->start_date,
+                    'valid_to' => null,
                 ]);
             }
         }

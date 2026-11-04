@@ -157,3 +157,19 @@ test('file PDF ditolak dengan pesan yang jelas', function () {
         ->post(route('admin.imports.store'), ['period_id' => $this->period->id, 'file' => UploadedFile::fake()->create('jadwal.pdf', 10, 'application/pdf')])
         ->assertSessionHasErrors(['file' => 'Format yang didukung: Excel (.xlsx, .xls) dan CSV. PDF belum dapat dibaca otomatis; simpan sebagai Excel dulu.']);
 });
+
+test('baris kelas berbeda di hari, jam, ruang, dan mata kuliah yang sama menjadi satu sesi gabungan', function () {
+    $service = app(ScheduleImportService::class);
+    $import = $service->store(scheduleCsv([
+        ['Tekom C', 'TKM2301', 'Pemrograman Web', 'Senin', '07.30-10.00', 'AE 107', 'Rina Kartika', ''],
+        ['PTIK B', 'TKM2301', 'Pemrograman Web', 'Senin', '07.30-10.00', 'AE 107', 'Rina Kartika', ''],
+    ]), $this->period, $this->admin);
+
+    $draft = $service->commit($import, $this->admin);
+    $session = $draft->sessions()->sole();
+
+    expect($session->participants()->pluck('name')->sort()->values()->all())->toBe(['PTIK B', 'Tekom C'])
+        ->and($session->lecturers()->count())->toBe(1)
+        ->and($draft->issues()->where('code', 'ROOM_CONFLICT')->exists())->toBeFalse()
+        ->and($draft->issues()->where('code', 'LECTURER_CONFLICT')->exists())->toBeFalse();
+});

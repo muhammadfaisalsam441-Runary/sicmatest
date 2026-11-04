@@ -18,6 +18,7 @@ use App\Models\ImportRow;
 use App\Models\Lecturer;
 use App\Models\Period;
 use App\Models\Room;
+use App\Models\ScheduleSession;
 use App\Models\ScheduleVersion;
 use App\Models\TeachingAssignment;
 use App\Models\TimeSlot;
@@ -139,8 +140,10 @@ class ScheduleImportService
             $draft = $this->drafts->create($period, ScheduleSource::Import);
             $draft->forceFill(['based_on_version_id' => $official?->id])->save();
 
+            $jointSessions = [];
+
             foreach ($rows as $row) {
-                $this->createSession($draft, $period, $import, $row);
+                $this->createSession($draft, $period, $import, $row, $jointSessions);
             }
 
             $import->update(['status' => ImportStatus::Committed, 'schedule_version_id' => $draft->id]);
@@ -420,7 +423,13 @@ class ScheduleImportService
         return $messages;
     }
 
-    private function createSession(ScheduleVersion $draft, Period $period, Import $import, ImportRow $row): void
+    /**
+     * Baris luring dengan hari, jam, ruang, periode, dan mata kuliah yang sama adalah satu sesi gabungan
+     * beberapa kelas (mis. kelas ULANG bergabung dengan kelas reguler), sehingga ruang hanya terblokir sekali (B12).
+     *
+     * @param  array<string, ScheduleSession>  $jointSessions
+     */
+    private function createSession(ScheduleVersion $draft, Period $period, Import $import, ImportRow $row, array &$jointSessions): void
     {
         $parsed = $row->parsed;
 
@@ -429,6 +438,16 @@ class ScheduleImportService
             'course_id' => $parsed['course_id'],
             'class_group_id' => $parsed['class_group_id'],
         ]);
+
+        $jointKey = $this->jointKey($parsed);
+
+        if ($jointKey !== null && isset($jointSessions[$jointKey])) {
+            $session = $jointSessions[$jointKey];
+            $session->participants()->syncWithoutDetaching([$parsed['class_group_id']]);
+            $this->attachLecturers($session, $offering, $parsed);
+
+            return;
+        }
 
         $session = $draft->sessions()->create([
             'course_offering_id' => $offering->id,
@@ -447,14 +466,41 @@ class ScheduleImportService
         ]);
 
         $session->participants()->sync([$parsed['class_group_id']]);
+        $this->attachLecturers($session, $offering, $parsed);
 
+        if ($jointKey !== null) {
+            $jointSessions[$jointKey] = $session;
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $parsed
+     */
+    private function jointKey(array $parsed): ?string
+    {
+        if ($parsed['mode'] !== SessionMode::Offline->value || $parsed['room_id'] === null || $parsed['day'] === null || $parsed['start_minute'] === null) {
+            return null;
+        }
+
+        return implode('|', [$parsed['day'], $parsed['start_minute'], $parsed['end_minute'], $parsed['room_id'], $parsed['phase'], Str::lower(Str::squish($parsed['title']))]);
+    }
+
+    /**
+     * Peran dosen pada sesi gabungan mengikuti baris pertama; beban mengajar dicatat per kelas (penawaran).
+     *
+     * @param  array<string, mixed>  $parsed
+     */
+    private function attachLecturers(ScheduleSession $session, CourseOffering $offering, array $parsed): void
+    {
         foreach ($parsed['lecturers'] as $entry) {
             $lecturerId = $entry['lecturer_id'] ?? Lecturer::query()->firstOrCreate(
                 ['source_name' => $entry['name']],
                 ['name' => $entry['name'], 'profile_status' => LecturerProfileStatus::Unverified, 'is_active' => true],
             )->id;
 
-            $session->lecturers()->syncWithoutDetaching([$lecturerId => ['role' => $entry['role']]]);
+            if (! $session->lecturers()->whereKey($lecturerId)->exists()) {
+                $session->lecturers()->attach($lecturerId, ['role' => $entry['role']]);
+            }
 
             TeachingAssignment::query()->firstOrCreate(
                 ['course_offering_id' => $offering->id, 'lecturer_id' => $lecturerId, 'phase' => $parsed['phase']],

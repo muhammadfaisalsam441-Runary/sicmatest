@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Enums\IssueSeverity;
 use App\Enums\ScheduleSource;
 use App\Enums\ScheduleVersionStatus;
 use App\Enums\SessionMode;
@@ -18,196 +17,178 @@ use App\Models\ScheduleSession;
 use App\Models\ScheduleVersion;
 use App\Models\User;
 use App\Services\ScheduleBlockBuilder;
+use App\Services\ScheduleValidator;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
+use RuntimeException;
 
 /**
- * DATA DEMO — jadwal v1 (digantikan), v2 (Jadwal resmi, room_blocks terisi), dan draf v3 dengan 3 masalah wajib.
+ * Jadwal resmi v1 = Jadwal TA Ganjil 2026/2027 JTIK (PDF update 21 Agustus 2026), room_blocks terisi.
+ *
+ * Jadwal sumber sendiri memuat dua bentrok yang perlu ditindaklanjuti jurusan (ikut terbawa ke draf):
+ * - CLASS_CONFLICT: PTIK ULANG 2025, Senin — Strategi Pembelajaran 10.05–12.40 vs Inovasi Teknologi 11.00–12.40.
+ * - LECTURER_CONFLICT: Alifya NFH, Rabu — PTIK B 2026 (Lab ICT 10, 13.10–15.40) vs PTIK ULANG 2023 (AE 102, 14.50–17.30).
+ *
+ * Draf v2 = salinan jadwal resmi untuk latihan menyusun ulang, ditambah dua masalah SIMULASI:
+ * - LEADERSHIP_THURSDAY: satu sesi Ketua Jurusan dipindah ke hari Kamis.
+ * - SESSION_WITHOUT_TIME: satu sesi diubah menjadi "Hubungi Dosen".
  */
 class ScheduleSeeder extends Seeder
 {
     /**
-     * Rentang slot → [menit mulai, menit selesai].
-     *
-     * @var array<string, array{0: int, 1: int}>
+     * Baris sumber yang dijadikan "Hubungi Dosen" di draf (simulasi).
      */
-    private const RANGES = [
-        'I-II' => [450, 550],
-        'I-III' => [450, 600],
-        'IV-V' => [600, 700],
-        'IV-VI' => [600, 750],
-        'VII-VIII' => [780, 880],
-        'VII-IX' => [780, 930],
-        'X-XI' => [940, 1040],
-    ];
-
-    /**
-     * Sesi jadwal resmi: [kode MK, kelas peserta, dosen (kunci => peran), hari ISO, rentang slot, kode ruang, mode].
-     *
-     * @var list<array{0: string, 1: list<string>, 2: array<string, string>, 3: ?int, 4: ?string, 5: ?string, 6: string}>
-     */
-    private const SESSIONS = [
-        ['TKM2301', ['TEKOM-C-2025'], ['rina' => 'lead'], 1, 'I-III', 'AE-107', 'offline'],
-        ['TKM2302', ['TEKOM-A-2025'], ['ahmad' => 'lead'], 1, 'I-III', 'AE-101', 'offline'],
-        ['TKM2303', ['PTIK-B-2025'], ['bayu' => 'lead'], 1, 'IV-VI', 'LAB-JARINGAN', 'offline'],
-        ['TKM2304', ['TEKOM-B-2025'], ['irfan' => 'lead'], 1, 'IV-VI', 'AE-102', 'offline'],
-        ['TKM2309', ['TEKOM-A-2025', 'TEKOM-B-2025'], ['lina' => 'lead'], 1, 'VII-VIII', 'AE-209', 'offline'],
-        ['TKM2306', ['PTIK-A-2025'], ['yusuf' => 'lead'], 2, 'I-III', null, 'online'],
-        ['TKM2305', ['TEKOM-C-2025'], ['rudi' => 'lead'], 2, 'IV-V', 'AE-103', 'offline'],
-        ['TKM2307', ['PTIK-B-2025'], ['maya' => 'lead'], 2, 'VII-VIII', 'AE-105', 'offline'],
-        ['TKM2308', ['TEKOM-B-2025'], ['fitri' => 'lead'], 2, 'I-III', 'LAB-EMBEDDED', 'offline'],
-        ['TKM2301', ['PTIK-A-2025'], ['rina' => 'lead'], 2, 'VII-IX', 'LAB-PEMROGRAMAN', 'offline'],
-        ['TKM2303', ['TEKOM-C-2025'], ['bayu' => 'lead'], 3, 'I-III', 'LAB-JARINGAN', 'offline'],
-        ['TKM2304', ['TEKOM-A-2025'], ['irfan' => 'lead'], 3, 'IV-VI', 'AE-106', 'offline'],
-        ['TKM2302', ['PTIK-B-2025'], ['ahmad' => 'lead'], 3, 'VII-IX', 'AE-104', 'offline'],
-        ['TKM2306', ['TEKOM-C-2025'], ['yusuf' => 'lead'], 3, 'VII-IX', 'LAB-SISTEM-CERDAS', 'offline'],
-        ['TKM2309', ['PTIK-A-2025'], ['lina' => 'lead'], 3, 'X-XI', 'PINISI-C1-R2', 'offline'],
-        ['TKM2301', ['TEKOM-B-2025'], ['rina' => 'lead'], 4, 'I-III', 'LAB-ICT-10', 'offline'],
-        ['TKM2305', ['TEKOM-A-2025'], ['rudi' => 'lead'], 4, 'IV-V', 'AE-213', 'offline'],
-        ['TKM2307', ['PTIK-A-2025'], ['nurul' => 'lead'], 4, 'IV-V', 'PINISI-C2-R3', 'offline'],
-        ['TKM2307', ['TEKOM-C-2025'], ['maya' => 'lead'], 4, 'VII-VIII', 'AE-107', 'offline'],
-        ['TKM2306', ['PTIK-B-2025'], ['yusuf' => 'lead'], 4, 'VII-IX', 'PINISI-C1-R5', 'offline'],
-        ['TKM2308', ['TEKOM-C-2025'], ['fitri' => 'lead', 'sinta' => 'partner'], 5, 'I-III', 'LAB-EMBEDDED', 'offline'],
-        ['TKM2303', ['TEKOM-A-2025'], ['hendra' => 'lead', 'bayu' => 'partner'], 5, 'I-III', 'LAB-JARINGAN', 'offline'],
-        ['TKM2304', ['PTIK-A-2025'], ['sinta' => 'lead'], 5, 'IV-VI', 'LAB-ICT-11', 'offline'],
-        ['TKM2302', ['TEKOM-C-2025'], ['ahmad' => 'lead'], 5, 'IV-VI', 'AE-209', 'offline'],
-        ['TKM2310', ['TEKOM-B-2025'], ['hendra' => 'lead'], 5, 'VII-IX', 'LAB-JARINGAN', 'offline'],
-        ['TKM2305', ['PTIK-B-2025'], ['arman' => 'lead'], null, null, null, 'unscheduled'],
-    ];
+    private const SIMULATED_UNSCHEDULED_ROW = 347;
 
     /**
      * Run the database seeds.
      */
-    public function run(ScheduleBlockBuilder $blockBuilder): void
+    public function run(ScheduleBlockBuilder $blockBuilder, ScheduleValidator $validator): void
     {
         $period = Period::query()->active()->firstOrFail();
         $publisher = User::query()->where('role', UserRole::SuperAdmin)->firstOrFail();
 
-        $v1 = $period->scheduleVersions()->create([
+        $official = $period->scheduleVersions()->create([
             'version_no' => 1,
-            'status' => ScheduleVersionStatus::Superseded,
-            'source' => ScheduleSource::Import,
-            'effective_from' => '2026-09-01',
-            'effective_to' => '2026-09-13',
-            'published_by' => $publisher->id,
-            'published_at' => '2026-08-28 10:00:00',
-        ]);
-        $this->seedSessions($v1, $period);
-
-        $v2 = $period->scheduleVersions()->create([
-            'version_no' => 2,
             'status' => ScheduleVersionStatus::Official,
-            'source' => ScheduleSource::Manual,
-            'based_on_version_id' => $v1->id,
-            'effective_from' => '2026-09-14',
+            'source' => ScheduleSource::Import,
+            'effective_from' => Carbon::parse($period->start_date)->toDateString(),
             'effective_to' => null,
             'published_by' => $publisher->id,
-            'published_at' => '2026-09-12 09:00:00',
+            'published_at' => '2026-08-21 10:00:00',
+            'lock_version' => 0,
         ]);
-        $this->seedSessions($v2, $period);
-        $blockBuilder->rebuild($v2);
+        $this->seedSessions($official, $period);
+        $blockBuilder->rebuild($official);
 
-        $v3 = $period->scheduleVersions()->create([
-            'version_no' => 3,
+        $draft = $period->scheduleVersions()->create([
+            'version_no' => 2,
             'status' => ScheduleVersionStatus::Draft,
             'source' => ScheduleSource::Manual,
-            'based_on_version_id' => $v2->id,
+            'based_on_version_id' => $official->id,
             'effective_from' => now()->addWeek()->startOfWeek()->toDateString(),
+            'lock_version' => 0,
         ]);
-        $this->seedSessions($v3, $period);
-        $this->introduceDraftProblems($v3);
+        $this->seedSessions($draft, $period);
+        $this->simulateDraftProblems($draft, $period);
+
+        $validator->validate($draft->fresh());
     }
 
     private function seedSessions(ScheduleVersion $version, Period $period): void
     {
-        $lecturers = Lecturer::query()->get()->keyBy('name');
-        $rooms = Room::query()->pluck('id', 'code');
-        $classGroups = ClassGroup::query()->pluck('id', 'code');
+        $classGroups = ClassGroup::query()->pluck('id', 'name');
         $courses = Course::query()->get()->keyBy('code');
+        $rooms = Room::query()->pluck('id', 'name');
+        $lecturers = Lecturer::query()->pluck('id', 'name');
 
-        foreach (self::SESSIONS as $row => [$courseCode, $classCodes, $teachers, $day, $range, $roomCode, $mode]) {
-            $course = $courses[$courseCode];
+        /** @var array<string, ScheduleSession> $sessions */
+        $sessions = [];
+
+        foreach (ScheduleSourceData::rows() as $row) {
+            $course = $courses[$row['course_code']];
             $offering = CourseOffering::query()->firstOrCreate([
                 'period_id' => $period->id,
                 'course_id' => $course->id,
-                'class_group_id' => $classGroups[$classCodes[0]],
+                'class_group_id' => $classGroups[$row['class']],
             ]);
 
-            foreach (array_slice($classCodes, 1) as $jointClassCode) {
-                CourseOffering::query()->firstOrCreate([
-                    'period_id' => $period->id,
-                    'course_id' => $course->id,
-                    'class_group_id' => $classGroups[$jointClassCode],
-                ]);
-            }
+            $key = ScheduleSourceData::sessionKey($row);
 
-            [$start, $end] = $range === null ? [null, null] : self::RANGES[$range];
-
-            $session = $version->sessions()->create([
+            $sessions[$key] ??= $version->sessions()->create([
                 'course_offering_id' => $offering->id,
                 'title' => $course->name,
-                'mode' => SessionMode::from($mode),
-                'day_of_week' => $day,
-                'start_minute' => $start,
-                'end_minute' => $end,
-                'room_id' => $roomCode === null ? null : $rooms[$roomCode],
-                'source_file' => $version->source === ScheduleSource::Import ? 'jadwal-ganjil-2026.xlsx' : null,
-                'source_row' => $version->source === ScheduleSource::Import ? $row + 2 : null,
-                'source_raw' => $mode === 'unscheduled' ? ['waktu' => 'Hubungi Dosen', 'ruang' => null] : null,
+                'mode' => SessionMode::Offline,
+                'day_of_week' => $row['day'],
+                'start_minute' => $row['start'],
+                'end_minute' => $row['end'],
+                'room_id' => $rooms[$row['room']],
+                'source_file' => ScheduleSourceData::SOURCE_FILE,
+                'source_row' => $row['no'],
+                'source_raw' => $row['raw'],
             ]);
 
-            $session->participants()->attach(array_map(fn (string $code): int => $classGroups[$code], $classCodes));
+            $session = $sessions[$key];
+            $session->participants()->syncWithoutDetaching([$classGroups[$row['class']]]);
 
-            foreach ($teachers as $key => $role) {
-                $lecturer = $lecturers[AcademicSeeder::LECTURERS[$key]];
-                $session->lecturers()->attach($lecturer->id, ['role' => $role]);
+            foreach ($row['lecturers'] as $index => $name) {
+                $role = $index === 0 ? TeachingRole::Lead : TeachingRole::Partner;
+                $lecturerId = $lecturers[$name];
+
+                if (! $session->lecturers()->whereKey($lecturerId)->exists()) {
+                    $session->lecturers()->attach($lecturerId, ['role' => $role->value]);
+                }
 
                 $offering->teachingAssignments()->firstOrCreate(
-                    ['lecturer_id' => $lecturer->id, 'phase' => 'full'],
-                    ['role' => TeachingRole::from($role), 'credited_sks' => null],
+                    ['lecturer_id' => $lecturerId, 'phase' => 'full'],
+                    ['role' => $role, 'credited_sks' => null],
                 );
             }
         }
     }
 
-    /**
-     * Tiga masalah wajib di draf v3: bentrok ruang, pimpinan hari Kamis, dan sesi tanpa waktu.
-     */
-    private function introduceDraftProblems(ScheduleVersion $draft): void
+    private function simulateDraftProblems(ScheduleVersion $draft, Period $period): void
     {
-        $rooms = Room::query()->pluck('id', 'code');
-        $leader = Lecturer::query()->where('name', AcademicSeeder::LECTURERS['hendra'])->firstOrFail();
+        $unscheduled = $draft->sessions()->where('source_row', self::SIMULATED_UNSCHEDULED_ROW)->firstOrFail();
+        $unscheduled->update([
+            'mode' => SessionMode::Unscheduled,
+            'day_of_week' => null,
+            'start_minute' => null,
+            'end_minute' => null,
+            'room_id' => null,
+            'source_raw' => [...$unscheduled->source_raw, 'waktu' => 'Hubungi Dosen'],
+        ]);
 
-        $sessionInRoom = fn (string $roomCode, int $day): ScheduleSession => $draft->sessions()
-            ->where('room_id', $rooms[$roomCode])
-            ->where('day_of_week', $day)
-            ->firstOrFail();
+        $this->moveLeaderToThursday($draft, $period);
+    }
 
-        $movedSession = $sessionInRoom('AE-213', 4);
-        $occupiedSession = $sessionInRoom('PINISI-C2-R3', 4);
-        $movedSession->update(['room_id' => $rooms['PINISI-C2-R3']]);
+    /**
+     * Pindahkan satu sesi Ketua Jurusan ke hari Kamis pada jam & ruang yang tidak menimbulkan bentrok lain,
+     * agar draf hanya memuat masalah pimpinan-Kamis untuk sesi ini.
+     */
+    private function moveLeaderToThursday(ScheduleVersion $draft, Period $period): void
+    {
+        $leader = Lecturer::query()->where('name', AcademicSeeder::HEAD_OF_DEPARTMENT)->firstOrFail();
+        $sessions = $draft->sessions()->with(['participants:id', 'lecturers:id'])->get();
+        $thursday = $sessions->filter(fn (ScheduleSession $session): bool => $session->day_of_week === 4)->values();
+        $starts = $period->timeSlots()->orderBy('start_minute')->pluck('start_minute');
+        $rooms = Room::query()->orderBy('name')->pluck('id');
 
-        $leaderSession = $draft->sessions()
-            ->whereHas('lecturers', fn ($query) => $query->whereKey($leader->id))
-            ->where('day_of_week', 5)
-            ->where('start_minute', 780)
-            ->firstOrFail();
-        $leaderSession->update(['day_of_week' => 4]);
+        $candidates = $sessions
+            ->filter(fn (ScheduleSession $session): bool => $session->lecturers->contains('id', $leader->id) && $session->day_of_week !== null)
+            ->sortBy('source_row');
 
-        $unscheduledSession = $draft->sessions()->where('mode', SessionMode::Unscheduled)->firstOrFail();
+        foreach ($candidates as $session) {
+            $duration = $session->end_minute - $session->start_minute;
 
-        $issues = [
-            ['ROOM_CONFLICT', [$movedSession->id, $occupiedSession->id], 'C2-R3 dipakai dua sesi pada Kamis 10.00–11.40 WITA.'],
-            ['LEADERSHIP_THURSDAY', [$leaderSession->id], $leader->name.' (pimpinan) dijadwalkan pada hari Kamis.'],
-            ['SESSION_WITHOUT_TIME', [$unscheduledSession->id], 'Sistem Operasi PTIK B belum punya hari, jam, dan ruang ("Hubungi Dosen").'],
-        ];
+            foreach ($starts as $start) {
+                foreach (collect([$session->room_id])->merge($rooms)->unique() as $roomId) {
+                    if ($this->isFree($thursday, $session, $start, $start + $duration, $roomId)) {
+                        $session->update(['day_of_week' => 4, 'start_minute' => $start, 'end_minute' => $start + $duration, 'room_id' => $roomId]);
 
-        foreach ($issues as [$code, $sessionIds, $message]) {
-            $draft->issues()->create([
-                'code' => $code,
-                'severity' => IssueSeverity::Error,
-                'session_ids' => $sessionIds,
-                'message' => $message,
-            ]);
+                        return;
+                    }
+                }
+            }
         }
+
+        throw new RuntimeException('Tidak menemukan jam Kamis yang bebas untuk simulasi draf.');
+    }
+
+    /**
+     * @param  Collection<int, ScheduleSession>  $thursday
+     */
+    private function isFree(Collection $thursday, ScheduleSession $moving, int $start, int $end, int $roomId): bool
+    {
+        $classIds = $moving->participants->pluck('id');
+        $lecturerIds = $moving->lecturers->pluck('id');
+
+        return $thursday->every(fn (ScheduleSession $other): bool => $other->id === $moving->id
+            || $other->start_minute >= $end
+            || $start >= $other->end_minute
+            || ($other->room_id !== $roomId
+                && $other->participants->pluck('id')->intersect($classIds)->isEmpty()
+                && $other->lecturers->pluck('id')->intersect($lecturerIds)->isEmpty()));
     }
 }

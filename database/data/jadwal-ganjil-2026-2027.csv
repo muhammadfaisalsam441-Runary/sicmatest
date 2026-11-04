@@ -1,0 +1,365 @@
+No,Kelas,Hari,Jam ke,Jam,Ruang,Kode MK,Mata Kuliah,SKS,Dosen,Periode
+1,PTIK A 2026,Kamis,I-II,07.30-09.10,AE 107,25X00CWK02001,Pendidikan Agama Islam (Religion),2,"Baso Ilyas, S.Pd.I., M.Pd.; Muh. Asyam Samjas, S.Pd., M.Pd.",Satu semester
+2,PTIK A 2026,Senin,VII-VIII,13.10-14.50,AE 209,25X00CWK02009,Pendidikan Kewarganegaraan,2,"Muh. Asyam Samjas, S.Pd., M.Pd.; Nurul Ayuni, S.A.P., M.A.P.",Satu semester
+3,PTIK A 2026,Jumat,IV-V,10.05-11.50,AE 209,25X00CWK02010,Bahasa Indonesia,2,"Prof. Dr. Idawati Garim, M.Si.; Fadilah Neyarasmi, S.Pd., M.Pd.",Satu semester
+4,PTIK A 2026,Rabu,V-VI,11.00-12.40,Lab Jaringan,25B09CKP02109,Matematika Dasar,2,"Dr. Iwan Suhardi, ST., MT.; Wirawan Setialaksana, S.Pd., M.Sc.",Satu semester
+5,PTIK A 2026,Rabu,III-IV,09.15-10.55,AE 103,25X00CKK02014,Pengantar Kependidikan,2,"Dr. Sanatang, S.Pd., M.T.; Ainun Nida Rifqi, SPsi, MPSi.T.",Satu semester
+6,PTIK A 2026,Senin,III-IV,09.15-10.55,Lab ICT 4,25B09CKP02111,Pengantar Ilmu Komputer,2,"Dr. Fathahillah, S.Pd., M.Eng.; Ayu Lestari, S.Pd., M.Pd.",Satu semester
+7,PTIK A 2026,Jumat,IX-XI,14.50-17.30,AE 209,25B09CKP03112,Computational Thinking,3,"Dr. Ir. Abd. Muis Mappalotteng, S.Pd., M.Pd., M.T., IPM.; Muh. Akbar, S.Pd., M.Pd.",Satu semester
+8,PTIK A 2026,Rabu,VII-VIII,13.10-14.50,AE 105,25B09CKP02113,Bahasa Inggris,2,"Prof. Dr. Ir. Gufran Darma Dirawan, S.T., M.EMD.; Prof. Nur Anny Taufieq, S.P., M.Si., Ph.D.",Satu semester
+9,PTIK A 2026,Selasa,IV-VI,10.05-12.40,Lab ICT 10,25B09CKP03114,Algoritma dan Pemrograman Dasar,3,"Alifya NFH, S.Pd., M.Pd.; Kurnia Wahyu Prima, S.Pd., M.Pd.T.",Satu semester
+10,PTIK B 2026,Kamis,III-IV,09.15-10.55,AE 107,25X00CWK02001,Pendidikan Agama Islam (Religion),2,"Baso Ilyas, S.Pd.I., M.Pd.; Muh. Asyam Samjas, S.Pd., M.Pd.",Satu semester
+11,PTIK B 2026,Selasa,VII-VIII,13.10-14.50,AE 107,25X00CWK02009,Pendidikan Kewarganegaraan,2,"Muh. Asyam Samjas, S.Pd., M.Pd.; Nurul Ayuni, S.A.P., M.A.P.",Satu semester
+12,PTIK B 2026,Jumat,VII-VIII,13.10-14.50,AE 209,25X00CWK02010,Bahasa Indonesia,2,"Prof. Dr. Idawati Garim, M.Si.; Fadilah Neyarasmi, S.Pd., M.Pd.",Satu semester
+13,PTIK B 2026,Kamis,I-II,07.30-09.10,AE 106,25B09CKP02109,Matematika Dasar,2,"Dr. Iwan Suhardi, ST., MT.; Wirawan Setialaksana, S.Pd., M.Sc.",Satu semester
+14,PTIK B 2026,Rabu,V-VI,11.00-12.40,AE 107,25X00CKK02014,Pengantar Kependidikan,2,"Dr. Imran, S.Kom., M.Pd.; Ainun Nida Rifqi, SPsi, MPSi.T.",Satu semester
+15,PTIK B 2026,Senin,V-VI,11.00-12.40,Lab ICT 4,25B09CKP02111,Pengantar Ilmu Komputer,2,"Dr. Fathahillah, S.Pd., M.Eng.; Ayu Lestari, S.Pd., M.Pd.",Satu semester
+16,PTIK B 2026,Senin,I-III,07.30-10.05,AE 105,25B09CKP03112,Computational Thinking,3,"Dr. Ir. Abd. Muis Mappalotteng, S.Pd., M.Pd., M.T., IPM.; Muh. Akbar, S.Pd., M.Pd.",Satu semester
+17,PTIK B 2026,Senin,VII-VIII,13.10-14.50,AE 103,25B09CKP02113,Bahasa Inggris,2,"Prof. Dr. Ir. Gufran Darma Dirawan, S.T., M.EMD.; Nursyahrifa, M.Pd.",Satu semester
+18,PTIK B 2026,Rabu,VII-IX,13.10-15.40,Lab ICT 10,25B09CKP03114,Algoritma dan Pemrograman Dasar,3,"Alifya NFH, S.Pd., M.Pd.; Kurnia Wahyu Prima, S.Pd., M.Pd.T.",Satu semester
+19,PTIK C 2026,Kamis,V-VI,11.00-12.40,AE 107,25X00CWK02001,Pendidikan Agama Islam (Religion),2,"Baso Ilyas, S.Pd.I., M.Pd.; Muh. Asyam Samjas, S.Pd., M.Pd.",Satu semester
+20,PTIK C 2026,Rabu,I-II,07.30-09.10,AE 102,25X00CWK02009,Pendidikan Kewarganegaraan,2,"Fediyatun Muntazarah, S.Pd., M.Pd.; Muh. Asyam Samjas, S.Pd., M.Pd.",Satu semester
+21,PTIK C 2026,Kamis,I-II,07.30-09.10,AE 105,25X00CWK02010,Bahasa Indonesia,2,"Dr. Baharman, S.S., S.Pd., M.Hum.; Dr. Mahmudah, M.Hum.",Satu semester
+22,PTIK C 2026,Kamis,III-IV,09.15-10.55,AE 106,25B09CKP02109,Matematika Dasar,2,"Nurul Mukhlisah Abdal, S.Si., M.Si.; Wirawan Setialaksana, S.Pd., M.Sc.",Satu semester
+23,PTIK C 2026,Jumat,IX-X,14.50-16.35,AE 107,25X00CKK02014,Pengantar Kependidikan,2,"Dr. Imran, S.Kom., M.Pd.; Ainun Nida Rifqi, SPsi, MPSi.T.",Satu semester
+24,PTIK C 2026,Selasa,VII-VIII,13.10-14.50,AE 104,25B09CKP02111,Pengantar Ilmu Komputer,2,"Dr. Fathahillah, S.Pd., M.Eng.; Kurnia Wahyu Prima, S.Pd., M.Pd.T.",Satu semester
+25,PTIK C 2026,Senin,IV-VI,10.05-12.40,AE 105,25B09CKP03112,Computational Thinking,3,"Veronika Asri Tandirerung, S.Pd, M.Pd.; Dr. Eng. Muhammad Ayat Hidayat, S.T., M.T.",Satu semester
+26,PTIK C 2026,Jumat,VII-VIII,13.10-14.50,AE 105,25B09CKP02113,Bahasa Inggris,2,"Prof. Dr. Ir. Gufran Darma Dirawan, S.T., M.EMD.; Prof. Nur Anny Taufieq, S.P., M.Si., Ph.D.",Satu semester
+27,PTIK C 2026,Senin,VII-IX,13.10-15.40,Lab ICT 11,25B09CKP03114,Algoritma dan Pemrograman Dasar,3,"Edi Suhardi Rahman, S.Pd, M.Pd.; Alifya NFH, S.Pd., M.Pd.",Satu semester
+28,PTIK D 2026,Kamis,VII-VIII,13.10-14.50,AE 107,25X00CWK02001,Pendidikan Agama Islam (Religion),2,"Muh. Asyam Samjas, S.Pd., M.Pd.; Baso Ilyas, S.Pd.I., M.Pd.",Satu semester
+29,PTIK D 2026,Senin,VII-VIII,13.10-14.50,AE 107,25X00CWK02009,Pendidikan Kewarganegaraan,2,"Fediyatun Muntazarah, S.Pd., M.Pd.; Baso Ilyas, S.Pd.I., M.Pd.",Satu semester
+30,PTIK D 2026,Kamis,III-IV,09.15-10.55,AE 105,25X00CWK02010,Bahasa Indonesia,2,"Dr. Baharman, S.S., S.Pd., M.Hum.; Dr. Mahmudah, M.Hum.",Satu semester
+31,PTIK D 2026,Kamis,V-VI,11.00-12.40,AE 106,25B09CKP02109,Matematika Dasar,2,"Wirawan Setialaksana, S.Pd., M.Sc.; Nurul Mukhlisah Abdal, S.Si., M.Si.",Satu semester
+32,PTIK D 2026,Rabu,VII-VIII,13.10-14.50,AE 107,25X00CKK02014,Pengantar Kependidikan,2,"Prof. Dr. Ir. H. Muh. Yahya, M.Kes., M.Eng., IPU., ASEAN. Eng.; Dr. Anas Arfandi, M.Pd.",Satu semester
+33,PTIK D 2026,Jumat,VII-VIII,13.10-14.50,AE 104,25B09CKP02111,Pengantar Ilmu Komputer,2,"Dr. Fathahillah, S.Pd., M.Eng.; Nurmayanti, S.Pd., M.Pd.",Satu semester
+34,PTIK D 2026,Selasa,I-III,07.30-10.05,AE 105,25B09CKP03112,Computational Thinking,3,"Veronika Asri Tandirerung, S.Pd, M.Pd.; Dr. Eng. Muhammad Ayat Hidayat, S.T., M.T.",Satu semester
+35,PTIK D 2026,Selasa,VII-VIII,13.10-14.50,AE 103,25B09CKP02113,Bahasa Inggris,2,"Andi Khaerun Niza, S.Pd., M.Pd.; Nursyahrifa, M.Pd.",Satu semester
+36,PTIK D 2026,Jumat,III-V,09.15-11.50,Lab ICT 10,25B09CKP03114,Algoritma dan Pemrograman Dasar,3,"Edi Suhardi Rahman, S.Pd, M.Pd.; Alifya NFH, S.Pd., M.Pd.",Satu semester
+37,PTIK E 2026,Jumat,IV-V,10.05-11.50,AE 107,25X00CWK02001,Pendidikan Agama Islam (Religion),2,"Muh. Asyam Samjas, S.Pd., M.Pd.; Baso Ilyas, S.Pd.I., M.Pd.",Satu semester
+38,PTIK E 2026,Selasa,VII-VIII,13.10-14.50,AE 209,25X00CWK02009,Pendidikan Kewarganegaraan,2,"Fediyatun Muntazarah, S.Pd., M.Pd.; Baso Ilyas, S.Pd.I., M.Pd.",Satu semester
+39,PTIK E 2026,Kamis,V-VI,11.00-12.40,AE 105,25X00CWK02010,Bahasa Indonesia,2,"Dr. Mahmudah, M.Hum.; Dr. Hasriani, M.Pd.",Satu semester
+40,PTIK E 2026,Kamis,VII-VIII,13.10-14.50,AE 209,25B09CKP02109,Matematika Dasar,2,"Dr. Maya Sari Wahyuni, S.T., M.Kom.; Nurul Mukhlisah Abdal, S.Si., M.Si.",Satu semester
+41,PTIK E 2026,Senin,VII-VIII,13.10-14.50,Lab Pemrograman,25X00CKK02014,Pengantar Kependidikan,2,"Prof. Dr. Hj. Lu'mu., M.Pd.; Ninik Rahayu Ashadi, S.Pd., M.Pd.",Satu semester
+42,PTIK E 2026,Rabu,V-VI,11.00-12.40,Lab Sistem Cerdas,25B09CKP02111,Pengantar Ilmu Komputer,2,"Dr. Fathahillah, S.Pd., M.Eng.; Ayu Lestari, S.Pd., M.Pd.",Satu semester
+43,PTIK E 2026,Jumat,I-III,07.30-10.05,AE 105,25B09CKP03112,Computational Thinking,3,"Dyah Darma Andayani, S.T., M.Tel.Eng.; Muhammad Hidayat L, S.Pd., M.Pd.",Satu semester
+44,PTIK E 2026,Kamis,I-II,07.30-09.10,AE 109,25B09CKP02113,Bahasa Inggris,2,"Prof. Dr. Ir. Gufran Darma Dirawan, S.T., M.EMD.; Nursyahrifa, M.Pd.",Satu semester
+45,PTIK E 2026,Jumat,VII-IX,13.10-15.40,Lab ICT 10,25B09CKP03114,Algoritma dan Pemrograman Dasar,3,"Dr. Iwan Suhardi, ST., MT.; Ayu Tri Wardani, S.Pd., M.Pd.",Satu semester
+46,PTIK F 2026,Jumat,VII-VIII,13.10-14.50,AE 107,25X00CWK02001,Pendidikan Agama Islam (Religion),2,"Muh. Asyam Samjas, S.Pd., M.Pd.; Baso Ilyas, S.Pd.I., M.Pd.",Satu semester
+47,PTIK F 2026,Rabu,VII-VIII,13.10-14.50,AE 209,25X00CWK02009,Pendidikan Kewarganegaraan,2,"Fediyatun Muntazarah, S.Pd., M.Pd.; Baso Ilyas, S.Pd.I., M.Pd.",Satu semester
+48,PTIK F 2026,Kamis,VII-VIII,13.10-14.50,AE 105,25X00CWK02010,Bahasa Indonesia,2,"Dr. Mahmudah, M.Hum.; Dr. Hasriani, M.Pd.",Satu semester
+49,PTIK F 2026,Senin,VII-VIII,13.10-14.50,AE 105,25B09CKP02109,Matematika Dasar,2,"Dr. Firdaus, S.Pd., MT.; Wirawan Setialaksana, S.Pd., M.Sc.",Satu semester
+50,PTIK F 2026,Rabu,V-VI,11.00-12.40,AE 209,25X00CKK02014,Pengantar Kependidikan,2,"Prof. Dr. Purnamawati, M.Pd.; Ninik Rahayu Ashadi, S.Pd., M.Pd.",Satu semester
+51,PTIK F 2026,Rabu,I-II,07.30-09.10,AE 104,25B09CKP02111,Pengantar Ilmu Komputer,2,"Dr. Fathahillah, S.Pd., M.Eng.; Ayu Lestari, S.Pd., M.Pd.",Satu semester
+52,PTIK F 2026,Senin,IX-XI,14.50-17.30,AE 107,25B09CKP03112,Computational Thinking,3,"Dyah Darma Andayani, S.T., M.Tel.Eng.; Muhammad Hidayat L, S.Pd., M.Pd.",Satu semester
+53,PTIK F 2026,Selasa,VII-VIII,13.10-14.50,AE 110,25B09CKP02113,Bahasa Inggris,2,"Ir. Hasrul Bakri, S.Pd, M.T.; Nurul Hidayah Pratama, M.Pd.",Satu semester
+54,PTIK F 2026,Kamis,IX-XI,14.50-17.30,AE 106,25B09CKP03114,Algoritma dan Pemrograman Dasar,3,"Dr. Iwan Suhardi, ST., MT.; Ayu Tri Wardani, S.Pd., M.Pd.",Satu semester
+55,TEKOM A 2026,Senin,IV-VI,10.05-12.40,Lab ICT 10,25B10CKP03101,Algoritme & Pemrograman Dasar,3,"Alifya NFH, S.Pd., M.Pd.; Ir. Rahmaniar, S.Kom., M.Kom.",Satu semester
+56,TEKOM A 2026,Kamis,I-II,07.30-09.10,AE 103,X00CWK02010,Bahasa Indonesia,2,"Prof. Dr. Idawati Garim, M.Si.; Fadilah Neyarasmi, S.Pd., M.Pd.",Satu semester
+57,TEKOM A 2026,Kamis,IX-XI,14.50-17.30,AE 209,25B10CKP03103,Aljabar Linear,3,"Dyah Darma Andayani, S.T., M.Tel.Eng.; Wirawan Setialaksana, S.Pd., M.Sc.",Satu semester
+58,TEKOM A 2026,Kamis,VII-VIII,13.10-14.50,Lab Pemrograman,X00CWK02008,Pendidikan Pancasila,2,"Fediyatun Muntazarah, S.Pd., M.Pd.; Nurul Ayuni, S.A.P., M.A.P.",Satu semester
+59,TEKOM A 2026,Rabu,V-VI,11.00-12.40,AE 104,25B10CKP02104,Pengantar Teknik Komputer,2,"Abd. Rahman Patta, S.Kom., M.T., Ph.D.; Ayu Hasnining, S. Kom., M. Kom.",Satu semester
+60,TEKOM A 2026,Selasa,VII-VIII,13.10-14.50,AE 105,25B10CKP02102,Bahasa Inggris,2,"Prof. Dr. Ir. Gufran Darma Dirawan, S.T., M.EMD.; Prof. Nur Anny Taufieq, S.P., M.Si., Ph.D.",Satu semester
+61,TEKOM A 2026,Senin,I-III,07.30-10.05,AE 103,X00CPU02011,"Literasi Sains, Teknologi dan Seni",3,"Nurul Mukhlisah Abdal, S.Si., M.Si.; Dr. Zainuddin, S.Pd., M.Pd.",Satu semester
+62,TEKOM A 2026,Selasa,IX-XI,14.50-17.30,Lab Embedded,25B10CKP03105,Rangkaian Elektronika,3,"Dr. Ir. Abd. Muis Mappalotteng, S.Pd., M.Pd., M.T., IPM.; Figur Muhammad, S.Kom., M.Kom.",Satu semester
+63,TEKOM B 2026,Kamis,VII-IX,13.10-15.40,Lab ICT 10,25B10CKP03101,Algoritme & Pemrograman Dasar,3,"Alifya NFH, S.Pd., M.Pd.; Nurmayanti, S.Pd., M.Pd.",Satu semester
+64,TEKOM B 2026,Kamis,III-IV,09.15-10.55,AE 209,X00CWK02010,Bahasa Indonesia,2,"Prof. Dr. Idawati Garim, M.Si.; Fadilah Neyarasmi, S.Pd., M.Pd.",Satu semester
+65,TEKOM B 2026,Senin,I-III,07.30-10.05,AE 109,25B10CKP03103,Aljabar Linear,3,"Dyah Darma Andayani, S.T., M.Tel.Eng.; Wirawan Setialaksana, S.Pd., M.Sc.",Satu semester
+66,TEKOM B 2026,Rabu,III-IV,09.15-10.55,AE 102,X00CWK02008,Pendidikan Pancasila,2,"Dr. Ir. H. Alimuddin Sa'ban Miru, M.Pd.; Muh. Asyam Samjas, S.Pd., M.Pd.",Satu semester
+67,TEKOM B 2026,Senin,VII-VIII,13.10-14.50,AE 104,25B10CKP02104,Pengantar Teknik Komputer,2,"Abd. Rahman Patta, S.Kom., M.T., Ph.D.; Ayu Hasnining, S. Kom., M. Kom.",Satu semester
+68,TEKOM B 2026,Jumat,IV-V,10.05-11.50,AE 105,25B10CKP02102,Bahasa Inggris,2,"Ir. Hasrul Bakri, S.Pd, M.T.; Nurul Hidayah Pratama, M.Pd.",Satu semester
+69,TEKOM B 2026,Senin,IV-VI,10.05-12.40,AE 103,X00CPU02011,"Literasi Sains, Teknologi dan Seni",3,"Nurul Mukhlisah Abdal, S.Si., M.Si.; Dr. Zainuddin, S.Pd., M.Pd.",Satu semester
+70,TEKOM B 2026,Selasa,V-VII,11.00-14.00,Lab Embedded,25B10CKP03105,Rangkaian Elektronika,3,"Dr. Ir. Abd. Muis Mappalotteng, S.Pd., M.Pd., M.T., IPM.; Figur Muhammad, S.Kom., M.Kom.",Satu semester
+71,TEKOM C 2026,Senin,VII-IX,13.10-15.40,Lab ICT 10,25B10CKP03101,Algoritme & Pemrograman Dasar,3,"Dr. Noer Ekafitri Sam, S.Pd., M.Pd.; Dr. Imran, S.Kom., M.Pd.",Satu semester
+72,TEKOM C 2026,Kamis,V-VI,11.00-12.40,AE 103,X00CWK02010,Bahasa Indonesia,2,"Prof. Dr. Idawati Garim, M.Si.; Fadilah Neyarasmi, S.Pd., M.Pd.",Satu semester
+73,TEKOM C 2026,Jumat,III-V,09.15-11.50,AE 104,25B10CKP03103,Aljabar Linear,3,"Nurul Mukhlisah Abdal, S.Si., M.Si.; Wirawan Setialaksana, S.Pd., M.Sc.",Satu semester
+74,TEKOM C 2026,Rabu,I-II,07.30-09.10,AE 105,X00CWK02008,Pendidikan Pancasila,2,"Baso Ilyas, S.Pd.I., M.Pd.; Nurul Ayuni, S.A.P., M.A.P.",Satu semester
+75,TEKOM C 2026,Rabu,III-IV,09.15-10.55,AE 104,25B10CKP02104,Pengantar Teknik Komputer,2,"Abd. Rahman Patta, S.Kom., M.T., Ph.D.; Kurnia Prima Putra, S.Kom., M.T.",Satu semester
+76,TEKOM C 2026,Kamis,III-IV,09.15-10.55,AE 104,25B10CKP02102,Bahasa Inggris,2,"Andi Khaerun Niza, S.Pd., M.Pd.; Nursyahrifa, M.Pd.",Satu semester
+77,TEKOM C 2026,Selasa,I-III,07.30-10.05,AE 103,X00CPU02011,"Literasi Sains, Teknologi dan Seni",3,"Nurul Mukhlisah Abdal, S.Si., M.Si.; Dr. Zainuddin, S.Pd., M.Pd.",Satu semester
+78,TEKOM C 2026,Kamis,IX-XI,14.50-17.30,Lab Embedded,25B10CKP03105,Rangkaian Elektronika,3,"Dr. Ir. Muliadi, S.Pd., M.T.; Figur Muhammad, S.Kom., M.Kom.",Satu semester
+79,TEKOM D 2026,Selasa,VII-IX,13.10-15.40,Lab ICT 10,25B10CKP03101,Algoritme & Pemrograman Dasar,3,"Dr. Noer Ekafitri Sam, S.Pd., M.Pd.; Muhammad Fadhlullah Kh.TQ, S.Si., M.C.S.(AI).",Satu semester
+80,TEKOM D 2026,Kamis,VII-VIII,13.10-14.50,AE 103,X00CWK02010,Bahasa Indonesia,2,"Prof. Dr. Idawati Garim, M.Si.; Fadilah Neyarasmi, S.Pd., M.Pd.",Satu semester
+81,TEKOM D 2026,Jumat,IX-XI,14.50-17.30,AE 104,25B10CKP03103,Aljabar Linear,3,"Nurul Mukhlisah Abdal, S.Si., M.Si.; Wirawan Setialaksana, S.Pd., M.Sc.",Satu semester
+82,TEKOM D 2026,Rabu,V-VI,11.00-12.40,AE 105,X00CWK02008,Pendidikan Pancasila,2,"Baso Ilyas, S.Pd.I., M.Pd.; Nurul Ayuni, S.A.P., M.A.P.",Satu semester
+83,TEKOM D 2026,Rabu,I-II,07.30-09.10,AE 103,25B10CKP02104,Pengantar Teknik Komputer,2,"Abd. Rahman Patta, S.Kom., M.T., Ph.D.; Kurnia Prima Putra, S.Kom., M.T.",Satu semester
+84,TEKOM D 2026,Kamis,V-VI,11.00-12.40,AE 104,25B10CKP02102,Bahasa Inggris,2,"Andi Khaerun Niza, S.Pd., M.Pd.; Nurul Hidayah Pratama, M.Pd.",Satu semester
+85,TEKOM D 2026,Selasa,IV-VI,10.05-12.40,AE 103,X00CPU02011,"Literasi Sains, Teknologi dan Seni",3,"Nurul Mukhlisah Abdal, S.Si., M.Si.; Dr. Zainuddin, S.Pd., M.Pd.",Satu semester
+86,TEKOM D 2026,Rabu,IX-XI,14.50-17.30,Lab Embedded,25B10CKP03105,Rangkaian Elektronika,3,"Dr. Ir. Abd. Muis Mappalotteng, S.Pd., M.Pd., M.T., IPM.; Figur Muhammad, S.Kom., M.Kom.",Satu semester
+87,TEKOM E 2026,Jumat,III-V,09.15-11.50,Lab ICT 11,25B10CKP03101,Algoritme & Pemrograman Dasar,3,"Dr. Noer Ekafitri Sam, S.Pd., M.Pd.; Muhammad Fadhlullah Kh.TQ, S.Si., M.C.S.(AI).",Satu semester
+88,TEKOM E 2026,Jumat,VII-VIII,13.10-14.50,AE 103,X00CWK02010,Bahasa Indonesia,2,"Dr. Mahmudah, M.Hum.; Dr. Hasriani, M.Pd.",Satu semester
+89,TEKOM E 2026,Senin,IX-XI,14.50-17.30,AE 209,25B10CKP03103,Aljabar Linear,3,"Wirawan Setialaksana, S.Pd., M.Sc.; Nurul Mukhlisah Abdal, S.Si., M.Si.",Satu semester
+90,TEKOM E 2026,Rabu,V-VI,11.00-12.40,AE 103,X00CWK02008,Pendidikan Pancasila,2,"Fediyatun Muntazarah, S.Pd., M.Pd.; Muh. Asyam Samjas, S.Pd., M.Pd.",Satu semester
+91,TEKOM E 2026,Rabu,VII-VIII,13.10-14.50,AE 104,25B10CKP02104,Pengantar Teknik Komputer,2,"Abd. Rahman Patta, S.Kom., M.T., Ph.D.; Ayu Hasnining, S. Kom., M. Kom.",Satu semester
+92,TEKOM E 2026,Rabu,III-IV,09.15-10.55,AE 105,25B10CKP02102,Bahasa Inggris,2,"Andi Khaerun Niza, S.Pd., M.Pd.; Nurul Hidayah Pratama, M.Pd.",Satu semester
+93,TEKOM E 2026,Rabu,IX-XI,14.50-17.30,AE 103,X00CPU02011,"Literasi Sains, Teknologi dan Seni",3,"Nurul Mukhlisah Abdal, S.Si., M.Si.; Dr. Zainuddin, S.Pd., M.Pd.",Satu semester
+94,TEKOM E 2026,Senin,IV-VI,10.05-12.40,AE 104,25B10CKP03105,Rangkaian Elektronika,3,"Dr. Ir. Abd. Muis Mappalotteng, S.Pd., M.Pd., M.T., IPM.; Figur Muhammad, S.Kom., M.Kom.",Satu semester
+95,PTIK A 2025,Kamis,I-II,07.30-09.10,AE 104,21B33C301,Profesi Kependidikan,2,"Dwi Rezky Anandari Sulaiman, S.Psi., M.Si.; Ainun Nida Rifqi, SPsi, MPSi.T.",Satu semester
+96,PTIK A 2025,Kamis,VII-IX,13.10-15.40,Pasca 1,21B33C302,Strategi Pembelajaran,3,"Prof. Dr. H. Syahrul, M.Pd.; Shabrina Syntha Dewi, S.Pd., M.Pd.",Satu semester
+97,PTIK A 2025,Selasa,IX-XI,14.50-17.30,AE 104,21B33C303,Struktur Data,3,"Alifya NFH, S.Pd., M.Pd.; Muh. Akbar, S.Pd., M.Pd.",Satu semester
+98,PTIK A 2025,Senin,I-III,07.30-10.05,Lab Jaringan,21B33C304,Jaringan Komputer,3,"Dr. Ir. Muliadi, S.Pd., M.T.; Dr. Haekal Febriansyah Ramadhan, S.T., M.T., M.Pd.",Satu semester
+99,PTIK A 2025,Rabu,VII-VIII,13.10-14.50,Lab Pemrograman,21B33C305,Inovasi Teknologi,2,"Ninik Rahayu Ashadi, S.Pd., M.Pd.; Nurmayanti, S.Pd., M.Pd.",Satu semester
+100,PTIK A 2025,Rabu,IX-XI,14.50-17.30,Lab Sistem Cerdas,21B33C306,Kecerdasan Buatan,3,"Dyah Darma Andayani, S.T., M.Tel.Eng.; Mudarris, S.Pd., M.Eng.",Satu semester
+101,PTIK A 2025,Selasa,IV-VI,10.05-12.40,Lab ICT 4,21B33C307,Keamanan Komputer,3,"Ir. Wahyu Hidayat M, S.Pd., M.Pd.; Aulyah Zakilah Ifani, M.Kom.",Satu semester
+102,PTIK A 2025,Jumat,IX-XI,14.50-17.30,Lab Pemrograman,21B33C308,Pemrograman Web,3,"M. Syahid Nur Wahid, M.Pd.; Muhammad Fadhil Supriadi, S.Pd., M.Pd.",Satu semester
+103,PTIK B 2025,Kamis,V-VI,11.00-12.40,Lab ICT 4,21B33C301,Profesi Kependidikan,2,"Dwi Rezky Anandari Sulaiman, S.Psi., M.Si.; Ainun Nida Rifqi, SPsi, MPSi.T.",Satu semester
+104,PTIK B 2025,Jumat,VII-IX,13.10-15.40,Lab ICT 11,21B33C302,Strategi Pembelajaran,3,"Prof. Dr. Ir. Riana Tangkin Mangesa, M.T.; Dr. Sanatang, S.Pd., M.T.",Satu semester
+105,PTIK B 2025,Selasa,I-III,07.30-10.05,AE 104,21B33C303,Struktur Data,3,"Alifya NFH, S.Pd., M.Pd.; Muh. Akbar, S.Pd., M.Pd.",Satu semester
+106,PTIK B 2025,Selasa,IX-XI,14.50-17.30,AE 108,21B33C304,Jaringan Komputer,3,"Dr. Ir. Muliadi, S.Pd., M.T.; Aulyah Zakilah Ifani, M.Kom.",Satu semester
+107,PTIK B 2025,Jumat,I-II,07.30-09.10,AE 104,21B33C305,Inovasi Teknologi,2,"Prof. Dr. Ir. H. Bakhrani A. Rauf, M.T.; Ir. Andi Rakhmat Baharuddin, S.Pd., M.Pd.",Satu semester
+108,PTIK B 2025,Rabu,II-IV,08.20-10.55,Lab ICT 10,21B33C306,Kecerdasan Buatan,3,"Faisal Najamuddin, S.Pd., M.Eng.; Mudarris, S.Pd., M.Eng.",Satu semester
+109,PTIK B 2025,Rabu,VII-IX,13.10-15.40,Lab ICT 11,21B33C307,Keamanan Komputer,3,"Fadhlirrahman Baso, S.Pd., M.Pd.; Aulyah Zakilah Ifani, M.Kom.",Satu semester
+110,PTIK B 2025,Kamis,IX-XI,14.50-17.30,Lab ICT 4,21B33C308,Pemrograman Web,3,"M. Syahid Nur Wahid, M.Pd.; Muhammad Fadhil Supriadi, S.Pd., M.Pd.",Satu semester
+111,PTIK C 2025,Rabu,V-VI,11.00-12.40,Lab ICT 10,21B33C301,Profesi Kependidikan,2,"Prof. Dr. Ir. H. Muh. Yahya, M.Kes., M.Eng., IPU., ASEAN. Eng.; Dwi Rezky Anandari Sulaiman, S.Psi., M.Si.",Satu semester
+112,PTIK C 2025,Selasa,IX-XI,14.50-17.30,AE 209,21B33C302,Strategi Pembelajaran,3,"Dr. Ir. Ridwan Daud Mahande, S.Pd., M.Pd., IPM.; Shabrina Syntha Dewi, S.Pd., M.Pd.",Satu semester
+113,PTIK C 2025,Senin,IV-VI,10.05-12.40,AE 108,21B33C303,Struktur Data,3,"Kurnia Wahyu Prima, S.Pd., M.Pd.T.; Abd Salam At Taqwa, S.Pd., M.Kom.",Satu semester
+114,PTIK C 2025,Rabu,II-IV,08.20-10.55,Lab ICT 11,21B33C304,Jaringan Komputer,3,"Dr. Eng. Ir. Jumadi M Parenreng, M.Kom., IPM.; Ir. Rahmaniar, S.Kom., M.Kom.",Satu semester
+115,PTIK C 2025,Jumat,VII-VIII,13.10-14.50,AE 109,21B33C305,Inovasi Teknologi,2,"Prof. Dr. Ir. H. Bakhrani A. Rauf, M.T.; Dr. Ir. Mustari S. Lamada, S.Pd., M.T.",Satu semester
+116,PTIK C 2025,Selasa,I-III,07.30-10.05,AE 106,21B33C306,Kecerdasan Buatan,3,"Dr. Imran, S.Kom., M.Pd.; Abd Salam At Taqwa, S.Pd., M.Kom.",Satu semester
+117,PTIK C 2025,Jumat,IX-XI,14.50-17.30,AE 101,21B33C307,Keamanan Komputer,3,"Ir. Wahyu Hidayat M, S.Pd., M.Pd.; Fadhlirrahman Baso, S.Pd., M.Pd.",Satu semester
+118,PTIK C 2025,Senin,VII-IX,13.10-15.40,Lab ICT 4,21B33C308,Pemrograman Web,3,"M. Syahid Nur Wahid, M.Pd.; Muhammad Fadhil Supriadi, S.Pd., M.Pd.",Satu semester
+119,PTIK D 2025,Senin,VII-VIII,13.10-14.50,AE 110,21B33C301,Profesi Kependidikan,2,"Prof. Dr. Ir. H. Muh. Yahya, M.Kes., M.Eng., IPU., ASEAN. Eng.; Dwi Rezky Anandari Sulaiman, S.Psi., M.Si.",Satu semester
+120,PTIK D 2025,Jumat,I-III,07.30-10.05,AE 209,21B33C302,Strategi Pembelajaran,3,"Dr. Ir. Ridwan Daud Mahande, S.Pd., M.Pd., IPM.; Ayu Widya Listari, S.Pd., M.Pd.",Satu semester
+121,PTIK D 2025,Senin,I-III,07.30-10.05,AE 107,21B33C303,Struktur Data,3,"Kurnia Wahyu Prima, S.Pd., M.Pd.T.; Abd Salam At Taqwa, S.Pd., M.Kom.",Satu semester
+122,PTIK D 2025,Jumat,IX-XI,14.50-17.30,Lab Jaringan,21B33C304,Jaringan Komputer,3,"Dr. Eng. Ir. Jumadi M Parenreng, M.Kom., IPM.; Ir. Rahmaniar, S.Kom., M.Kom.",Satu semester
+123,PTIK D 2025,Kamis,VII-VIII,13.10-14.50,AE 110,21B33C305,Inovasi Teknologi,2,"Prof. Dr. Ir. H. Bakhrani A. Rauf, M.T.; Ninik Rahayu Ashadi, S.Pd., M.Pd.",Satu semester
+124,PTIK D 2025,Selasa,IV-VI,10.05-12.40,AE 106,21B33C306,Kecerdasan Buatan,3,"Dr. Imran, S.Kom., M.Pd.; Abd Salam At Taqwa, S.Pd., M.Kom.",Satu semester
+125,PTIK D 2025,Senin,IX-XI,14.50-17.30,AE 109,21B33C307,Keamanan Komputer,3,"Ir. Wahyu Hidayat M, S.Pd., M.Pd.; Fadhlirrahman Baso, S.Pd., M.Pd.",Satu semester
+126,PTIK D 2025,Kamis,I-III,07.30-10.05,Lab Pemrograman,21B33C308,Pemrograman Web,3,"M. Syahid Nur Wahid, M.Pd.; Mushaf, S. Kom., M.Kom.",Satu semester
+127,PTIK E 2025,Senin,VII-VIII,13.10-14.50,AE 108,21B33C301,Profesi Kependidikan,2,"Prof. Dr. H. Syahrul, M.Pd.; Mardiana, S.Pd., M.Pd.",Satu semester
+128,PTIK E 2025,Kamis,IX-XI,14.50-17.30,AE 107,21B33C302,Strategi Pembelajaran,3,"Prof. Dr. Muhammad Rais, S.Pd., M.P., M.T.; Ninik Rahayu Ashadi, S.Pd., M.Pd.",Satu semester
+129,PTIK E 2025,Rabu,I-III,07.30-10.05,AE 107,21B33C303,Struktur Data,3,"Alifya NFH, S.Pd., M.Pd.; Muh. Akbar, S.Pd., M.Pd.",Satu semester
+130,PTIK E 2025,Rabu,IX-XI,14.50-17.30,Lab Jaringan,21B33C304,Jaringan Komputer,3,"Abd. Rahman Patta, S.Kom., M.T., Ph.D.; Dr. Haekal Febriansyah Ramadhan, S.T., M.T., M.Pd.",Satu semester
+131,PTIK E 2025,Kamis,I-II,07.30-09.10,AE 209,21B33C305,Inovasi Teknologi,2,"Dr. Ir. Mustari S. Lamada, S.Pd., M.T.; Nurmayanti, S.Pd., M.Pd.",Satu semester
+132,PTIK E 2025,Jumat,IX-XI,14.50-17.30,AE 102,21B33C306,Kecerdasan Buatan,3,"Muhammad Fajar B, S.Pd., M.Cs.; Abd Salam At Taqwa, S.Pd., M.Kom.",Satu semester
+133,PTIK E 2025,Selasa,IX-XI,14.50-17.30,Lab ICT 4,21B33C307,Keamanan Komputer,3,"Dr. Eng. Ir. Abdul Wahid, ST., M.Kom., IPM.; Veronika Asri Tandirerung, S.Pd, M.Pd.",Satu semester
+134,PTIK E 2025,Kamis,IV-VI,10.05-12.40,Lab Pemrograman,21B33C308,Pemrograman Web,3,"Ayu Tri Wardani, S.Pd., M.Pd.; Kurnia Wahyu Prima, S.Pd., M.Pd.T.",Satu semester
+135,PTIK F 2025,Selasa,VII-VIII,13.10-14.50,Lab Animasi,21B33C301,Profesi Kependidikan,2,"Prof. Dr. H. Syahrul, M.Pd.; Mardiana, S.Pd., M.Pd.",Satu semester
+136,PTIK F 2025,Selasa,I-III,07.30-10.05,Lab ICT 4,21B33C302,Strategi Pembelajaran,3,"Prof. Dr. H. Syahrul, M.Pd.; Suci Anita Octavia, S.Pd., M.Pd.",Satu semester
+137,PTIK F 2025,Rabu,IV-VI,10.05-12.40,AE 110,21B33C303,Struktur Data,3,"Alifya NFH, S.Pd., M.Pd.; Muh. Akbar, S.Pd., M.Pd.",Satu semester
+138,PTIK F 2025,Senin,IX-XI,14.50-17.30,AE 106,21B33C304,Jaringan Komputer,3,"Dr. Ir. Muliadi, S.Pd., M.T.; Kurnia Wahyu Prima, S.Pd., M.Pd.T.",Satu semester
+139,PTIK F 2025,Kamis,V-VI,11.00-12.40,AE 209,21B33C305,Inovasi Teknologi,2,"Dr. Ir. Mustari S. Lamada, S.Pd., M.T.; Mudarris, S.Pd., M.Eng.",Satu semester
+140,PTIK F 2025,Rabu,I-III,07.30-10.05,AE 106,21B33C306,Kecerdasan Buatan,3,"Muhammad Fajar B, S.Pd., M.Cs.; Abd Salam At Taqwa, S.Pd., M.Kom.",Satu semester
+141,PTIK F 2025,Senin,I-III,07.30-10.05,AE 102,21B33C307,Keamanan Komputer,3,"Dr. Eng. Ir. Abdul Wahid, ST., M.Kom., IPM.; Veronika Asri Tandirerung, S.Pd, M.Pd.",Satu semester
+142,PTIK F 2025,Jumat,III-V,09.15-11.50,Lab ICT 4,21B33C308,Pemrograman Web,3,"Ayu Tri Wardani, S.Pd., M.Pd.; Kurnia Wahyu Prima, S.Pd., M.Pd.T.",Satu semester
+143,PTIK ULANG 2025,Jumat,I-II,07.30-09.10,AE 106,21B33C301,Profesi Kependidikan,2,"Dwi Rezky Anandari Sulaiman, S.Psi., M.Si.; Ainun Nida Rifqi, SPsi, MPSi.T.",Satu semester
+144,PTIK ULANG 2025,Senin,IV-VI,10.05-12.40,AE 215,21B33C302,Strategi Pembelajaran,3,"Dr. Sanatang, S.Pd., M.T.; Dr. Ir. Ridwan Daud Mahande, S.Pd., M.Pd., IPM.",Satu semester
+145,PTIK ULANG 2025,Kamis,IV-VI,10.05-12.40,AE 101,21B33C303,Struktur Data,3,"Muh. Akbar, S.Pd., M.Pd.; Mushaf, S. Kom., M.Kom.",Satu semester
+146,PTIK ULANG 2025,Jumat,VII-IX,13.10-15.40,AE 108,21B33C304,Jaringan Komputer,3,"Dr. Ir. Muliadi, S.Pd., M.T.; Aulyah Zakilah Ifani, M.Kom.",Satu semester
+147,PTIK ULANG 2025,Senin,V-VI,11.00-12.40,AE 101,21B33C305,Inovasi Teknologi,2,"Dr. Ir. Mustari S. Lamada, S.Pd., M.T.; Mudarris, S.Pd., M.Eng.",Satu semester
+148,PTIK ULANG 2025,Kamis,I-III,07.30-10.05,AE 102,21B33C306,Kecerdasan Buatan,3,"Muhammad Fajar B, S.Pd., M.Cs.; Abd Salam At Taqwa, S.Pd., M.Kom.",Satu semester
+149,PTIK ULANG 2025,Rabu,I-III,07.30-10.05,AE 101,21B33C307,Keamanan Komputer,3,"Fadhlirrahman Baso, S.Pd., M.Pd.; Aulyah Zakilah Ifani, M.Kom.",Satu semester
+150,PTIK ULANG 2025,Selasa,I-III,07.30-10.05,AE 109,21B33C308,Pemrograman Web,3,"Ayu Tri Wardani, S.Pd., M.Pd.; Kurnia Wahyu Prima, S.Pd., M.Pd.T.",Satu semester
+151,PTIK ULANG 2025,Senin,IX-X,14.50-16.35,AE 101,21B33C101,Pendidikan Agama Islam (Religion),2,"Muh. Asyam Samjas, S.Pd., M.Pd.; Baso Ilyas, S.Pd.I., M.Pd.",Satu semester
+152,PTIK ULANG 2025,Rabu,VII-VIII,13.10-14.50,AE 108,21B33C108,Matematika Dasar,2,"Wirawan Setialaksana, S.Pd., M.Sc.; Nurul Mukhlisah Abdal, S.Si., M.Si.",Satu semester
+153,PTIK ULANG 2025,Rabu,V-VI,11.00-12.40,AE 101,21B33C605,Game Edukasi,2,"Dr. Sanatang, S.Pd., M.T.; Ayu Widya Listari, S.Pd., M.Pd.",Satu semester
+154,TEKOM A 2025,Selasa,IX-XI,14.50-17.30,Lab Pemrograman,21B01C301,Pemrograman Lanjut,3,"M. Syahid Nur Wahid, M.Pd.; Mushaf, S. Kom., M.Kom.",Satu semester
+155,TEKOM A 2025,Rabu,I-IV,07.30-10.55,Lab Embedded,21B01C302,Sistem Mikroprosessor + Lab,4,"Dr. Satria Gunawan Zain, S.Pd, M.T.; Figur Muhammad, S.Kom., M.Kom.",Satu semester
+156,TEKOM A 2025,Selasa,IV-VI,10.05-12.40,AE 109,21B01C303,Analisis dan Desain Algoritme,3,"Asmaul Husna Nasrullah, S.Kom., M.Kom.; Nurmayanti, S.Pd., M.Pd.",Satu semester
+157,TEKOM A 2025,Rabu,IX-XI,14.50-17.30,AE 109,21B01C304,Matematika Diskrit,3,"Dr. Maya Sari Wahyuni, S.T., M.Kom.; Ayu Hasnining, S. Kom., M. Kom.",Satu semester
+158,TEKOM A 2025,Kamis,V-VI,11.00-12.40,AE 109,21B01C305,Inovasi Teknologi,2,"Ir. Wahyu Hidayat M, S.Pd., M.Pd.; Ninik Rahayu Ashadi, S.Pd., M.Pd.",Satu semester
+159,TEKOM A 2025,Kamis,IX-XI,14.50-17.30,AE 104,21B01C306,Kecerdasan Buatan,3,"Muhammad Fajar B, S.Pd., M.Cs.; Abd Salam At Taqwa, S.Pd., M.Kom.",Satu semester
+160,TEKOM A 2025,Senin,I-III,07.30-10.05,Lab Pemrograman,21B01C307,Pemrograman Web,3,"Abd. Rahman Patta, S.Kom., M.T., Ph.D.; Mushaf, S. Kom., M.Kom.; Andi Baso Kaswar, S.Pd., M.Kom.",Satu semester
+161,TEKOM A 2025,Selasa,I-III,07.30-10.05,Lab Animasi,21B01C308,Desain Antarmuka Pengguna,3,"Kurnia Prima Putra, S.Kom., M.T.; Ayu Hasnining, S. Kom., M. Kom.",Satu semester
+162,TEKOM B 2025,Selasa,I-III,07.30-10.05,Lab Pemrograman,21B01C301,Pemrograman Lanjut,3,"M. Syahid Nur Wahid, M.Pd.; Mushaf, S. Kom., M.Kom.",Satu semester
+163,TEKOM B 2025,Jumat,VII-X,13.10-16.35,Lab Embedded,21B01C302,Sistem Mikroprosessor + Lab,4,"Dr. Satria Gunawan Zain, S.Pd, M.T.; Figur Muhammad, S.Kom., M.Kom.",Satu semester
+164,TEKOM B 2025,Rabu,I-III,07.30-10.05,Lab Pemrograman,21B01C303,Analisis dan Desain Algoritme,3,"Asmaul Husna Nasrullah, S.Kom., M.Kom.; Nurmayanti, S.Pd., M.Pd.",Satu semester
+165,TEKOM B 2025,Kamis,IX-XI,14.50-17.30,AE 109,21B01C304,Matematika Diskrit,3,"Al Imran, ST, MT.; Ayu Hasnining, S. Kom., M. Kom.",Satu semester
+166,TEKOM B 2025,Jumat,I-II,07.30-09.10,AE 110,21B01C305,Inovasi Teknologi,2,"Dr. Ir. Mustari S. Lamada, S.Pd., M.T.; Dr. Eng. Ir. Jumadi M Parenreng, M.Kom., IPM.",Satu semester
+167,TEKOM B 2025,Jumat,III-V,09.15-11.50,Lab Sistem Cerdas,21B01C306,Kecerdasan Buatan,3,"Asmaul Husna Nasrullah, S.Kom., M.Kom.; Abd Salam At Taqwa, S.Pd., M.Kom.",Satu semester
+168,TEKOM B 2025,Senin,IX-XI,14.50-17.30,Lab Pemrograman,21B01C307,Pemrograman Web,3,"Abd. Rahman Patta, S.Kom., M.T., Ph.D.; Mushaf, S. Kom., M.Kom.; Andi Baso Kaswar, S.Pd., M.Kom.",Satu semester
+169,TEKOM B 2025,Senin,IV-VI,10.05-12.40,Lab Animasi,21B01C308,Desain Antarmuka Pengguna,3,"Kurnia Prima Putra, S.Kom., M.T.; Ayu Hasnining, S. Kom., M. Kom.",Satu semester
+170,TEKOM C 2025,Jumat,III-V,09.15-11.50,Lab Pemrograman,21B01C301,Pemrograman Lanjut,3,"Mushaf, S. Kom., M.Kom.; Muh. Akbar, S.Pd., M.Pd.",Satu semester
+171,TEKOM C 2025,Selasa,I-IV,07.30-10.55,Lab Embedded,21B01C302,Sistem Mikroprosessor + Lab,4,"Dr. Ir. Abd. Muis Mappalotteng, S.Pd., M.Pd., M.T., IPM.; Dr. Ir. Mukhlisin, S.Pd., M.Pd., IPM., APEC Eng.",Satu semester
+172,TEKOM C 2025,Selasa,IX-XI,14.50-17.30,AE 109,21B01C303,Analisis dan Desain Algoritme,3,"Asmaul Husna Nasrullah, S.Kom., M.Kom.; Nurmayanti, S.Pd., M.Pd.",Satu semester
+173,TEKOM C 2025,Senin,IX-XI,14.50-17.30,AE 108,21B01C304,Matematika Diskrit,3,"Dr. Iwan Suhardi, ST., MT.; Ayu Tri Wardani, S.Pd., M.Pd.",Satu semester
+174,TEKOM C 2025,Senin,VII-VIII,13.10-14.50,AE 109,21B01C305,Inovasi Teknologi,2,"Dr. Ir. Mustari S. Lamada, S.Pd., M.T.; Ir. Wahyu Hidayat M, S.Pd., M.Pd.",Satu semester
+175,TEKOM C 2025,Jumat,IX-XI,14.50-17.30,Lab Sistem Cerdas,21B01C306,Kecerdasan Buatan,3,"Dyah Darma Andayani, S.T., M.Tel.Eng.; Asmaul Husna Nasrullah, S.Kom., M.Kom.",Satu semester
+176,TEKOM C 2025,Rabu,IV-VI,10.05-12.40,Lab Pemrograman,21B01C307,Pemrograman Web,3,"Dr. Ir. Mustari S. Lamada, S.Pd., M.T.; M. Syahid Nur Wahid, M.Pd.",Satu semester
+177,TEKOM C 2025,Kamis,IV-VI,10.05-12.40,Lab Animasi,21B01C308,Desain Antarmuka Pengguna,3,"Kurnia Prima Putra, S.Kom., M.T.; Ayu Lestari, S.Pd., M.Pd.",Satu semester
+178,TEKOM D 2025,Kamis,IX-XI,14.50-17.30,Lab Pemrograman,21B01C301,Pemrograman Lanjut,3,"Mushaf, S. Kom., M.Kom.; Muh. Akbar, S.Pd., M.Pd.",Satu semester
+179,TEKOM D 2025,Jumat,I-IV,07.30-10.55,Lab Embedded,21B01C302,Sistem Mikroprosessor + Lab,4,"Dr. Ir. Abd. Muis Mappalotteng, S.Pd., M.Pd., M.T., IPM.; Dr. Ir. Mukhlisin, S.Pd., M.Pd., IPM., APEC Eng.",Satu semester
+180,TEKOM D 2025,Jumat,IX-XI,14.50-17.30,AE 109,21B01C303,Analisis dan Desain Algoritme,3,"Nur Azizah Eka Budiarti, S. Kom., M. Kom.; Muhammad Fadhlullah Kh.TQ, S.Si., M.C.S.(AI).",Satu semester
+181,TEKOM D 2025,Senin,I-III,07.30-10.05,AE 110,21B01C304,Matematika Diskrit,3,"Dr. Iwan Suhardi, ST., MT.; Ayu Tri Wardani, S.Pd., M.Pd.",Satu semester
+182,TEKOM D 2025,Rabu,VII-VIII,13.10-14.50,AE 109,21B01C305,Inovasi Teknologi,2,"Dr. Ir. Mustari S. Lamada, S.Pd., M.T.; Mudarris, S.Pd., M.Eng.",Satu semester
+183,TEKOM D 2025,Senin,IX-XI,14.50-17.30,AE 104,21B01C306,Kecerdasan Buatan,3,"Dewi Fatmarani Surianto, S.Kom., M.Kom.; Asmaul Husna Nasrullah, S.Kom., M.Kom.",Satu semester
+184,TEKOM D 2025,Senin,IV-VI,10.05-12.40,Lab Pemrograman,21B01C307,Pemrograman Web,3,"Muhammad Fajar B, S.Pd., M.Cs.; Muh. Akbar, S.Pd., M.Pd.",Satu semester
+185,TEKOM D 2025,Selasa,IV-VI,10.05-12.40,Lab Animasi,21B01C308,Desain Antarmuka Pengguna,3,"Kurnia Prima Putra, S.Kom., M.T.; Ayu Lestari, S.Pd., M.Pd.",Satu semester
+186,TEKOM E 2025,Selasa,IV-VI,10.05-12.40,Lab Pemrograman,21B01C301,Pemrograman Lanjut,3,"Abd. Rahman Patta, S.Kom., M.T., Ph.D.; Mushaf, S. Kom., M.Kom.",Satu semester
+187,TEKOM E 2025,Senin,I-IV,07.30-10.55,Lab Embedded,21B01C302,Sistem Mikroprosessor + Lab,4,"Dr. Satria Gunawan Zain, S.Pd, M.T.; Akhyar Muchtar, S.Pd., M.T.",Satu semester
+188,TEKOM E 2025,Rabu,IV-VI,10.05-12.40,AE 109,21B01C303,Analisis dan Desain Algoritme,3,"Nur Azizah Eka Budiarti, S. Kom., M. Kom.; Muhammad Fadhlullah Kh.TQ, S.Si., M.C.S.(AI).",Satu semester
+189,TEKOM E 2025,Selasa,IX-XI,14.50-17.30,AE 110,21B01C304,Matematika Diskrit,3,"Al Imran, ST, MT.; Ayu Hasnining, S. Kom., M. Kom.",Satu semester
+190,TEKOM E 2025,Selasa,VII-VIII,13.10-14.50,Lab ICT 11,21B01C305,Inovasi Teknologi,2,"Dr. Eng. Ir. Jumadi M Parenreng, M.Kom., IPM.; Ninik Rahayu Ashadi, S.Pd., M.Pd.",Satu semester
+191,TEKOM E 2025,Selasa,I-III,07.30-10.05,Lab Sistem Cerdas,21B01C306,Kecerdasan Buatan,3,"Dewi Fatmarani Surianto, S.Kom., M.Kom.; Asmaul Husna Nasrullah, S.Kom., M.Kom.",Satu semester
+192,TEKOM E 2025,Rabu,IX-XI,14.50-17.30,Lab Pemrograman,21B01C307,Pemrograman Web,3,"Muhammad Fajar B, S.Pd., M.Cs.; Muh. Akbar, S.Pd., M.Pd.",Satu semester
+193,TEKOM E 2025,Senin,IX-XI,14.50-17.30,Lab Animasi,21B01C308,Desain Antarmuka Pengguna,3,"Dr. Ir. Ridwan Daud Mahande, S.Pd., M.Pd., IPM.; Ayu Hasnining, S. Kom., M. Kom.",Satu semester
+194,PTIK A 2024,Kamis,III-IV,09.15-10.55,Lab ICT 10,21B33C501,Metodologi Penelitian,2,"Prof. Dr. H. Syahrul, M.Pd.; Dr. Ir. Ridwan Daud Mahande, S.Pd., M.Pd., IPM.",Satu semester
+195,PTIK A 2024,Jumat,III-V,09.15-11.50,Lab Animasi,21B33C502,Multimedia Pembelajaran,3,"Dr. Fathahillah, S.Pd., M.Eng.; Suci Anita Octavia, S.Pd., M.Pd.",Satu semester
+196,PTIK A 2024,Selasa,IX-X,14.50-16.35,Lab ICT 11,21B33C503,Psikologi Pendidikan,2,"Dwi Rezky Anandari Sulaiman, S.Psi., M.Si.; Ainun Nida Rifqi, SPsi, MPSi.T.",Satu semester
+197,PTIK A 2024,Rabu,I-III,07.30-10.05,AE 209,21B33C504,Teknik Kendali Digital,3,"Dr. Ir. Abd. Muis Mappalotteng, S.Pd., M.Pd., M.T., IPM.; Dr. Zainuddin, S.Pd., M.Pd.",Satu semester
+198,PTIK A 2024,Rabu,IX-XI,14.50-17.30,AE 209,21B33C505,Perencanaan Pembelajaran,3,"Dr. Sanatang, S.Pd., M.T.; Shabrina Syntha Dewi, S.Pd., M.Pd.",Satu semester
+199,PTIK A 2024,Senin,I-III,07.30-10.05,AE 209,21B33C506,Kewirausahaan,3,"Dr. Ir. H. Alimuddin Sa'ban Miru, M.Pd.; Fadhlirrahman Baso, S.Pd., M.Pd.",Satu semester
+200,PTIK B 2024,Kamis,V-VI,11.00-12.40,Lab ICT 10,21B33C501,Metodologi Penelitian,2,"Prof. Dr. H. Syahrul, M.Pd.; Dr. Ir. Ridwan Daud Mahande, S.Pd., M.Pd., IPM.",Satu semester
+201,PTIK B 2024,Jumat,IX-XI,14.50-17.30,Lab Animasi,21B33C502,Multimedia Pembelajaran,3,"Kurnia Wahyu Prima, S.Pd., M.Pd.T.; Ayu Lestari, S.Pd., M.Pd.",Satu semester
+202,PTIK B 2024,Kamis,III-IV,09.15-10.55,AE 103,21B33C503,Psikologi Pendidikan,2,"Dwi Rezky Anandari Sulaiman, S.Psi., M.Si.; Ainun Nida Rifqi, SPsi, MPSi.T.",Satu semester
+203,PTIK B 2024,Rabu,IV-VI,10.05-12.40,AE 106,21B33C504,Teknik Kendali Digital,3,"Dr. Ir. Abd. Muis Mappalotteng, S.Pd., M.Pd., M.T., IPM.; Dr. Zainuddin, S.Pd., M.Pd.",Satu semester
+204,PTIK B 2024,Senin,I-III,07.30-10.05,Lab ICT 10,21B33C505,Perencanaan Pembelajaran,3,"Dr. Sanatang, S.Pd., M.T.; Shabrina Syntha Dewi, S.Pd., M.Pd.",Satu semester
+205,PTIK B 2024,Selasa,I-III,07.30-10.05,AE 209,21B33C506,Kewirausahaan,3,"Dr. Sanatang, S.Pd., M.T.; Fadhlirrahman Baso, S.Pd., M.Pd.",Satu semester
+206,PTIK C 2024,Kamis,VII-VIII,13.10-14.50,AE 104,21B33C501,Metodologi Penelitian,2,"Dr. Ir. Mustari S. Lamada, S.Pd., M.T.; Dr. Iwan Suhardi, ST., MT.",Satu semester
+207,PTIK C 2024,Kamis,IX-XI,14.50-17.30,AE 105,21B33C502,Multimedia Pembelajaran,3,"Kurnia Wahyu Prima, S.Pd., M.Pd.T.; Ayu Lestari, S.Pd., M.Pd.",Satu semester
+208,PTIK C 2024,Rabu,VII-VIII,13.10-14.50,AE 110,21B33C503,Psikologi Pendidikan,2,"Dwi Rezky Anandari Sulaiman, S.Psi., M.Si.; Ainun Nida Rifqi, SPsi, MPSi.T.",Satu semester
+209,PTIK C 2024,Jumat,IX-XI,14.50-17.30,AE 106,21B33C504,Teknik Kendali Digital,3,"Dr. Fathahillah, S.Pd., M.Eng.; Dr. Ir. Mukhlisin, S.Pd., M.Pd., IPM., APEC Eng.",Satu semester
+210,PTIK C 2024,Senin,IV-VI,10.05-12.40,AE 110,21B33C505,Perencanaan Pembelajaran,3,"Prof. Dr. Ir. Riana Tangkin Mangesa, M.T.; Nurmayanti, S.Pd., M.Pd.",Satu semester
+211,PTIK C 2024,Selasa,I-III,07.30-10.05,AE 107,21B33C506,Kewirausahaan,3,"Dr. Ir. Muhammad Riska, S.Pd., M.Pd.; Akhyar Muchtar, S.Pd., M.T.",Satu semester
+212,PTIK D 2024,Rabu,VII-VIII,13.10-14.50,AE 103,21B33C501,Metodologi Penelitian,2,"Dr. Ir. Ridwan Daud Mahande, S.Pd., M.Pd., IPM.; Dr. Iwan Suhardi, ST., MT.",Satu semester
+213,PTIK D 2024,Rabu,IX-XI,14.50-17.30,AE 107,21B33C502,Multimedia Pembelajaran,3,"Ninik Rahayu Ashadi, S.Pd., M.Pd.; Nurmayanti, S.Pd., M.Pd.",Satu semester
+214,PTIK D 2024,Jumat,VII-VIII,13.10-14.50,AE 110,21B33C503,Psikologi Pendidikan,2,"Dwi Rezky Anandari Sulaiman, S.Psi., M.Si.; Ainun Nida Rifqi, SPsi, MPSi.T.",Satu semester
+215,PTIK D 2024,Kamis,IV-VI,10.05-12.40,AE 110,21B33C504,Teknik Kendali Digital,3,"Dr. Fathahillah, S.Pd., M.Eng.; Dr. Ir. Mukhlisin, S.Pd., M.Pd., IPM., APEC Eng.",Satu semester
+216,PTIK D 2024,Rabu,IV-VI,10.05-12.40,AE 108,21B33C505,Perencanaan Pembelajaran,3,"Shabrina Syntha Dewi, S.Pd., M.Pd.; Nurmayanti, S.Pd., M.Pd.",Satu semester
+217,PTIK D 2024,Kamis,VII-IX,13.10-15.40,Lab ICT 11,21B33C506,Kewirausahaan,3,"Dr. Ir. Muhammad Riska, S.Pd., M.Pd.; Akhyar Muchtar, S.Pd., M.T.",Satu semester
+218,PTIK E 2024,Selasa,VII-VIII,13.10-14.50,Lab Pemrograman,21B33C501,Metodologi Penelitian,2,"Prof. Dr. Amiruddin, M.T.; Dr. Ir. Ridwan Daud Mahande, S.Pd., M.Pd., IPM.",Satu semester
+219,PTIK E 2024,Senin,IX-XI,14.50-17.30,AE 105,21B33C502,Multimedia Pembelajaran,3,"Dr. Udin Sidik Sidin, S.Pd, M.T.; Dr. Ir. Muhammad Riska, S.Pd., M.Pd.",Satu semester
+220,PTIK E 2024,Kamis,VII-VIII,13.10-14.50,AE 102,21B33C503,Psikologi Pendidikan,2,"Dwi Rezky Anandari Sulaiman, S.Psi., M.Si.; Ainun Nida Rifqi, SPsi, MPSi.T.",Satu semester
+221,PTIK E 2024,Rabu,IX-XI,14.50-17.30,AE 110,21B33C504,Teknik Kendali Digital,3,"Akhyar Muchtar, S.Pd., M.T.; Ahmad Risal, S.Pd., M.Pd.",Satu semester
+222,PTIK E 2024,Jumat,IX-XI,14.50-17.30,AE 110,21B33C505,Perencanaan Pembelajaran,3,"Dr. Zainuddin, S.Pd., M.Pd.; Srijadi Gowa, S.Pd., M.Pd.",Satu semester
+223,PTIK E 2024,Selasa,IX-XI,14.50-17.30,AE 102,21B33C506,Kewirausahaan,3,"Ir. Fitrah A. Darmawan, S.Pd., M.Pd., IPM.; Dr. Andi Imran, S.Pd., M.T.",Satu semester
+224,PTIK F 2024,Selasa,VII-VIII,13.10-14.50,Lab ICT 4,21B33C501,Metodologi Penelitian,2,"Dr. Ir. Mustari S. Lamada, S.Pd., M.T.; Dr. Iwan Suhardi, ST., MT.",Satu semester
+225,PTIK F 2024,Jumat,IX-XI,14.50-17.30,AE 105,21B33C502,Multimedia Pembelajaran,3,"Dr. Ir. Muhammad Riska, S.Pd., M.Pd.; Dr. Udin Sidik Sidin, S.Pd, M.T.",Satu semester
+226,PTIK F 2024,Jumat,IV-V,10.05-11.50,AE 103,21B33C503,Psikologi Pendidikan,2,"Dwi Rezky Anandari Sulaiman, S.Psi., M.Si.; Ainun Nida Rifqi, SPsi, MPSi.T.",Satu semester
+227,PTIK F 2024,Rabu,I-III,07.30-10.05,AE 110,21B33C504,Teknik Kendali Digital,3,"Akhyar Muchtar, S.Pd., M.T.; Ahmad Risal, S.Pd., M.Pd.",Satu semester
+228,PTIK F 2024,Jumat,I-III,07.30-10.05,AE 107,21B33C505,Perencanaan Pembelajaran,3,"Ninik Rahayu Ashadi, S.Pd., M.Pd.; Shabrina Syntha Dewi, S.Pd., M.Pd.",Satu semester
+229,PTIK F 2024,Senin,IV-VI,10.05-12.40,AE 107,21B33C506,Kewirausahaan,3,"Ir. Fitrah A. Darmawan, S.Pd., M.Pd., IPM.; Dr. Andi Imran, S.Pd., M.T.",Satu semester
+230,PTIK G 2024,Jumat,X-XI,15.40-17.30,AE 108,21B33C501,Metodologi Penelitian,2,"Prof. Dr. H. Syahrul, M.Pd.; Dr. Iwan Suhardi, ST., MT.",Satu semester
+231,PTIK G 2024,Rabu,I-III,07.30-10.05,Lab Animasi,21B33C502,Multimedia Pembelajaran,3,"Dr. Muh. Yusuf Mappeasse, M.Pd.; Muh. Ihsan Zulfikar, S.Pd., M.Pd.",Satu semester
+232,PTIK G 2024,Senin,IX-X,14.50-16.35,AE 103,21B33C503,Psikologi Pendidikan,2,"Dwi Rezky Anandari Sulaiman, S.Psi., M.Si.; Ainun Nida Rifqi, SPsi, MPSi.T.",Satu semester
+233,PTIK G 2024,Kamis,IX-XI,14.50-17.30,AE 110,21B33C504,Teknik Kendali Digital,3,"Dr. Fathahillah, S.Pd., M.Eng.; Dr. Ir. Mukhlisin, S.Pd., M.Pd., IPM., APEC Eng.",Satu semester
+234,PTIK G 2024,Selasa,I-III,07.30-10.05,AE 110,21B33C505,Perencanaan Pembelajaran,3,"Shabrina Syntha Dewi, S.Pd., M.Pd.; Ninik Rahayu Ashadi, S.Pd., M.Pd.",Satu semester
+235,PTIK G 2024,Selasa,IV-VI,10.05-12.40,AE 209,21B33C506,Kewirausahaan,3,"Dr. Sanatang, S.Pd., M.T.; Fadhlirrahman Baso, S.Pd., M.Pd.",Satu semester
+236,PTIK H 2024,Rabu,I-II,07.30-09.10,AE 108,21B33C501,Metodologi Penelitian,2,"Prof. Dr. H. Syahrul, M.Pd.; Dr. Ir. Mustari S. Lamada, S.Pd., M.T.",Satu semester
+237,PTIK H 2024,Rabu,IV-VI,10.05-12.40,Lab Animasi,21B33C502,Multimedia Pembelajaran,3,"Dr. Muh. Yusuf Mappeasse, M.Pd.; Muh. Ihsan Zulfikar, S.Pd., M.Pd.",Satu semester
+238,PTIK H 2024,Kamis,IX-X,14.50-16.35,AE 103,21B33C503,Psikologi Pendidikan,2,"Dwi Rezky Anandari Sulaiman, S.Psi., M.Si.; Ainun Nida Rifqi, SPsi, MPSi.T.",Satu semester
+239,PTIK H 2024,Senin,IX-XI,14.50-17.30,AE 110,21B33C504,Teknik Kendali Digital,3,"Dr. Fathahillah, S.Pd., M.Eng.; Dr. Ir. Mukhlisin, S.Pd., M.Pd., IPM., APEC Eng.",Satu semester
+240,PTIK H 2024,Selasa,IV-VI,10.05-12.40,AE 110,21B33C505,Perencanaan Pembelajaran,3,"Prof. Dr. Ir. Riana Tangkin Mangesa, M.T.; Ninik Rahayu Ashadi, S.Pd., M.Pd.",Satu semester
+241,PTIK H 2024,Senin,IV-VI,10.05-12.40,AE 209,21B33C506,Kewirausahaan,3,"Dr. Ir. H. Alimuddin Sa'ban Miru, M.Pd.; Fadhlirrahman Baso, S.Pd., M.Pd.",Satu semester
+242,PTIK I 2024,Jumat,IV-V,10.05-11.50,AE 109,21B33C501,Metodologi Penelitian,2,"Dr. Ir. Mustari S. Lamada, S.Pd., M.T.; Dr. Iwan Suhardi, ST., MT.",Satu semester
+243,PTIK I 2024,Senin,I-III,07.30-10.05,Lab Animasi,21B33C502,Multimedia Pembelajaran,3,"Muh. Ihsan Zulfikar, S.Pd., M.Pd.; Nurmayanti, S.Pd., M.Pd.",Satu semester
+244,PTIK I 2024,Selasa,VII-VIII,13.10-14.50,AE 109,21B33C503,Psikologi Pendidikan,2,"Dwi Rezky Anandari Sulaiman, S.Psi., M.Si.; Ainun Nida Rifqi, SPsi, MPSi.T.",Satu semester
+245,PTIK I 2024,Selasa,IX-XI,14.50-17.30,AE 106,21B33C504,Teknik Kendali Digital,3,"Dr. Fathahillah, S.Pd., M.Eng.; Dr. Zainuddin, S.Pd., M.Pd.",Satu semester
+246,PTIK I 2024,Rabu,IX-XI,14.50-17.30,AE 108,21B33C505,Perencanaan Pembelajaran,3,"Prof. Dr. H. Ruslan, M.Pd.; Dr. Muh. Yusuf Mappeasse, M.Pd.",Satu semester
+247,PTIK I 2024,Kamis,II-IV,08.20-10.55,Lab ICT 4,21B33C506,Kewirausahaan,3,"Dr. Ir. H. Alimuddin Sa'ban Miru, M.Pd.; Fadhlirrahman Baso, S.Pd., M.Pd.",Satu semester
+248,PTIK Pilihan A 2024,Jumat,VII-VIII,13.10-14.50,Lab Pemrograman,21B33C507,Pengujian Perangkat Lunak*,2,"Ayu Hasnining, S. Kom., M. Kom.; Ayu Lestari, S.Pd., M.Pd.",Satu semester
+249,PTIK Pilihan A 2024,Senin,IV-VI,10.05-12.40,Lab ICT 11,21B33C508,Sistem Informasi Enterprise*,3,"Ayu Tri Wardani, S.Pd., M.Pd.; Mushaf, S. Kom., M.Kom.",Satu semester
+250,PTIK Pilihan A 2024,Kamis,I-III,07.30-10.05,AE 110,21B33C509,Analisa Desain Jaringan**,3,"Kurnia Wahyu Prima, S.Pd., M.Pd.T.; Aulyah Zakilah Ifani, M.Kom.",Satu semester
+251,PTIK Pilihan A 2024,Jumat,I-II,07.30-09.10,Lab Animasi,21B33C510,Jaringan Sensor Nirkabel**,2,"Dr. Ir. Muliadi, S.Pd., M.T.; Dr. Haekal Febriansyah Ramadhan, S.T., M.T., M.Pd.",Satu semester
+252,PTIK Pilihan A 2024,Kamis,VII-VIII,13.10-14.50,Lab Animasi,21B33C511,Videography***,2,"Muh. Ihsan Zulfikar, S.Pd., M.Pd.; Ayu Lestari, S.Pd., M.Pd.",Satu semester
+253,PTIK Pilihan A 2024,Selasa,IX-XI,14.50-17.30,Lab Animasi,21B33C512,VR AR***,3,"Kurnia Prima Putra, S.Kom., M.T.; Muh. Ihsan Zulfikar, S.Pd., M.Pd.",Satu semester
+254,PTIK Pilihan A 2024,Senin,VII-VIII,13.10-14.50,Lab Sistem Cerdas,21B33C513,Data Mining****,2,"Dewi Fatmarani Surianto, S.Kom., M.Kom.; Abd Salam At Taqwa, S.Pd., M.Kom.",Satu semester
+255,PTIK Pilihan A 2024,Rabu,VII-VIII,13.10-14.50,Lab ICT 4,21B33C514,Cloud Computing****,2,"M. Syahid Nur Wahid, M.Pd.; Muhammad Irfan, S.Pd., M.Pd.",Satu semester
+256,PTIK Pilihan A 2024,Selasa,VII-VIII,13.10-14.50,AE 108,21B33C515,Sistem Terdistribusi****,2,"Muh. Mahdinul Bahar, S.Kom.,M.Pd.; Ir. Rahmaniar, S.Kom., M.Kom.",Satu semester
+257,PTIK Pilihan B 2024,Jumat,I-II,07.30-09.10,Lab Pemrograman,21B33C507,Pengujian Perangkat Lunak*,2,"Ayu Hasnining, S. Kom., M. Kom.; Ayu Lestari, S.Pd., M.Pd.",Satu semester
+258,PTIK Pilihan B 2024,Selasa,IX-XI,14.50-17.30,AE 103,21B33C508,Sistem Informasi Enterprise*,3,"Dr. Eng. Muhammad Ayat Hidayat, S.T., M.T.; Ayu Tri Wardani, S.Pd., M.Pd.",Satu semester
+259,PTIK Pilihan B 2024,Senin,IV-VI,10.05-12.40,AE 106,21B33C509,Analisa Desain Jaringan**,3,"Dr. Ir. Muliadi, S.Pd., M.T.; Dr. Haekal Febriansyah Ramadhan, S.T., M.T., M.Pd.",Satu semester
+260,PTIK Pilihan B 2024,Rabu,VII-VIII,13.10-14.50,Lab Animasi,21B33C510,Jaringan Sensor Nirkabel**,2,"Dr. Ir. Muliadi, S.Pd., M.T.; Dr. Haekal Febriansyah Ramadhan, S.T., M.T., M.Pd.",Satu semester
+261,PTIK Pilihan B 2024,Senin,VII-VIII,13.10-14.50,Lab Animasi,21B33C511,Videography***,2,"Muh. Ihsan Zulfikar, S.Pd., M.Pd.; Ayu Lestari, S.Pd., M.Pd.",Satu semester
+262,PTIK Pilihan B 2024,Kamis,IX-XI,14.50-17.30,Lab Animasi,21B33C512,VR AR***,3,"Kurnia Prima Putra, S.Kom., M.T.; Muh. Ihsan Zulfikar, S.Pd., M.Pd.",Satu semester
+263,PTIK Pilihan B 2024,Selasa,VII-VIII,13.10-14.50,Lab Sistem Cerdas,21B33C513,Data Mining****,2,"Dewi Fatmarani Surianto, S.Kom., M.Kom.; Abd Salam At Taqwa, S.Pd., M.Kom.",Satu semester
+264,PTIK Pilihan B 2024,Rabu,IX-X,14.50-16.35,Lab ICT 4,21B33C514,Cloud Computing****,2,"M. Syahid Nur Wahid, M.Pd.; Muhammad Irfan, S.Pd., M.Pd.",Satu semester
+265,PTIK Pilihan B 2024,Jumat,VII-VIII,13.10-14.50,Lab Animasi,21B33C515,Sistem Terdistribusi****,2,"Muh. Mahdinul Bahar, S.Kom.,M.Pd.; Ir. Rahmaniar, S.Kom., M.Kom.",Satu semester
+266,PTIK Pilihan C 2024,Selasa,X-XI,15.40-17.30,AE 101,21B33C507,Pengujian Perangkat Lunak*,2,"Ninik Rahayu Ashadi, S.Pd., M.Pd.; Ayu Lestari, S.Pd., M.Pd.",Satu semester
+267,PTIK Pilihan C 2024,Rabu,IX-XI,14.50-17.30,AE 106,21B33C508,Sistem Informasi Enterprise*,3,"Dr. Eng. Muhammad Ayat Hidayat, S.T., M.T.; Mushaf, S. Kom., M.Kom.",Satu semester
+268,PTIK Pilihan C 2024,Jumat,I-II,07.30-09.10,Lab Sistem Cerdas,21B33C513,Data Mining****,2,"Dewi Fatmarani Surianto, S.Kom., M.Kom.; Abd Salam At Taqwa, S.Pd., M.Kom.",Satu semester
+269,PTIK Pilihan C 2024,Kamis,VII-VIII,13.10-14.50,Lab ICT 4,21B33C514,Cloud Computing****,2,"M. Syahid Nur Wahid, M.Pd.; Muh. Mahdinul Bahar, S.Kom.,M.Pd.",Satu semester
+270,PTIK Pilihan C 2024,Kamis,II-IV,08.20-10.55,Lab ICT 11,21B33C509,Analisa Desain Jaringan**,3,"Dr. Eng. Ir. Jumadi M Parenreng, M.Kom., IPM.; Ir. Rahmaniar, S.Kom., M.Kom.",Satu semester
+271,PTIK Pilihan C 2024,Selasa,II-III,08.20-10.05,Lab ICT 10,21B33C515,Sistem Terdistribusi****,2,"Muh. Mahdinul Bahar, S.Kom.,M.Pd.; Muhammad Irfan, S.Pd., M.Pd.",Satu semester
+272,PTIK Pilihan D 2024,Rabu,VII-VIII,13.10-14.50,AE 106,21B33C513,Data Mining****,2,"Asmaul Husna Nasrullah, S.Kom., M.Kom.; Abd Salam At Taqwa, S.Pd., M.Kom.",Satu semester
+273,PTIK Pilihan D 2024,Jumat,I-II,07.30-09.10,AE 102,21B33C514,Cloud Computing****,2,"M. Syahid Nur Wahid, M.Pd.; Muh. Mahdinul Bahar, S.Kom.,M.Pd.",Satu semester
+274,PTIK Pilihan D 2024,Rabu,IV-VI,10.05-12.40,Lab ICT 4,21B33C508,Sistem Informasi Enterprise*,3,"Dr. Eng. Muhammad Ayat Hidayat, S.T., M.T.; Mushaf, S. Kom., M.Kom.",Satu semester
+275,PTIK ULANG 2024,Senin,VII-VIII,13.10-14.50,AE 101,21B33C501,Metodologi Penelitian,2,"Dr. Ir. Ridwan Daud Mahande, S.Pd., M.Pd., IPM.; Dr. Iwan Suhardi, ST., MT.",Satu semester
+276,PTIK ULANG 2024,Rabu,VII-VIII,13.10-14.50,AE 209,21B33C106,Pendidikan Kewarganegaraan,2,"Fediyatun Muntazarah, S.Pd., M.Pd.; Baso Ilyas, S.Pd.I., M.Pd.",Satu semester
+277,PTIK ULANG 2024,Rabu,I-II,07.30-09.10,AE 104,21B33C110,Pengantar Ilmu Komputer,2,"Dr. Fathahillah, S.Pd., M.Eng.; Ayu Lestari, S.Pd., M.Pd.",Satu semester
+278,PTIK ULANG 2024,Kamis,IX-XI,14.50-17.30,AE 101,21B33C506,Kewirausahaan,3,"Fadhlirrahman Baso, S.Pd., M.Pd.; Ir. Rahmaniar, S.Kom., M.Kom.",Satu semester
+279,PTIK ULANG 2024,Jumat,I-III,07.30-10.05,AE 101,21B33C502,Multimedia Pembelajaran,3,"Dr. Udin Sidik Sidin, S.Pd, M.T.; Nurmayanti, S.Pd., M.Pd.",Satu semester
+280,PTIK ULANG 2024,Selasa,I-III,07.30-10.05,AE 102,21B33C505,Perencanaan Pembelajaran,3,"Prof. Dr. Ir. Riana Tangkin Mangesa, M.T.; Srijadi Gowa, S.Pd., M.Pd.",Satu semester
+281,TEKOM ES-A 2024,Senin,V-VI,11.00-12.40,Lab Embedded,21B01C501,Metodologi Penelitian,2,"Prof. Dr. Hendra Jaya, S.Pd., M.T.; Abd. Rahman Patta, S.Kom., M.T., Ph.D.",Satu semester
+282,TEKOM ES-A 2024,Selasa,I-III,07.30-10.05,AE 108,21B01C502,Kewirausahaan,3,"Dr. Satria Gunawan Zain, S.Pd, M.T.; Ir. Rahmaniar, S.Kom., M.Kom.",Satu semester
+283,TEKOM ES-A 2024,Selasa,IV-VI,10.05-12.40,AE 104,21B01C503,Elektronika Lanjut+Lab,3,"Dr. Ir. Muliadi, S.Pd., M.T.; Dr. Noer Ekafitri Sam, S.Pd., M.Pd.",Satu semester
+284,TEKOM ES-A 2024,Kamis,I-IV,07.30-10.55,Lab Embedded,21B01C504,Sensor & Aktuator + Lab,4,"Dr. Zainuddin, S.Pd., M.Pd.; Figur Muhammad, S.Kom., M.Kom.",Satu semester
+285,TEKOM ES-A 2024,Jumat,III-V,09.15-11.50,AE 110,21B01C505,Gerbang Logika Terprogram,3,"Dr. Eng. Muhammad Ayat Hidayat, S.T., M.T.; Figur Muhammad, S.Kom., M.Kom.",Satu semester
+286,TEKOM ES-A 2024,Senin,VII-VIII,13.10-14.50,Lab Embedded,21B01C506,Pemrosesan Sinyal,2,"Prof. Yasser Abdul Djawad, S.T., M.Sc., Ph.D.; Dyah Darma Andayani, S.T., M.Tel.Eng.",Satu semester
+287,TEKOM JDF-A 2024,Kamis,V-VI,11.00-12.40,Lab Jaringan,21B01C501,Metodologi Penelitian,2,"Dr. Eng. Ir. Abdul Wahid, ST., M.Kom., IPM.; Dr. Eng. Muhammad Ayat Hidayat, S.T., M.T.",Satu semester
+288,TEKOM JDF-A 2024,Selasa,IV-VI,10.05-12.40,AE 105,21B01C502,Kewirausahaan,3,"Dr. Satria Gunawan Zain, S.Pd, M.T.; Ir. Rahmaniar, S.Kom., M.Kom.",Satu semester
+289,TEKOM JDF-A 2024,Kamis,VII-VIII,13.10-14.50,Lab Jaringan,21B01C511,Jaringan Komunikasi Nirkabel,2,"Dr. Eng. Ir. Abdul Wahid, ST., M.Kom., IPM.; Aulyah Zakilah Ifani, M.Kom.",Satu semester
+290,TEKOM JDF-A 2024,Rabu,I-IV,07.30-10.55,Lab Jaringan,21B01C512,Administrasi Jaringan + Lab,4,"Dr. Haekal Febriansyah Ramadhan, S.T., M.T., M.Pd.; Muhammad Irfan, S.Pd., M.Pd.",Satu semester
+291,TEKOM JDF-A 2024,Senin,IV-VI,10.05-12.40,Lab Jaringan,21B01C513,Kriptografi,3,"Dr. Eng. Ir. Abdul Wahid, ST., M.Kom., IPM.; Aulyah Zakilah Ifani, M.Kom.",Satu semester
+292,TEKOM JDF-A 2024,Selasa,I-III,07.30-10.05,Lab Jaringan,21B01C514,Pemrograman Jaringan+Lab,3,"Dr. Eng. Ir. Jumadi M Parenreng, M.Kom., IPM.; Dr. Haekal Febriansyah Ramadhan, S.T., M.T., M.Pd.",Satu semester
+293,TEKOM JDF-B 2024,Jumat,VII-VIII,13.10-14.50,Lab ICT 4,21B01C501,Metodologi Penelitian,2,"Prof. Dr. Drs. Ir. H. Jamaluddin P. M.P., IPM.; Dr. Eng. Ir. Jumadi M Parenreng, M.Kom., IPM.",Satu semester
+294,TEKOM JDF-B 2024,Rabu,IX-XI,14.50-17.30,AE 105,21B01C502,Kewirausahaan,3,"Dr. Satria Gunawan Zain, S.Pd, M.T.; Ir. Rahmaniar, S.Kom., M.Kom.",Satu semester
+295,TEKOM JDF-B 2024,Selasa,VII-VIII,13.10-14.50,Lab Jaringan,21B01C511,Jaringan Komunikasi Nirkabel,2,"Dr. Eng. Ir. Abdul Wahid, ST., M.Kom., IPM.; Aulyah Zakilah Ifani, M.Kom.",Satu semester
+296,TEKOM JDF-B 2024,Kamis,I-IV,07.30-10.55,Lab Jaringan,21B01C512,Administrasi Jaringan + Lab,4,"Dr. Haekal Febriansyah Ramadhan, S.T., M.T., M.Pd.; Muhammad Irfan, S.Pd., M.Pd.",Satu semester
+297,TEKOM JDF-B 2024,Kamis,IX-XI,14.50-17.30,Lab Jaringan,21B01C513,Kriptografi,3,"Dr. Eng. Ir. Abdul Wahid, ST., M.Kom., IPM.; Aulyah Zakilah Ifani, M.Kom.",Satu semester
+298,TEKOM JDF-B 2024,Selasa,IX-XI,14.50-17.30,Lab Jaringan,21B01C514,Pemrograman Jaringan+Lab,3,"Dr. Eng. Ir. Jumadi M Parenreng, M.Kom., IPM.; Dr. Haekal Febriansyah Ramadhan, S.T., M.T., M.Pd.",Satu semester
+299,TEKOM Pilihan A 2024,Selasa,IV-VI,10.05-12.40,Lab Jaringan,21B01C515,Sistem Komputasi Terdistribusi,3,"Dr. Eng. Muhammad Ayat Hidayat, S.T., M.T.; M. Syahid Nur Wahid, M.Pd.",Satu semester
+300,TEKOM Pilihan A 2024,Senin,I-III,07.30-10.05,AE 104,21B01C516,Sistem Temu Kembali,3,"Faisal Najamuddin, S.Pd., M.Eng.; Muhammad Fadhlullah Kh.TQ, S.Si., M.C.S.(AI).",Satu semester
+301,TEKOM Pilihan A 2024,Rabu,V-VI,11.00-12.40,Lab ICT 11,21B01C517,Tata Kelola IT,2,"Faisal Najamuddin, S.Pd., M.Eng.; Ayu Tri Wardani, S.Pd., M.Pd.",Satu semester
+302,TEKOM Pilihan A 2024,Senin,VII-VIII,13.10-14.50,AE 106,21B01C518,Kapita Selekta,2,"Dr. Eng. Ir. Abdul Wahid, ST., M.Kom., IPM.; Aulyah Zakilah Ifani, M.Kom.",Satu semester
+303,TEKOM Pilihan A 2024,Jumat,IX-X,14.50-16.35,AE 103,21B01C519,Interaksi Manusia dan Komputer,2,"Kurnia Prima Putra, S.Kom., M.T.; Ayu Hasnining, S. Kom., M. Kom.",Satu semester
+304,TEKOM Pilihan A 2024,Jumat,I-III,07.30-10.05,AE 103,21B01C520,Instrumentasi Cerdas,3,"Nur Azizah Eka Budiarti, S. Kom., M. Kom.; Dr. Zainuddin, S.Pd., M.Pd.",Satu semester
+305,TEKOM Pilihan A 2024,Senin,IX-XI,14.50-17.30,Lab Jaringan,21B01C521,Wireless Sensor Network,3,"Dr. Eng. Ir. Jumadi M Parenreng, M.Kom., IPM.; Dr. Haekal Febriansyah Ramadhan, S.T., M.T., M.Pd.",Satu semester
+306,TEKOM Pilihan A 2024,Kamis,V-VII,11.00-14.00,Lab Embedded,21B01C522,Sistem Robotika,3,"Dr. Satria Gunawan Zain, S.Pd, M.T.; Figur Muhammad, S.Kom., M.Kom.",Satu semester
+307,TEKOM Pilihan A 2024,Rabu,IX-XI,14.50-17.30,Lab Animasi,21B01C523,Augmented Reality dan Virtual Reality,3,"Kurnia Prima Putra, S.Kom., M.T.; Muh. Ihsan Zulfikar, S.Pd., M.Pd.",Satu semester
+308,TEKOM Pilihan B 2024,Senin,I-III,07.30-10.05,AE 108,21B01C515,Sistem Komputasi Terdistribusi,3,"Dr. Eng. Muhammad Ayat Hidayat, S.T., M.T.; M. Syahid Nur Wahid, M.Pd.",Satu semester
+309,TEKOM Pilihan B 2024,Rabu,IX-XI,14.50-17.30,AE 104,21B01C516,Sistem Temu Kembali,3,"Faisal Najamuddin, S.Pd., M.Eng.; Muhammad Fadhlullah Kh.TQ, S.Si., M.C.S.(AI).",Satu semester
+310,TEKOM Pilihan B 2024,Selasa,V-VI,11.00-12.40,Lab ICT 11,21B01C517,Tata Kelola IT,2,"Faisal Najamuddin, S.Pd., M.Eng.; Ayu Tri Wardani, S.Pd., M.Pd.",Satu semester
+311,TEKOM Pilihan B 2024,Kamis,V-VI,11.00-12.40,Lab ICT 11,21B01C518,Kapita Selekta,2,"Dr. Eng. Ir. Jumadi M Parenreng, M.Kom., IPM.; Aulyah Zakilah Ifani, M.Kom.",Satu semester
+312,TEKOM Pilihan B 2024,Kamis,VII-VIII,13.10-14.50,Lab Sistem Cerdas,21B01C519,Interaksi Manusia dan Komputer,2,"Kurnia Prima Putra, S.Kom., M.T.; Ayu Hasnining, S. Kom., M. Kom.",Satu semester
+313,TEKOM Pilihan B 2024,Rabu,I-III,07.30-10.05,AE 109,21B01C520,Instrumentasi Cerdas,3,"Dessy Ana Laila Sari, S.Si., M.T.; Nur Azizah Eka Budiarti, S. Kom., M. Kom.",Satu semester
+314,TEKOM Pilihan B 2024,Jumat,III-V,09.15-11.50,Lab Jaringan,21B01C521,Wireless Sensor Network,3,"Dr. Eng. Ir. Jumadi M Parenreng, M.Kom., IPM.; Dr. Haekal Febriansyah Ramadhan, S.T., M.T., M.Pd.",Satu semester
+315,TEKOM Pilihan B 2024,Rabu,V-VII,11.00-14.00,Lab Embedded,21B01C522,Sistem Robotika,3,"Dr. Satria Gunawan Zain, S.Pd, M.T.; Figur Muhammad, S.Kom., M.Kom.",Satu semester
+316,TEKOM Pilihan B 2024,Kamis,I-III,07.30-10.05,Lab Animasi,21B01C523,Augmented Reality dan Virtual Reality,3,"Kurnia Prima Putra, S.Kom., M.T.; Muh. Ihsan Zulfikar, S.Pd., M.Pd.",Satu semester
+317,TEKOM Pilihan C 2024,Selasa,VII-VIII,13.10-14.50,AE 102,21B01C519,Interaksi Manusia dan Komputer,2,"Muh. Ihsan Zulfikar, S.Pd., M.Pd.; Ayu Hasnining, S. Kom., M. Kom.",Satu semester
+318,TEKOM SC-A 2024,Senin,I-III,07.30-10.05,Lab Sistem Cerdas,21B01C507,Data Mining,3,"Dewi Fatmarani Surianto, S.Kom., M.Kom.; Asmaul Husna Nasrullah, S.Kom., M.Kom.",Satu semester
+319,TEKOM SC-A 2024,Selasa,IV-VI,10.05-12.40,Lab Sistem Cerdas,21B01C508,Jaringan Syaraf Tiruan,3,"Muhammad Fajar B, S.Pd., M.Cs.; Nur Azizah Eka Budiarti, S. Kom., M. Kom.",Satu semester
+320,TEKOM SC-A 2024,Selasa,IX-XI,14.50-17.30,AE 107,21B01C502,Kewirausahaan,3,"Dr. Sanatang, S.Pd., M.T.; Fadhlirrahman Baso, S.Pd., M.Pd.",Satu semester
+321,TEKOM SC-A 2024,Jumat,VII-VIII,13.10-14.50,Lab Sistem Cerdas,21B01C501,Metodologi Penelitian,2,"Dr. Ir. Ridwan Daud Mahande, S.Pd., M.Pd., IPM.; Dr. Eng. Muhammad Ayat Hidayat, S.T., M.T.",Satu semester
+322,TEKOM SC-A 2024,Kamis,IX-XI,14.50-17.30,Lab Sistem Cerdas,21B01C509,Pengolahan Citra Digital,3,"Nur Azizah Eka Budiarti, S. Kom., M. Kom.; Muhammad Fadhlullah Kh.TQ, S.Si., M.C.S.(AI).",Satu semester
+323,TEKOM SC-A 2024,Kamis,I-II,07.30-09.10,Lab Sistem Cerdas,21B01C510,Sistem Pengambilan Keputusan,2,"Dewi Fatmarani Surianto, S.Kom., M.Kom.; Nur Azizah Eka Budiarti, S. Kom., M. Kom.",Satu semester
+324,TEKOM SC-B 2024,Senin,IV-VI,10.05-12.40,Lab Sistem Cerdas,21B01C507,Data Mining,3,"Dewi Fatmarani Surianto, S.Kom., M.Kom.; Asmaul Husna Nasrullah, S.Kom., M.Kom.",Satu semester
+325,TEKOM SC-B 2024,Senin,IX-XI,14.50-17.30,Lab Sistem Cerdas,21B01C508,Jaringan Syaraf Tiruan,3,"Muhammad Fajar B, S.Pd., M.Cs.; Nur Azizah Eka Budiarti, S. Kom., M. Kom.",Satu semester
+326,TEKOM SC-B 2024,Selasa,IX-XI,14.50-17.30,AE 105,21B01C502,Kewirausahaan,3,"Dr. Satria Gunawan Zain, S.Pd, M.T.; Ir. Rahmaniar, S.Kom., M.Kom.",Satu semester
+327,TEKOM SC-B 2024,Selasa,II-III,08.20-10.05,Lab ICT 11,21B01C501,Metodologi Penelitian,2,"Abd. Rahman Patta, S.Kom., M.T., Ph.D.; Dr. Eng. Ir. Abdul Wahid, ST., M.Kom., IPM.",Satu semester
+328,TEKOM SC-B 2024,Rabu,I-III,07.30-10.05,Lab Sistem Cerdas,21B01C509,Pengolahan Citra Digital,3,"Dyah Darma Andayani, S.T., M.Tel.Eng.; Muhammad Fadhlullah Kh.TQ, S.Si., M.C.S.(AI).",Satu semester
+329,TEKOM SC-B 2024,Kamis,III-IV,09.15-10.55,Lab Sistem Cerdas,21B01C510,Sistem Pengambilan Keputusan,2,"Dewi Fatmarani Surianto, S.Kom., M.Kom.; Nur Azizah Eka Budiarti, S. Kom., M. Kom.",Satu semester
+330,TEKOM SC-C 2024,Selasa,IV-VI,10.05-12.40,AE 107,21B01C507,Data Mining,3,"Dewi Fatmarani Surianto, S.Kom., M.Kom.; Muhammad Fadhlullah Kh.TQ, S.Si., M.C.S.(AI).",Satu semester
+331,TEKOM SC-C 2024,Selasa,IX-XI,14.50-17.30,Lab Sistem Cerdas,21B01C508,Jaringan Syaraf Tiruan,3,"Muhammad Fajar B, S.Pd., M.Cs.; Nur Azizah Eka Budiarti, S. Kom., M. Kom.",Satu semester
+332,TEKOM SC-C 2024,Jumat,I-III,07.30-10.05,AE 109,21B01C502,Kewirausahaan,3,"Dr. Satria Gunawan Zain, S.Pd, M.T.; Fadhlirrahman Baso, S.Pd., M.Pd.",Satu semester
+333,TEKOM SC-C 2024,Kamis,III-IV,09.15-10.55,AE 109,21B01C501,Metodologi Penelitian,2,"Prof. Dr. Hendra Jaya, S.Pd., M.T.; Dr. Ir. Mustari S. Lamada, S.Pd., M.T.",Satu semester
+334,TEKOM SC-C 2024,Senin,IV-VI,10.05-12.40,AE 109,21B01C509,Pengolahan Citra Digital,3,"Dyah Darma Andayani, S.T., M.Tel.Eng.; Muhammad Fadhlullah Kh.TQ, S.Si., M.C.S.(AI).",Satu semester
+335,TEKOM SC-C 2024,Kamis,V-VI,11.00-12.40,Lab Sistem Cerdas,21B01C510,Sistem Pengambilan Keputusan,2,"Dewi Fatmarani Surianto, S.Kom., M.Kom.; Nur Azizah Eka Budiarti, S. Kom., M. Kom.",Satu semester
+336,PTIK A 2023,Selasa,IV-VI,10.05-12.40,AE 101,21B33C601,Statistik,3,"Dr. Ir. Ridwan Daud Mahande, S.Pd., M.Pd., IPM.; Wirawan Setialaksana, S.Pd., M.Sc.",Satu semester
+337,PTIK B 2023,Kamis,IX-XI,14.50-17.30,AE 108,21B33C601,Statistik,3,"Dr. Ir. Ridwan Daud Mahande, S.Pd., M.Pd., IPM.; Nurul Mukhlisah Abdal, S.Si., M.Si.",Satu semester
+338,PTIK ULANG 2023,Kamis,IV-VI,10.05-12.40,AE 108,21B33C606,Pembelajaran Mikro,3,"Dr. Sanatang, S.Pd., M.T.; Nurmayanti, S.Pd., M.Pd.",Satu semester
+339,PTIK ULANG 2023,Senin,V-VI,11.00-12.40,AE 102,21B33C614,Proses Digital dan Simulasi Digital,2,"Dr. Satria Gunawan Zain, S.Pd, M.T.; Faisal Najamuddin, S.Pd., M.Eng.",Satu semester
+340,PTIK ULANG 2023,Senin,VII-VIII,13.10-14.50,Lab Jaringan,21B33C607,Administrasi Jaringan,2,"Dr. Eng. Ir. Jumadi M Parenreng, M.Kom., IPM.; Dr. Haekal Febriansyah Ramadhan, S.T., M.T., M.Pd.",Satu semester
+341,PTIK ULANG 2023,Rabu,VII-VIII,13.10-14.50,AE 101,14B33C203,Eleketronika Analog dan Digital,2,"Dr. Fathahillah, S.Pd., M.Eng.; Dr. Zainuddin, S.Pd., M.Pd.",Satu semester
+342,PTIK ULANG 2023,Senin,I-II,07.30-09.10,AE 101,21B33C602,Kesehatan dan Keselamatan Kerja,2,"Prof. Dr. Ir. H. Muh. Yahya, M.Kes., M.Eng., IPU., ASEAN. Eng.; Dr. Ir. Ridwan Daud Mahande, S.Pd., M.Pd., IPM.",Satu semester
+343,PTIK ULANG 2023,Jumat,III-IV,09.15-10.55,AE 102,14B33C407,Komputer Grafis,2,"Muh. Ihsan Zulfikar, S.Pd., M.Pd.; Ayu Lestari, S.Pd., M.Pd.",Satu semester
+344,PTIK ULANG 2023,Rabu,IX-XI,14.50-17.30,AE 102,21B33C604,Manajemen Proyek TI,3,"Alifya NFH, S.Pd., M.Pd.; Edi Suhardi Rahman, S.Pd, M.Pd.",Satu semester
+345,PTIK ULANG 2023,Kamis,I-III,07.30-10.05,AE 108,21B33C111,Organisasi dan Arsitektur Komputer,3,"Ninik Rahayu Ashadi, S.Pd., M.Pd.; Shabrina Syntha Dewi, S.Pd., M.Pd.",Satu semester
+346,PTIK ULANG 2023,Senin,IX-XI,14.50-17.30,AE 102,14B33C606,Pemrograman 2D dan 3D,3,"Kurnia Prima Putra, S.Kom., M.T.; Muh. Ihsan Zulfikar, S.Pd., M.Pd.",Satu semester
+347,PTIK ULANG 2023,Senin,III-IV,09.15-10.55,AE 101,21B33C104,Pendidikan Agama Hindu,2,"Ngurah Bagus Widhia Kusuma Putra, S.Ikom.",Satu semester
+348,PTIK ULANG 2023,Selasa,VII-IX,13.10-15.40,AE 101,21B33C504,Teknik Kendali Digital,3,"Dr. Ir. Mukhlisin, S.Pd., M.Pd., IPM., APEC Eng.; Ahmad Risal, S.Pd., M.Pd.",Satu semester
+349,TEKOM ULANG 2023,Jumat,III-V,09.15-11.50,AE 108,21B01C615,Keamanan Jaringan,3,"Dr. Eng. Ir. Abdul Wahid, ST., M.Kom., IPM.; Aulyah Zakilah Ifani, M.Kom.",Satu semester
+350,TEKOM ULANG 2023,Kamis,VII-VIII,13.10-14.50,AE 101,21B01C608,Natural Language Processing,2,"Dewi Fatmarani Surianto, S.Kom., M.Kom.; Asmaul Husna Nasrullah, S.Kom., M.Kom.",Satu semester
+351,TEKOM ULANG 2023,Rabu,V-VI,11.00-12.40,AE 102,21B01C617,Proyek Jaringan dan Keamanan,2,"Dr. Eng. Ir. Abdul Wahid, ST., M.Kom., IPM.; Aulyah Zakilah Ifani, M.Kom.",Satu semester
+352,TEKOM ULANG 2023,Rabu,VII-VIII,13.10-14.50,Lab Sistem Cerdas,21B01C601,Information Teori and Decoding,2,"Dr. Maya Sari Wahyuni, S.T., M.Kom.; Muhammad Fadhlullah Kh.TQ, S.Si., M.C.S.(AI).",Satu semester
+353,TEKOM ULANG 2023,Kamis,IX-XI,14.50-17.30,AE 102,21B01C609,Big Data,3,"Dewi Fatmarani Surianto, S.Kom., M.Kom.; Asmaul Husna Nasrullah, S.Kom., M.Kom.",Satu semester
+354,TEKOM ULANG 2023,Senin,IX-XI,14.50-17.30,Lab Embedded,21B01C604,Perancangan VLSI,3,"Dr. Eng. Muhammad Ayat Hidayat, S.T., M.T.; Figur Muhammad, S.Kom., M.Kom.",Satu semester
+355,TEKOM ULANG 2023,Rabu,IX-XI,14.50-17.30,AE 101,21B01C402,Statistik dan Probabilitas,3,"Dr. Iwan Suhardi, ST., MT.; Wirawan Setialaksana, S.Pd., M.Sc.",Satu semester
+356,TEKOM ULANG 2023,Selasa,IV-VI,10.05-12.40,AE 102,21B01C403,Pemodelan dan Metode Numerik,3,"Muliaty Yantahin, S.T., M.T.; Dyah Darma Andayani, S.T., M.Tel.Eng.",Satu semester
+357,TEKOM ULANG 2023,Kamis,IV-VI,10.05-12.40,AE 102,21B01C611,Computer Vision,3,"Muhammad Fajar B, S.Pd., M.Cs.; Muhammad Fadhlullah Kh.TQ, S.Si., M.C.S.(AI).",Satu semester
+358,PTIK ULANG 2020,Senin,VII-VIII,13.10-14.50,AE 102,14B33C308,Jaringan Komputer,2,"Dr. Ir. Muliadi, S.Pd., M.T.; Ir. Rahmaniar, S.Kom., M.Kom.",Satu semester
+359,PTIK ULANG 2020,Jumat,VII-VIII,13.10-14.50,AE 102,14B33C301,Sistem Operasi Komputer,2,"Shabrina Syntha Dewi, S.Pd., M.Pd.; Abd Salam At Taqwa, S.Pd., M.Kom.",Satu semester
+360,PTIK ULANG 2020,Senin,II-III,08.20-10.05,AE 106,14B33C306,Psikologi Pendidikan,2,"Dwi Rezky Anandari Sulaiman, S.Psi., M.Si.; Ainun Nida Rifqi, SPsi, MPSi.T.",Satu semester
+361,PTIK ULANG 2020,Jumat,III-V,09.15-11.50,AE 106,14B33C409,Praktikum Jaringan Komputer,3,"Dr. Ir. Muliadi, S.Pd., M.T.; Ir. Rahmaniar, S.Kom., M.Kom.",Satu semester
+362,PTIK ULANG 2020,Selasa,II-III,08.20-10.05,AE 101,14B33C514,Multimedia dan Konversi,2,"Muh. Ihsan Zulfikar, S.Pd., M.Pd.; Ayu Lestari, S.Pd., M.Pd.",Satu semester
+363,PTIK ULANG 2020,Kamis,I-II,07.30-09.10,AE 101,14B33C502,E-Learning,2,"Prof. Dr. Muhammad Rais, S.Pd., M.P., M.T.; Dr. Ir. Ridwan Daud Mahande, S.Pd., M.Pd., IPM.",Satu semester
+364,TEKOM ULANG 2020,Selasa,IV-VI,10.05-12.40,AE 108,18B01C401,Etika Profesi,3,"Dwi Rezky Anandari Sulaiman, S.Psi., M.Si.; Ainun Nida Rifqi, SPsi, MPSi.T.",Satu semester

@@ -4,7 +4,7 @@
     <head>
         @include('layouts.partials.head', ['title' => trim($__env->yieldContent('title')) ?: null])
     </head>
-    <body class="flex min-h-screen flex-col">
+    <body class="flex min-h-screen flex-col" data-portal="public" data-portal-user="{{ auth()->id() }}" data-login-url="{{ route('login') }}" data-validation-errors="{{ $errors->any() ? 'true' : 'false' }}">
         <header class="border-b border-border bg-surface">
             <div class="mx-auto flex h-[88px] w-full max-w-[1168px] items-center justify-between px-8">
                 <a href="{{ route('home') }}" class="text-[28px] font-bold tracking-tight text-primary">SICMA</a>

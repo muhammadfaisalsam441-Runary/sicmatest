@@ -94,6 +94,7 @@ Route::post('/dosen/impor', [LecturerController::class, 'import'])->name('lectur
 
 Route::get('/pembagian-mengajar', [TeachingAssignmentController::class, 'index'])->name('teaching.index');
 Route::post('/pembagian-mengajar', [TeachingAssignmentController::class, 'store'])->name('teaching.store');
+Route::post('/pembagian-mengajar/batch', [TeachingAssignmentController::class, 'batchStore'])->name('teaching.batch');
 Route::post('/pembagian-mengajar/{assignment}/kunci', [TeachingAssignmentController::class, 'toggleLock'])->name('teaching.lock');
 Route::delete('/pembagian-mengajar/{assignment}', [TeachingAssignmentController::class, 'destroy'])->name('teaching.destroy');
 

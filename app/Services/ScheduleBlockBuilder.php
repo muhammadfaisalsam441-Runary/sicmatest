@@ -59,6 +59,10 @@ class ScheduleBlockBuilder
     {
         $period = $version->period;
 
+        if ($period->start_date === null || $period->end_date === null) {
+            return [];
+        }
+
         $skippedDates = $period->calendarExceptions
             ->mapWithKeys(fn ($exception): array => [$exception->date->toDateString() => true]);
 

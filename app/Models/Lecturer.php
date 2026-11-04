@@ -16,7 +16,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 /**
  * Dosen. Data yang belum pasti berstatus "Perlu verifikasi" (B16).
  */
-#[Fillable(['name', 'nidn', 'homebase', 'profile_status', 'is_active', 'source_name'])]
+#[Fillable(['name', 'nidn', 'nip', 'homebase', 'profile_status', 'is_active', 'source_name', 'source_data'])]
 class Lecturer extends Model
 {
     /** @use HasFactory<LecturerFactory> */
@@ -33,6 +33,7 @@ class Lecturer extends Model
             'homebase' => LecturerHomebase::class,
             'profile_status' => LecturerProfileStatus::class,
             'is_active' => 'boolean',
+            'source_data' => 'array',
         ];
     }
 

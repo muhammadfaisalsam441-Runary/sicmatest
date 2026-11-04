@@ -1,0 +1,94 @@
+<style>
+  body {
+    margin: 0;
+    font-family: var(--font-family-default, Inter, sans-serif);
+    color: var(--figma-color-text);
+    background: var(--figma-color-bg);
+    padding: 12px;
+    box-sizing: border-box;
+  }
+  .header-title {
+    font-size: 14px;
+    font-weight: 700;
+    margin: 0 0 4px 0;
+    color: var(--figma-color-text);
+  }
+  .badge {
+    display: inline-block;
+    padding: 2px 6px;
+    font-size: 10px;
+    font-weight: 600;
+    background: #e7efff;
+    color: #052778;
+    border-radius: 4px;
+    margin-bottom: 8px;
+  }
+  .info {
+    font-size: 11px;
+    line-height: 1.45;
+    color: var(--figma-color-text-secondary);
+    margin: 0 0 10px 0;
+  }
+  .status {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: var(--figma-color-bg-secondary);
+    color: var(--figma-color-text);
+    margin-bottom: 12px;
+    word-break: break-word;
+  }
+  .btn-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+</style>
+
+<div class="header-title">SICMA Optimizer (v5)</div>
+<div class="badge">Fix Filter 'Saya' + ERD + Screens</div>
+<p class="info">
+  Perbaikan label filter (mengubah 'Saya 2' / 'Saya 1' menjadi 'Saya'), optimasi font tabel ERD 20px, dan penataan layar Lo-Fi & Hi-Fi SICMA.
+</p>
+
+<div id="status" class="status">⏳ Siap menjalankan perbaikan...</div>
+
+<div class="btn-group">
+  <fig-button id="btn-filter" variant="primary" style="width: 100%;">🏷️ Perbaiki Label Filter "Saya" Saja</fig-button>
+  <fig-button id="btn-erd" variant="secondary" style="width: 100%;">⚡ Terapkan Perbaikan ERD</fig-button>
+  <fig-button id="btn-all" variant="secondary" style="width: 100%;">🚀 Terapkan Seluruhnya (Filter + ERD + Layar)</fig-button>
+</div>
+
+<script>
+  const statusEl = document.getElementById("status");
+
+  document.getElementById("btn-filter").onclick = () => {
+    statusEl.textContent = "⏳ Memperbaiki label Filter 'Saya'...";
+    parent.postMessage({ pluginMessage: { type: "run-filter" } }, "*");
+  };
+
+  document.getElementById("btn-erd").onclick = () => {
+    statusEl.textContent = "⏳ Memperbesar font & merapikan ERD...";
+    parent.postMessage({ pluginMessage: { type: "run-erd" } }, "*");
+  };
+
+  document.getElementById("btn-all").onclick = () => {
+    statusEl.textContent = "⏳ Menerapkan optimasi label, ERD, dan layar...";
+    parent.postMessage({ pluginMessage: { type: "run-all" } }, "*");
+  };
+
+  window.onmessage = (e) => {
+    const msg = e.data.pluginMessage;
+    if (!msg) return;
+    if (msg.type === "done-filter") {
+      statusEl.textContent = "✅ Selesai! (" + msg.count + " label 'Saya' berhasil diperbaiki tanpa angka)";
+    } else if (msg.type === "done-erd") {
+      statusEl.textContent = "✅ Selesai! (" + msg.count + " tabel ERD diperbesar & layout 01 dirapikan)";
+    } else if (msg.type === "done") {
+      statusEl.textContent = "✅ Selesai! (" + msg.count + " perubahan diterapkan)";
+    } else if (msg.type === "error") {
+      statusEl.textContent = "❌ Error: " + msg.message;
+    }
+  };
+</script>

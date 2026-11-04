@@ -2,14 +2,18 @@
 
 namespace App\Services;
 
+use App\Enums\RoomBlockSource;
 use App\Enums\ScheduleSource;
 use App\Enums\ScheduleVersionStatus;
 use App\Enums\SessionMode;
+use App\Enums\SessionPhase;
 use App\Exceptions\DomainException;
 use App\Models\Period;
 use App\Models\Room;
+use App\Models\RoomBlock;
 use App\Models\ScheduleSession;
 use App\Models\ScheduleVersion;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -32,12 +36,18 @@ class DraftService
         return DB::transaction(function () use ($period, $source, $base): ScheduleVersion {
             $versionNo = (int) $period->scheduleVersions()->lockForUpdate()->max('version_no') + 1;
 
+            $effectiveFrom = now()->startOfDay()->max($period->start_date);
+
+            if ($period->end_date !== null && $effectiveFrom->greaterThan($period->end_date)) {
+                $effectiveFrom = $period->start_date ?? $period->end_date;
+            }
+
             $draft = $period->scheduleVersions()->create([
                 'version_no' => $versionNo,
                 'status' => ScheduleVersionStatus::Draft,
                 'source' => $source,
                 'based_on_version_id' => $base?->id,
-                'effective_from' => now()->max($period->start_date)->toDateString(),
+                'effective_from' => $effectiveFrom->toDateString(),
                 'lock_version' => 0,
             ]);
 
@@ -134,17 +144,20 @@ class DraftService
             return collect();
         }
 
-        $session->loadMissing('participants');
+        $session->loadMissing(['participants', 'version.period.calendarExceptions']);
 
         $occupied = ScheduleSession::query()
             ->where('schedule_version_id', $session->schedule_version_id)
             ->whereKeyNot($session->id)
             ->where('mode', SessionMode::Offline)
             ->where('day_of_week', $session->day_of_week)
+            ->when($session->phase !== SessionPhase::Full, fn ($query) => $query->whereIn('phase', [SessionPhase::Full, $session->phase]))
             ->where('start_minute', '<', $session->end_minute)
             ->where('end_minute', '>', $session->start_minute)
             ->whereNotNull('room_id')
-            ->pluck('room_id');
+            ->pluck('room_id')
+            ->merge($this->externallyOccupiedRoomIds($session))
+            ->unique();
 
         $students = $session->participants->pluck('student_count');
         $needed = $students->contains(null) ? null : $students->sum();
@@ -157,6 +170,61 @@ class DraftService
             ->get()
             ->sortBy('name', SORT_NATURAL)
             ->values();
+    }
+
+    /**
+     * @return Collection<int, int>
+     */
+    private function externallyOccupiedRoomIds(ScheduleSession $session): Collection
+    {
+        $version = $session->version;
+        $period = $version?->period;
+
+        if ($version === null || $period === null || $period->start_date === null || $period->end_date === null) {
+            return collect();
+        }
+
+        $from = CarbonImmutable::parse($version->effective_from->toDateString())->max(CarbonImmutable::parse($period->start_date->toDateString()));
+        $to = CarbonImmutable::parse(($version->effective_to ?? $period->end_date)->toDateString())->min(CarbonImmutable::parse($period->end_date->toDateString()));
+
+        if ($from->greaterThan($to)) {
+            return collect();
+        }
+
+        $holidays = $period->calendarExceptions->map(fn ($exception): string => $exception->date->toDateString())->all();
+        $blocks = RoomBlock::query()
+            ->active()
+            ->whereIn('source_type', [RoomBlockSource::Reservation, RoomBlockSource::Closure])
+            ->overlapping($from->startOfDay(), $to->endOfDay())
+            ->get();
+
+        $occupied = collect();
+
+        foreach ($blocks as $block) {
+            for ($date = CarbonImmutable::instance($block->start_at)->startOfDay()->max($from); $date->lessThanOrEqualTo($to) && $date->lessThan($block->end_at); $date = $date->addDay()) {
+                if ($date->dayOfWeekIso !== $session->day_of_week || in_array($date->toDateString(), $holidays, true)) {
+                    continue;
+                }
+
+                if ($session->phase === SessionPhase::BeforeUts && $period->uts_start !== null && $date->greaterThanOrEqualTo($period->uts_start)) {
+                    continue;
+                }
+
+                if ($session->phase === SessionPhase::AfterUts && $period->uts_end !== null && $date->lessThanOrEqualTo($period->uts_end)) {
+                    continue;
+                }
+
+                $blockStart = $block->start_at->lessThan($date) ? 0 : $block->start_at->hour * 60 + $block->start_at->minute;
+                $blockEnd = $block->end_at->greaterThanOrEqualTo($date->addDay()) ? 1440 : $block->end_at->hour * 60 + $block->end_at->minute;
+
+                if ($blockStart < $session->end_minute && $blockEnd > $session->start_minute) {
+                    $occupied->push($block->room_id);
+                    break;
+                }
+            }
+        }
+
+        return $occupied;
     }
 
     private function assertDraft(ScheduleVersion $version): void

@@ -7,10 +7,14 @@
     $durationOptions = collect([30, 60, 90, 120, 150, 180])
         ->filter(fn ($minutes) => $minutes >= config('sicma.reservation.min_minutes') && $minutes <= config('sicma.reservation.max_minutes'))
         ->mapWithKeys(fn ($minutes) => [$minutes => Wita::duration($minutes)]);
-    [$openHour] = explode(':', config('sicma.operating_hours.start'));
-    [$closeHour] = explode(':', config('sicma.operating_hours.end'));
+    [$openHour, $openMinute] = array_map('intval', explode(':', (string) config('sicma.operating_hours.start')));
+    [$closeHour, $closeMinute] = array_map('intval', explode(':', (string) config('sicma.operating_hours.end')));
+    $openMinutes = $openHour * 60 + $openMinute;
+    $lastStartMinutes = ($closeHour * 60 + $closeMinute) - (int) config('sicma.reservation.min_minutes');
     $timeOptions = collect(['sekarang' => 'Sekarang • '.Wita::clock(now())])
-        ->merge(collect(range((int) $openHour, (int) $closeHour - 1))->flatMap(fn ($hour) => [sprintf('%02d:00', $hour) => sprintf('%02d:00 WITA', $hour), sprintf('%02d:30', $hour) => sprintf('%02d:30 WITA', $hour)]));
+        ->merge(collect(range($openMinutes, $lastStartMinutes, 30))->mapWithKeys(fn (int $minutes) => [
+            sprintf('%02d:%02d', intdiv($minutes, 60), $minutes % 60) => sprintf('%02d:%02d WITA', intdiv($minutes, 60), $minutes % 60),
+        ]));
     $buildingOptions = $buildings->pluck('name', 'id')->put('lainnya', 'Gedung belum didata');
 @endphp
 
@@ -18,7 +22,7 @@
     <div class="flex flex-col gap-6" x-data="{ loading: false }">
         <x-page-header title="Cari Ruangan" subtitle="Temukan ruangan kosong yang sesuai untuk kelasmu." />
 
-        <form method="GET" action="{{ route('keti.search') }}" x-on:submit="loading = true" class="flex items-center gap-3 rounded-card border border-border bg-surface p-3" role="search">
+        <form method="GET" action="{{ route('keti.search') }}" class="flex items-center gap-3 rounded-card border border-border bg-surface p-3" role="search">
             @foreach (array_filter(['tanggal' => $filters['tanggal'] ?? null, 'durasi' => $filters['durasi'] ?? null, 'gedung' => $filters['gedung'] ?? null, 'orang' => $filters['orang'] ?? null, 'urutan' => $filters['urutan'] ?? null]) as $name => $value)
                 <input type="hidden" name="{{ $name }}" value="{{ $value }}">
             @endforeach
@@ -36,7 +40,7 @@
 
         @if ($showFilter)
             <x-card>
-                <form method="GET" action="{{ route('keti.search') }}" x-on:submit="loading = true" class="flex flex-col gap-5">
+                <form method="GET" action="{{ route('keti.search') }}" class="flex flex-col gap-5">
                     <h2 class="text-lg font-semibold">Atur pencarian</h2>
                     <div class="grid grid-cols-3 gap-4">
                         <x-field label="Tanggal" name="tanggal">

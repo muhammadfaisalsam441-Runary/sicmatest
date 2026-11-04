@@ -90,6 +90,10 @@ class SchedulePublisher
     {
         $draft->loadMissing('period');
 
+        if ($draft->period->start_date === null || $draft->period->end_date === null) {
+            throw new DomainException('INVALID_DATE', 'Lengkapi kalender semester sebelum menetapkan jadwal.');
+        }
+
         if (! in_array($draft->status, [ScheduleVersionStatus::Draft, ScheduleVersionStatus::Ready], true)) {
             throw new DomainException('INVALID_STATUS_TRANSITION', "Versi {$draft->version_no} bukan draf sehingga tidak bisa ditetapkan.");
         }

@@ -23,6 +23,7 @@ class RoomController extends Controller
         $status = match ($request->query('status')) {
             'tersedia' => 'available',
             'digunakan' => 'busy',
+            'tutup' => 'closed',
             default => null,
         };
 
@@ -57,6 +58,7 @@ class RoomController extends Controller
             $keyword !== null => 'Hasil pencarian “'.$keyword.'”',
             $status === 'available' => 'Ruangan tersedia saat ini',
             $status === 'busy' => 'Ruangan sedang digunakan',
+            $status === 'closed' => 'Ruangan tutup saat ini',
             $selectedBuilding !== null => 'Ruangan di gedung '.$selectedBuilding->name,
             $building === 'lainnya' => 'Ruangan lainnya',
             default => 'Semua ruangan JTIK',

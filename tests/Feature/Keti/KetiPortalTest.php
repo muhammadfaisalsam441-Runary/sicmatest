@@ -97,6 +97,18 @@ test('kelas pemesan diambil dari akun, bukan dari request', function () {
     expect($reservation->class_group_id)->toBe($this->classGroup->id);
 });
 
+test('pemesanan lewat fetch mengembalikan tujuan detail reservasi', function () {
+    $room = Room::factory()->create();
+
+    $response = $this->actingAs($this->keti)
+        ->postJson(route('keti.reservations.store'), bookingPayload($room))
+        ->assertCreated();
+
+    $reservation = Reservation::query()->sole();
+    $response->assertJsonPath('redirect_url', route('keti.reservations.show', $reservation))
+        ->assertJsonPath('reservation_id', $reservation->id);
+});
+
 test('kirim ulang formulir yang sama tidak menggandakan reservasi', function () {
     $room = Room::factory()->create();
     $payload = bookingPayload($room);

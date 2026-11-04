@@ -6,9 +6,11 @@ use App\Enums\AvailabilityType;
 use App\Enums\IssueSeverity;
 use App\Enums\LecturerProfileStatus;
 use App\Enums\OptimizationJobStatus;
+use App\Enums\RoomBlockSource;
 use App\Enums\ScheduleSource;
 use App\Enums\ScheduleVersionStatus;
 use App\Enums\SessionMode;
+use App\Enums\SessionPhase;
 use App\Enums\SolverStatus;
 use App\Exceptions\DomainException;
 use App\Jobs\RunScheduleOptimization;
@@ -16,6 +18,7 @@ use App\Models\LecturerAvailability;
 use App\Models\OptimizationJob;
 use App\Models\Period;
 use App\Models\Room;
+use App\Models\RoomBlock;
 use App\Models\ScheduleSession;
 use App\Models\ScheduleVersion;
 use App\Models\User;
@@ -23,10 +26,10 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
-use Illuminate\Support\Facades\Process;
+use Throwable;
 
 /**
- * Susun jadwal otomatis: snapshot data → worker Python (OR-Tools CP-SAT) → hasil SELALU menjadi draf baru (B21).
+ * Susun jadwal otomatis dengan PHP; hasil selalu menjadi draf baru.
  *
  * Jadwal resmi tetap berlaku sampai admin menekan Tetapkan. Status solver disimpan terpisah dari status proses;
  * FEASIBLE tidak pernah disebut optimal.
@@ -48,6 +51,7 @@ class SchedulerService
         private ScheduleValidator $validator,
         private AuditLogger $audit,
         private NotificationService $notifications,
+        private PhpScheduleSolver $solver,
     ) {}
 
     /**
@@ -74,6 +78,12 @@ class SchedulerService
         $warnings = [];
         $base = $this->baseVersion($period);
 
+        if ($period->start_date === null || $period->end_date === null) {
+            $errors[] = 'Lengkapi tanggal mulai dan akhir semester sebelum menyusun jadwal otomatis.';
+        } elseif ($period->end_date->lessThan($period->start_date) || $period->end_date->lessThan(CarbonImmutable::today())) {
+            $errors[] = 'Rentang semester tidak valid atau sudah berakhir. Periksa kalender semester.';
+        }
+
         if ($base === null) {
             $errors[] = 'Belum ada jadwal resmi atau draf sebagai dasar. Impor jadwal perkuliahan lebih dulu.';
         }
@@ -99,6 +109,10 @@ class SchedulerService
 
         if ($base !== null && $errors === []) {
             [$inScope, $fixed] = $this->partition($base, $scope);
+            if ($inScope->merge($fixed)->contains(fn (ScheduleSession $session): bool => $session->phase !== SessionPhase::Full)
+                && ($period->uts_start === null || $period->uts_end === null || $period->uts_end->lessThan($period->uts_start))) {
+                $errors[] = 'Lengkapi rentang UTS yang valid untuk membedakan sesi sebelum dan setelah UTS.';
+            }
 
             if ($inScope->isEmpty()) {
                 $errors[] = match ($scope['type']) {
@@ -109,6 +123,9 @@ class SchedulerService
             }
 
             $withoutLecturer = $inScope->filter(fn (ScheduleSession $session): bool => $session->lecturers->isEmpty())->count();
+            if ($inScope->contains(fn (ScheduleSession $session): bool => $session->is_locked && ! $this->isTimed($session))) {
+                $errors[] = 'Lengkapi waktu sesi terkunci atau buka kuncinya sebelum menyusun jadwal.';
+            }
             if ($withoutLecturer > 0) {
                 $warnings[] = "{$withoutLecturer} sesi belum punya pengajar; bentrok dosen tidak dapat diperiksa untuk sesi tersebut.";
             }
@@ -128,7 +145,7 @@ class SchedulerService
     }
 
     /**
-     * Mulai penyusunan. Mode dari config('sicma.scheduler.run_mode'): detached (default), queue, sync, atau manual (tes).
+     * Antrean PHP menjadi mode utama; sync dan manual dipakai untuk pengujian.
      *
      * @param  array{type: string, class_ids?: list<int>}  $scope
      */
@@ -138,48 +155,50 @@ class SchedulerService
             throw new DomainException('DATA_INCOMPLETE', 'Pilih waktu pencarian Cepat, Seimbang, atau Mendalam.');
         }
 
-        $readiness = $this->readiness($period, $scope);
+        return DB::transaction(function () use ($period, $scope, $timeLimit, $actor): OptimizationJob {
+            Period::query()->whereKey($period->id)->lockForUpdate()->firstOrFail();
+            $readiness = $this->readiness($period, $scope);
 
-        if ($readiness['errors'] !== []) {
-            throw new DomainException('DATA_INCOMPLETE', $readiness['errors'][0], ['errors' => $readiness['errors']]);
-        }
+            if ($readiness['errors'] !== []) {
+                throw new DomainException('DATA_INCOMPLETE', $readiness['errors'][0], ['errors' => $readiness['errors']]);
+            }
 
-        $base = $this->baseVersion($period);
-        $snapshot = $this->snapshot($base, $scope, $timeLimit);
-        $json = json_encode($snapshot, JSON_UNESCAPED_UNICODE);
+            $base = $this->baseVersion($period);
+            $snapshot = $this->snapshot($base, $scope, $timeLimit);
+            $json = json_encode($snapshot, JSON_UNESCAPED_UNICODE);
 
-        // Klik berulang tidak membuat pekerjaan ganda: masukan yang sama dan masih berjalan dipakai ulang.
-        $running = OptimizationJob::query()
-            ->where('input_hash', hash('sha256', $json))
-            ->whereIn('status', [OptimizationJobStatus::Queued, OptimizationJobStatus::Running])
-            ->first();
+            // Klik berulang tidak membuat pekerjaan ganda: masukan yang sama dan masih berjalan dipakai ulang.
+            $running = OptimizationJob::query()
+                ->where('input_hash', hash('sha256', $json))
+                ->whereIn('status', [OptimizationJobStatus::Queued, OptimizationJobStatus::Running])
+                ->first();
 
-        if ($running !== null) {
-            return $running;
-        }
+            if ($running !== null) {
+                return $running;
+            }
 
-        $job = OptimizationJob::create([
-            'schedule_version_id' => $base->id,
-            'scope' => [...$scope, 'base_version_id' => $base->id, 'base_version_no' => $base->version_no, 'in_scope' => $readiness['in_scope']],
-            'time_limit_seconds' => $timeLimit,
-            'status' => OptimizationJobStatus::Queued,
-            'input_hash' => hash('sha256', $json),
-            'created_by' => $actor->id,
-        ]);
+            $job = OptimizationJob::create([
+                'schedule_version_id' => $base->id,
+                'scope' => [...$scope, 'base_version_id' => $base->id, 'base_version_no' => $base->version_no, 'in_scope' => $readiness['in_scope']],
+                'time_limit_seconds' => $timeLimit,
+                'status' => OptimizationJobStatus::Queued,
+                'input_hash' => hash('sha256', $json),
+                'created_by' => $actor->id,
+            ]);
 
-        File::ensureDirectoryExists($this->directory($job));
-        File::put($this->inputPath($job), $json);
+            File::ensureDirectoryExists($this->directory($job));
+            File::put($this->inputPath($job), $json);
 
-        $this->audit->log('optimization.started', $job, null, ['scope' => $job->scope, 'time_limit_seconds' => $timeLimit]);
+            $this->audit->log('optimization.started', $job, null, ['scope' => $job->scope, 'time_limit_seconds' => $timeLimit]);
 
-        match (config('sicma.scheduler.run_mode')) {
-            'queue' => RunScheduleOptimization::dispatch($job),
-            'sync' => $this->runNow($job),
-            'manual' => null,
-            default => $this->launchDetached($job),
-        };
+            match (config('sicma.scheduler.run_mode')) {
+                'sync' => $this->runNow($job),
+                'manual' => null,
+                default => RunScheduleOptimization::dispatch($job)->afterCommit(),
+            };
 
-        return $job->fresh();
+            return $job->fresh();
+        });
     }
 
     /**
@@ -187,43 +206,62 @@ class SchedulerService
      */
     public function runNow(OptimizationJob $job): OptimizationJob
     {
-        $job->forceFill(['status' => OptimizationJobStatus::Running, 'started_at' => now()])->save();
+        $claimed = DB::transaction(function () use ($job): bool {
+            $current = OptimizationJob::query()->whereKey($job->id)->lockForUpdate()->firstOrFail();
+            if ($current->status !== OptimizationJobStatus::Queued) {
+                return false;
+            }
+            $current->forceFill(['status' => OptimizationJobStatus::Running, 'started_at' => now()])->save();
 
-        $result = Process::timeout($job->time_limit_seconds + (int) config('sicma.scheduler.grace_seconds'))
-            ->run([config('sicma.scheduler.python_bin'), config('sicma.scheduler.worker_path'), $this->inputPath($job), $this->outputPath($job)]);
-
-        if (! File::exists($this->outputPath($job))) {
-            return $this->fail($job, 'Worker penyusun jadwal tidak menghasilkan keluaran. '.trim($result->errorOutput() ?: $result->output()));
+            return true;
+        });
+        if (! $claimed) {
+            return $job->fresh();
         }
 
-        return $this->finalize($job, json_decode(File::get($this->outputPath($job)), true) ?? []);
+        try {
+            $json = File::get($this->inputPath($job));
+            if (! hash_equals($job->input_hash, hash('sha256', $json))) {
+                return $this->fail($job, 'Snapshot masukan berubah atau rusak. Mulai penyusunan baru.');
+            }
+            $input = json_decode($json, true, flags: JSON_THROW_ON_ERROR);
+            $output = $this->solver->solve($input, fn (): bool => OptimizationJob::query()->findOrFail($job->id)->status !== OptimizationJobStatus::Running);
+
+            return $this->finalize($job, $output);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return $this->fail($job, 'Generator PHP gagal memproses data. Periksa log aplikasi lalu coba lagi.');
+        }
     }
 
     /**
-     * Periksa proses yang berjalan terpisah: simpan hasilnya bila sudah ada, gagalkan bila melewati batas waktu.
+     * Baca status antrean dan gagalkan proses yang melewati batas waktu.
      */
     public function poll(OptimizationJob $job): OptimizationJob
     {
-        if (! in_array($job->status, [OptimizationJobStatus::Queued, OptimizationJobStatus::Running], true)) {
+        return DB::transaction(function () use ($job): OptimizationJob {
+            $job = OptimizationJob::query()->whereKey($job->id)->lockForUpdate()->firstOrFail();
+            if (! in_array($job->status, [OptimizationJobStatus::Queued, OptimizationJobStatus::Running], true)) {
+                return $job;
+            }
+
+            $deadline = CarbonImmutable::instance($job->started_at ?? $job->created_at)
+                ->addSeconds($job->status === OptimizationJobStatus::Queued ? (int) config('sicma.scheduler.queue_wait_seconds', 600)
+                    : $job->time_limit_seconds + (int) config('sicma.scheduler.grace_seconds'));
+
+            if (now()->greaterThan($deadline)) {
+                return $this->fail($job, $job->status === OptimizationJobStatus::Queued
+                    ? 'Antrean belum diproses. Pastikan service queue Laravel berjalan, lalu coba lagi.'
+                    : 'Generator PHP melewati batas proses. Periksa service queue dan log aplikasi.');
+            }
+
             return $job;
-        }
-
-        if (File::exists($this->outputPath($job))) {
-            return $this->finalize($job, json_decode(File::get($this->outputPath($job)), true) ?? []);
-        }
-
-        $deadline = CarbonImmutable::instance($job->started_at ?? $job->created_at)
-            ->addSeconds($job->time_limit_seconds + (int) config('sicma.scheduler.grace_seconds'));
-
-        if (now()->greaterThan($deadline)) {
-            return $this->fail($job, 'Worker tidak merespons sampai batas waktu. Pastikan Python dan OR-Tools terpasang (lihat README).');
-        }
-
-        return $job;
+        });
     }
 
     /**
-     * Simpan hasil worker. Hanya OPTIMAL/FEASIBLE yang membuat draf baru; jadwal resmi tidak pernah diubah (B21).
+     * Simpan hasil lengkap atau parsial sebagai draf, lalu validasi sebelum memberi status layak.
      *
      * @param  array<string, mixed>  $output
      */
@@ -242,10 +280,44 @@ class SchedulerService
                 'objective' => $output['objective'] ?? null,
                 'wall_time' => $output['wall_time'] ?? null,
                 'unplaced' => $output['unplaced'] ?? [],
+                'unplaced_details' => [],
+                'attempts' => $output['attempts'] ?? null,
             ];
 
-            if (in_array($solverStatus, [SolverStatus::Optimal, SolverStatus::Feasible], true)) {
-                $result = [...$result, ...$this->applyToNewDraft($job, $output['assignments'] ?? [])];
+            $input = json_decode(File::get($this->inputPath($job)), true, flags: JSON_THROW_ON_ERROR);
+            $assignments = $output['assignments'] ?? [];
+            $expected = collect($input['sessions'])->keyBy('id');
+            $base = ScheduleVersion::query()->whereKey($job->scope['base_version_id'])->lockForUpdate()->firstOrFail();
+            $valid = ($input['base_lock_version'] ?? $base->lock_version) === $base->lock_version
+                && $base->period->start_date !== null && $base->period->end_date !== null;
+            if ($valid) {
+                $currentInput = $this->snapshot($base, $job->scope, $job->time_limit_seconds);
+                $valid = $currentInput === $input && is_array($assignments) && $this->solver->accepts($currentInput, $assignments);
+            }
+            $seen = $valid ? array_fill_keys(array_column($assignments, 'id'), true) : [];
+            if (! $valid) {
+                $solverStatus = SolverStatus::ModelInvalid;
+                $result['message'] = 'Data dasar berubah atau keluaran tidak sesuai cakupan/kunci. Jalankan penyusunan baru.';
+            } elseif ($assignments !== [] && in_array($solverStatus, [SolverStatus::Optimal, SolverStatus::Feasible, SolverStatus::Unknown], true)) {
+                $result['unplaced'] = array_values(array_diff($expected->keys()->all(), array_keys($seen)));
+                $details = collect($output['unplaced_details'] ?? [])->keyBy('id');
+                $labels = $base->sessions()->with('participants')->whereIn('id', $result['unplaced'])->get()->keyBy('id');
+                $result['unplaced_details'] = array_map(fn (int $id): array => ['id' => $id,
+                    'label' => $labels[$id]->title.' — '.$labels[$id]->participants->pluck('name')->implode(' + '),
+                    'reason' => $details->get($id)['reason'] ?? 'Belum ditemukan penempatan yang memenuhi aturan.'], $result['unplaced']);
+                $result = [...$result, ...$this->applyToNewDraft($job, $assignments, $result['unplaced'])];
+                $draft = ScheduleVersion::query()->findOrFail($result['draft_version_id']);
+                $this->validator->validate($draft);
+                $result['validation_errors'] = $draft->issues()->whereNull('resolved_at')->where('severity', IssueSeverity::Error)->count();
+                $result['validation_warnings'] = $draft->issues()->whereNull('resolved_at')->where('severity', IssueSeverity::Warning)->count();
+                $result['publishable'] = $result['unplaced'] === [] && $result['validation_errors'] === 0;
+                $solverStatus = $result['publishable'] ? SolverStatus::Feasible : SolverStatus::Unknown;
+                if (! $result['publishable']) {
+                    $result['message'] = count($result['unplaced']).' sesi belum ditempatkan; '.$result['validation_errors'].' masalah wajib perlu diperbaiki sebelum penetapan.';
+                }
+            } elseif (in_array($solverStatus, [SolverStatus::Optimal, SolverStatus::Feasible], true)) {
+                $solverStatus = SolverStatus::Unknown;
+                $result['message'] = 'Tidak ada penempatan yang dihasilkan.';
             }
 
             $job->forceFill([
@@ -262,10 +334,6 @@ class SchedulerService
 
         if ($finalized === null) {
             return $job->fresh();
-        }
-
-        if (isset($finalized->result['draft_version_id'])) {
-            $this->validator->validate(ScheduleVersion::query()->findOrFail($finalized->result['draft_version_id']));
         }
 
         $this->notifications->notify(
@@ -301,18 +369,23 @@ class SchedulerService
      */
     public function snapshot(ScheduleVersion $base, array $scope, int $timeLimit): array
     {
-        $period = $base->period()->with('timeSlots')->firstOrFail();
+        $period = $base->period()->with(['timeSlots', 'calendarExceptions'])->firstOrFail();
         [$inScope, $fixed] = $this->partition($base, $scope);
 
         $slots = $period->timeSlots->sortBy('start_minute')->values();
         $slotLength = $slots->isNotEmpty() ? $slots->first()->end_minute - $slots->first()->start_minute : 50;
 
-        $from = CarbonImmutable::parse($base->effective_from->toDateString());
+        $from = CarbonImmutable::today()->max($period->start_date)->max($base->effective_from);
         $to = CarbonImmutable::parse($period->end_date->toDateString());
         $lecturers = $inScope->flatMap->lecturers->merge($fixed->flatMap->lecturers)->unique('id');
 
         return [
+            'base_lock_version' => $base->lock_version,
             'time_limit' => $timeLimit,
+            'capacity_blocks_publish' => (bool) config('sicma.scheduler.capacity_blocks_publish'),
+            'uts_start' => $period->uts_start?->toDateString(),
+            'uts_end' => $period->uts_end?->toDateString(),
+            'room_blocks' => $this->roomBlocks($period, $from, $to),
             'days' => config('sicma.scheduler.days'),
             'slots' => $slots->map(fn ($slot): array => ['label' => $slot->label, 'start' => $slot->start_minute, 'end' => $slot->end_minute])->all(),
             'rooms' => Room::query()->where('is_active', true)->get()->map(fn (Room $room): array => ['id' => $room->id, 'capacity' => $room->capacity])->all(),
@@ -324,6 +397,9 @@ class SchedulerService
                 ->get()
                 ->map(fn ($availability): array => ['lecturer' => $availability->lecturer_id, 'day' => $availability->day_of_week, 'start' => $availability->start_minute, 'end' => $availability->end_minute])
                 ->all(),
+            'availability' => LecturerAvailability::query()->whereBelongsTo($period)->get()
+                ->map(fn ($availability): array => ['lecturer' => $availability->lecturer_id, 'day' => $availability->day_of_week,
+                    'start' => $availability->start_minute, 'end' => $availability->end_minute, 'type' => $availability->type->value])->all(),
             'fixed' => $fixed->filter(fn (ScheduleSession $session): bool => $this->isTimed($session))->map(fn (ScheduleSession $session): array => [
                 'day' => $session->day_of_week,
                 'start' => $session->start_minute,
@@ -335,7 +411,8 @@ class SchedulerService
             ])->values()->all(),
             'sessions' => $inScope->map(fn (ScheduleSession $session): array => [
                 'id' => $session->id,
-                'duration' => $this->isTimed($session) ? $session->end_minute - $session->start_minute : max(1, $session->courseOffering?->course?->sks ?? 2) * $slotLength,
+                'duration' => $this->isTimed($session) ? $session->end_minute - $session->start_minute
+                    : ($session->source_raw['scheduling_duration_minutes'] ?? max(1, $session->courseOffering?->course?->sks ?? 2) * $slotLength),
                 'mode' => $session->mode === SessionMode::Online ? 'online' : 'offline',
                 'phase' => $session->phase->value,
                 'lecturers' => $session->lecturers->pluck('id')->all(),
@@ -355,7 +432,7 @@ class SchedulerService
      */
     private function partition(ScheduleVersion $base, array $scope): array
     {
-        $sessions = $base->sessions()->with(['participants', 'lecturers.leadershipTerms', 'courseOffering.course'])->get();
+        $sessions = $base->sessions()->with(['participants', 'lecturers.leadershipTerms', 'courseOffering.course'])->orderBy('id')->get();
 
         $problemIds = $scope['type'] === 'terdampak'
             ? $base->issues()->whereNull('resolved_at')->where('severity', IssueSeverity::Error)->pluck('session_ids')->flatten()->unique()
@@ -373,16 +450,29 @@ class SchedulerService
 
     /**
      * @param  list<array{id: int, day: int, start_minute: int, end_minute: int, room_id: int|null}>  $assignments
+     * @param  list<int>  $unplaced
      * @return array{draft_version_id: int, draft_version_no: int, placed: int, changed: int}
      */
-    private function applyToNewDraft(OptimizationJob $job, array $assignments): array
+    private function applyToNewDraft(OptimizationJob $job, array $assignments, array $unplaced): array
     {
         $base = ScheduleVersion::query()->findOrFail($job->scope['base_version_id']);
         $draft = $this->drafts->create($base->period, ScheduleSource::Generated);
         $map = $this->drafts->copySessions($base, $draft);
-        $draft->forceFill(['based_on_version_id' => $base->id])->save();
+        $draft->forceFill(['based_on_version_id' => $base->id, 'effective_from' => $draft->effective_from->max($base->effective_from)->toDateString()])->save();
 
         $changed = 0;
+
+        foreach ($unplaced as $id) {
+            $session = ScheduleSession::query()->findOrFail($map[$id]);
+            if (! $session->is_locked) {
+                $source = $session->source_raw ?? [];
+                if ($this->isTimed($session)) {
+                    $source['scheduling_duration_minutes'] = $session->end_minute - $session->start_minute;
+                }
+                $session->forceFill(['mode' => $session->mode === SessionMode::Online ? SessionMode::Online : SessionMode::Unscheduled,
+                    'day_of_week' => null, 'start_minute' => null, 'end_minute' => null, 'room_id' => null, 'source_raw' => $source])->save();
+            }
+        }
 
         foreach ($assignments as $assignment) {
             $session = ScheduleSession::query()->find($map[$assignment['id']] ?? null);
@@ -406,9 +496,21 @@ class SchedulerService
         return ['draft_version_id' => $draft->id, 'draft_version_no' => $draft->version_no, 'placed' => count($assignments), 'changed' => $changed];
     }
 
-    private function fail(OptimizationJob $job, string $message): OptimizationJob
+    public function fail(OptimizationJob $job, string $message): OptimizationJob
     {
-        $job->forceFill(['status' => OptimizationJobStatus::Failed, 'finished_at' => now(), 'result' => ['message' => $message]])->save();
+        $changed = DB::transaction(function () use ($job, $message): bool {
+            $current = OptimizationJob::query()->whereKey($job->id)->lockForUpdate()->firstOrFail();
+            if (! in_array($current->status, [OptimizationJobStatus::Queued, OptimizationJobStatus::Running], true)) {
+                return false;
+            }
+            $current->forceFill(['status' => OptimizationJobStatus::Failed, 'finished_at' => now(), 'result' => ['message' => $message]])->save();
+
+            return true;
+        });
+        if (! $changed) {
+            return $job->fresh();
+        }
+        $job = $job->fresh();
         $this->audit->log('optimization.failed', $job, null, ['message' => $message]);
         $this->notifications->notify($job->creator, 'optimization.failed', 'Penyusunan jadwal gagal dijalankan', $message, ['optimization_job_id' => $job->id]);
 
@@ -416,22 +518,28 @@ class SchedulerService
     }
 
     /**
-     * Jalankan worker sebagai proses terpisah agar tidak bergantung pada queue worker atau batas waktu request.
+     * Blok reservasi dan penutupan dipisah per tanggal; hari libur tidak menghasilkan sesi kuliah.
+     *
+     * @return list<array{room: int, date: string, day: int, start: int, end: int}>
      */
-    private function launchDetached(OptimizationJob $job): void
+    private function roomBlocks(Period $period, CarbonImmutable $from, CarbonImmutable $to): array
     {
-        $job->forceFill(['status' => OptimizationJobStatus::Running, 'started_at' => now()])->save();
-
-        $arguments = [config('sicma.scheduler.python_bin'), config('sicma.scheduler.worker_path'), $this->inputPath($job), $this->outputPath($job)];
-
-        if (PHP_OS_FAMILY === 'Windows') {
-            $command = 'start "" /B '.implode(' ', array_map(fn (string $argument): string => '"'.$argument.'"', $arguments)).' > NUL 2>&1';
-            pclose(popen($command, 'r'));
-
-            return;
+        $rows = [];
+        $holidays = $period->calendarExceptions->map(fn ($exception): string => $exception->date->toDateString())->all();
+        $blocks = RoomBlock::query()->active()->whereIn('source_type', [RoomBlockSource::Reservation, RoomBlockSource::Closure])
+            ->overlapping($from->startOfDay(), $to->endOfDay())->get();
+        foreach ($blocks as $block) {
+            for ($date = CarbonImmutable::instance($block->start_at)->startOfDay()->max($from); $date->lessThanOrEqualTo($to) && $date->lessThan($block->end_at); $date = $date->addDay()) {
+                if (in_array($date->toDateString(), $holidays, true)) {
+                    continue;
+                }
+                $rows[] = ['room' => $block->room_id, 'date' => $date->toDateString(), 'day' => $date->dayOfWeekIso,
+                    'start' => $block->start_at->lessThan($date) ? 0 : $block->start_at->hour * 60 + $block->start_at->minute,
+                    'end' => $block->end_at->greaterThanOrEqualTo($date->addDay()) ? 1440 : $block->end_at->hour * 60 + $block->end_at->minute];
+            }
         }
 
-        exec('nohup '.implode(' ', array_map('escapeshellarg', $arguments)).' > /dev/null 2>&1 &');
+        return $rows;
     }
 
     private function isTimed(ScheduleSession $session): bool
@@ -439,7 +547,8 @@ class SchedulerService
         return $session->mode !== SessionMode::Unscheduled
             && $session->day_of_week !== null
             && $session->start_minute !== null
-            && $session->end_minute !== null;
+            && $session->end_minute !== null
+            && $session->end_minute > $session->start_minute;
     }
 
     private function directory(OptimizationJob $job): string
@@ -450,10 +559,5 @@ class SchedulerService
     public function inputPath(OptimizationJob $job): string
     {
         return $this->directory($job).DIRECTORY_SEPARATOR.'input.json';
-    }
-
-    public function outputPath(OptimizationJob $job): string
-    {
-        return $this->directory($job).DIRECTORY_SEPARATOR.'output.json';
     }
 }

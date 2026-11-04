@@ -15,7 +15,7 @@ class FavoriteController extends Controller
 {
     public function index(Request $request, AvailabilityService $availability): View
     {
-        $request->validate(['status' => ['nullable', 'in:tersedia,digunakan']]);
+        $request->validate(['status' => ['nullable', 'in:tersedia,digunakan,tutup']]);
 
         $rooms = $request->user()->favoriteRooms()->with(['building', 'facilities'])->where('is_active', true)->orderBy('name')->get();
         $results = $availability->forRooms($rooms, CarbonImmutable::now());
@@ -23,7 +23,8 @@ class FavoriteController extends Controller
 
         $filtered = match ($request->query('status')) {
             'tersedia' => $cards->where('badge', 'Tersedia'),
-            'digunakan' => $cards->where('badge', '!=', 'Tersedia'),
+            'digunakan' => $cards->where('badge', 'Digunakan'),
+            'tutup' => $cards->where('badge', 'Tutup'),
             default => $cards,
         };
 
@@ -32,7 +33,8 @@ class FavoriteController extends Controller
             'counts' => [
                 'all' => $cards->count(),
                 'available' => $cards->where('badge', 'Tersedia')->count(),
-                'busy' => $cards->where('badge', '!=', 'Tersedia')->count(),
+                'busy' => $cards->where('badge', 'Digunakan')->count(),
+                'closed' => $cards->where('badge', 'Tutup')->count(),
             ],
             'status' => $request->query('status'),
         ]);

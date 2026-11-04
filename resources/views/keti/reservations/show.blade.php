@@ -18,8 +18,7 @@
 
 @section('content')
     <div class="flex flex-col gap-6"
-         @if ($status->isActive()) x-data="{ version: {{ $reservation->lock_version }} }"
-         x-init="setInterval(async () => { try { const r = await fetch('{{ route('keti.reservations.status', $reservation) }}', { headers: { Accept: 'application/json' } }); const d = await r.json(); if (d.lock_version !== version || d.status !== '{{ $status->value }}') location.reload(); } catch (e) {} }, {{ (int) config('sicma.polling_seconds') * 1000 }})" @endif>
+         @if ($status->isActive()) x-data="statusPolling({ url: @js(route('keti.reservations.status', $reservation)), interval: {{ (int) config('sicma.polling_seconds') * 1000 }}, version: {{ $reservation->lock_version }}, status: @js($status->value) })" @endif>
         <x-page-header :title="$title" :subtitle="$subtitle" />
 
         @if ($status === ReservationStatus::Cancelled)

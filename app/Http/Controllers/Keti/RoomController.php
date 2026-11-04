@@ -27,7 +27,7 @@ class RoomController extends Controller
             'q' => ['nullable', 'string', 'max:60'],
             'gedung' => ['nullable', 'string', 'max:20'],
             'lantai' => ['nullable', 'integer', 'min:0', 'max:20'],
-            'status' => ['nullable', 'in:tersedia,digunakan'],
+            'status' => ['nullable', 'in:tersedia,digunakan,tutup'],
         ]);
 
         $now = CarbonImmutable::now()->startOfMinute();
@@ -40,6 +40,7 @@ class RoomController extends Controller
             status: match ($filters['status'] ?? null) {
                 'tersedia' => 'available',
                 'digunakan' => 'busy',
+                'tutup' => 'closed',
                 default => null,
             },
             sort: SearchCriteria::SORT_NAME,

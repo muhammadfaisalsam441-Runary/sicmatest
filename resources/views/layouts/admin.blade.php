@@ -4,7 +4,7 @@
     <head>
         @include('layouts.partials.head', ['title' => trim($__env->yieldContent('title')) ?: null])
     </head>
-    <body class="min-h-screen">
+    <body class="min-h-screen" data-portal="admin" data-portal-user="{{ auth()->id() }}" data-login-url="{{ route('login') }}" data-validation-errors="{{ $errors->any() ? 'true' : 'false' }}">
         <div class="grid min-h-screen grid-cols-[240px_1fr]">
             <aside class="sticky top-0 flex h-screen flex-col border-r border-border bg-surface px-4 py-7">
                 <a href="{{ Nav::url('admin.dashboard') }}" class="flex flex-col gap-1 px-3">
@@ -42,7 +42,7 @@
                        'border-border hover:bg-primary-soft/60' => ! Nav::active('admin.keti-accounts.*'),
                    ])>Akun Keti</a>
 
-                <form method="POST" action="{{ Nav::url('logout') }}" class="mt-auto">
+                <form method="POST" action="{{ Nav::url('logout') }}" class="mt-auto" data-native>
                     @csrf
                     <button type="submit" class="flex w-full items-center gap-3 rounded-control border border-border px-4 py-3 text-sm font-medium text-ink hover:bg-danger-soft hover:text-danger">
                         <i data-lucide="log-out" class="size-5"></i>

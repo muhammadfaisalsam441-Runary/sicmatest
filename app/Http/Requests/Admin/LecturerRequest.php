@@ -37,7 +37,17 @@ class LecturerRequest extends FormRequest
             'leadership_from' => ['nullable', 'required_with:leadership_position', 'date'],
             'leadership_to' => ['nullable', 'date', 'after_or_equal:leadership_from'],
             'target_sks' => ['nullable', 'numeric', 'min:0', 'max:60'],
-            'max_sks' => ['nullable', 'numeric', 'min:0', 'max:60'],
+            'max_sks' => ['nullable', 'numeric', 'min:0', 'max:60', ...($this->filled('target_sks') ? ['gte:target_sks'] : [])],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'max_sks.gte' => 'Maksimum SKS harus lebih besar atau sama dengan target SKS.',
         ];
     }
 

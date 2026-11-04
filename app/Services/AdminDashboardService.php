@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\LecturerProfileStatus;
+use App\Enums\RoomStatus;
 use App\Enums\ScheduleVersionStatus;
 use App\Models\Lecturer;
 use App\Models\Period;
@@ -47,19 +48,23 @@ class AdminDashboardService
     public function roomStatuses(CarbonInterface $at): Collection
     {
         $rooms = Room::query()->with('building')->where('is_active', true)->get();
-
-        return $this->availability->forRooms($rooms, $at)
+        $results = $this->availability->forRooms($rooms, $at)
             ->sortBy(fn (AvailabilityResult $result): string => $result->room->name, SORT_NATURAL)
-            ->values()
-            ->map(function (AvailabilityResult $result): array {
-                $agenda = $result->currentBlock !== null ? $this->agenda->describe($result->currentBlock) : null;
+            ->values();
+        $agendas = $this->agenda->describeMany(
+            $results->map(fn (AvailabilityResult $result) => $result->currentBlock)->filter()->values()
+        );
+
+        return $results
+            ->map(function (AvailabilityResult $result) use ($agendas): array {
+                $agenda = $result->currentBlock !== null ? $agendas->get($result->currentBlock->id) : null;
                 $until = $result->isAvailable() ? $result->freeUntil : $result->busyUntil;
 
                 return [
                     'room' => $result->room->name,
                     'class' => $agenda['class'] ?? null,
                     'title' => $agenda['title'] ?? ($result->isAvailable() ? 'Tersedia untuk kelas' : ($result->reason ?? '—')),
-                    'until' => $until !== null ? 'Hingga '.Wita::clock($until, false) : '—',
+                    'until' => $until !== null ? ($result->status === RoomStatus::Closed ? 'Buka ' : 'Hingga ').Wita::clock($until, false) : '—',
                     'badge' => $result->badge(),
                     'variant' => match (true) {
                         $result->isAvailable() => 'success',

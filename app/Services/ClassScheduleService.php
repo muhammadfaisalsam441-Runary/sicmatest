@@ -27,6 +27,9 @@ class ClassScheduleService
 
         return ScheduleVersion::query()
             ->published()
+            ->whereHas('period', fn (Builder $query) => $query
+                ->whereDate('start_date', '<=', $day)
+                ->whereDate('end_date', '>=', $day))
             ->whereDate('effective_from', '<=', $day)
             ->where(fn (Builder $query) => $query->whereNull('effective_to')->orWhereDate('effective_to', '>=', $day))
             ->with('period.calendarExceptions')
@@ -61,7 +64,8 @@ class ClassScheduleService
 
     private function hasClassesOn(Period $period, CarbonImmutable $date): bool
     {
-        return $date->betweenIncluded($period->start_date, $period->end_date)
+        return $period->start_date !== null && $period->end_date !== null
+            && $date->betweenIncluded($period->start_date, $period->end_date)
             && ! $period->calendarExceptions->contains(fn ($exception): bool => $exception->date->isSameDay($date));
     }
 

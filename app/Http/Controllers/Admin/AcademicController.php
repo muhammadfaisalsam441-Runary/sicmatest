@@ -54,6 +54,18 @@ class AcademicController extends Controller
     {
         $before = $period->only(array_keys($request->validated()));
         $period->update($request->validated());
+
+        if ($period->start_date !== null && $period->end_date !== null) {
+            $alignedEffectiveFrom = now()->startOfDay()->max($period->start_date)->min($period->end_date)->toDateString();
+
+            $period->scheduleVersions()
+                ->drafts()
+                ->where(fn ($query) => $query
+                    ->whereDate('effective_from', '<', $period->start_date->toDateString())
+                    ->orWhereDate('effective_from', '>', $period->end_date->toDateString()))
+                ->update(['effective_from' => $alignedEffectiveFrom]);
+        }
+
         $this->audit->log('period.updated', $period, $before, $period->only(array_keys($request->validated())));
 
         return back()->with('toast', ['type' => 'success', 'title' => 'Kalender semester disimpan']);

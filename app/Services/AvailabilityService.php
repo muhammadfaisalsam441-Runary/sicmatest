@@ -91,7 +91,8 @@ class AvailabilityService
 
         $results = match ($criteria->status) {
             'available' => $results->filter->isAvailable(),
-            'busy' => $results->reject->isAvailable(),
+            'busy' => $results->filter(fn (AvailabilityResult $result): bool => in_array($result->status, [RoomStatus::Scheduled, RoomStatus::Booked, RoomStatus::InUse], true)),
+            'closed' => $results->where('status', RoomStatus::Closed),
             default => $results,
         };
 
@@ -111,7 +112,8 @@ class AvailabilityService
         return [
             'all' => $results->count(),
             'available' => $results->filter->isAvailable()->count(),
-            'busy' => $results->filter(fn (AvailabilityResult $result): bool => ! $result->isAvailable() && $result->status !== RoomStatus::Uncertain)->count(),
+            'busy' => $results->filter(fn (AvailabilityResult $result): bool => in_array($result->status, [RoomStatus::Scheduled, RoomStatus::Booked, RoomStatus::InUse], true))->count(),
+            'closed' => $results->where('status', RoomStatus::Closed)->count(),
             'uncertain' => $results->where('status', RoomStatus::Uncertain)->count(),
             'by_building' => $rooms->countBy(fn (Room $room): string => $room->building?->name ?? 'Gedung belum didata')->all(),
         ];

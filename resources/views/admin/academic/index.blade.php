@@ -37,8 +37,8 @@
                             @method('PUT')
                             <x-field label="Semester & tahun akademik" name="name"><x-input name="name" :value="$period->name" required /></x-field>
                             <div class="grid grid-cols-2 gap-3">
-                                <x-field label="Mulai kuliah" name="start_date"><x-input type="date" name="start_date" :value="$period->start_date->toDateString()" required /></x-field>
-                                <x-field label="Akhir kuliah" name="end_date"><x-input type="date" name="end_date" :value="$period->end_date->toDateString()" required /></x-field>
+                                <x-field label="Mulai kuliah" name="start_date"><x-input type="date" name="start_date" :value="$period->start_date?->toDateString()" required /></x-field>
+                                <x-field label="Akhir kuliah" name="end_date"><x-input type="date" name="end_date" :value="$period->end_date?->toDateString()" required /></x-field>
                                 <x-field label="Mulai UTS" name="uts_start"><x-input type="date" name="uts_start" :value="$period->uts_start?->toDateString()" /></x-field>
                                 <x-field label="Selesai UTS" name="uts_end"><x-input type="date" name="uts_end" :value="$period->uts_end?->toDateString()" /></x-field>
                                 <x-field label="Mulai UAS" name="uas_start"><x-input type="date" name="uas_start" :value="$period->uas_start?->toDateString()" /></x-field>
@@ -93,9 +93,9 @@
                         @foreach ($period->timeSlots as $slot)
                             <div class="flex items-center gap-2 rounded-control border border-border px-3 py-2">
                                 <span class="w-10 text-sm font-semibold">{{ $slot->label }}</span>
-                                <input type="time" name="slots[{{ $slot->id }}][start]" value="{{ $clock($slot->start_minute) }}" class="w-full rounded border border-border px-2 py-1 text-sm" aria-label="Mulai slot {{ $slot->label }}">
+                                <input type="time" name="slots[{{ $slot->id }}][start]" min="{{ config('sicma.operating_hours.start') }}" max="{{ config('sicma.operating_hours.end') }}" value="{{ $clock($slot->start_minute) }}" class="w-full rounded border border-border px-2 py-1 text-sm" aria-label="Mulai slot {{ $slot->label }}">
                                 <span class="text-muted">–</span>
-                                <input type="time" name="slots[{{ $slot->id }}][end]" value="{{ $clock($slot->end_minute) }}" class="w-full rounded border border-border px-2 py-1 text-sm" aria-label="Selesai slot {{ $slot->label }}">
+                                <input type="time" name="slots[{{ $slot->id }}][end]" min="{{ config('sicma.operating_hours.start') }}" max="{{ config('sicma.operating_hours.end') }}" value="{{ $clock($slot->end_minute) }}" class="w-full rounded border border-border px-2 py-1 text-sm" aria-label="Selesai slot {{ $slot->label }}">
                             </div>
                         @endforeach
                     </div>

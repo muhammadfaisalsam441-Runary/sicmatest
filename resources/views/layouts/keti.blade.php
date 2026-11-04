@@ -5,7 +5,7 @@
     <head>
         @include('layouts.partials.head', ['title' => trim($__env->yieldContent('title')) ?: null])
     </head>
-    <body class="min-h-screen">
+    <body class="min-h-screen" data-portal="keti" data-portal-user="{{ auth()->id() }}" data-login-url="{{ route('login') }}" data-validation-errors="{{ $errors->any() ? 'true' : 'false' }}">
         <div class="grid min-h-screen grid-cols-[212px_1fr]">
             <aside class="flex flex-col gap-10 border-r border-border bg-surface px-5 py-9">
                 <div class="flex flex-col gap-6">
@@ -55,7 +55,7 @@
                                      class="absolute right-0 z-40 mt-2 w-56 overflow-hidden rounded-card border border-border bg-surface py-2 shadow-lg">
                                     <a href="{{ Nav::url('keti.profile') }}" class="block px-4 py-2 text-sm text-ink hover:bg-primary-soft/60" role="menuitem">Profil</a>
                                     <a href="{{ Nav::url('keti.activity', ['cakupan' => 'saya']) }}" class="block px-4 py-2 text-sm text-ink hover:bg-primary-soft/60" role="menuitem">Aktivitas saya</a>
-                                    <form method="POST" action="{{ Nav::url('logout') }}">
+                                    <form method="POST" action="{{ Nav::url('logout') }}" data-native>
                                         @csrf
                                         <button type="submit" class="block w-full px-4 py-2 text-left text-sm text-danger hover:bg-danger-soft" role="menuitem">Keluar</button>
                                     </form>

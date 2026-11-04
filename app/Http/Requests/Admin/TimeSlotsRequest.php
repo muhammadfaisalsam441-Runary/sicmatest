@@ -25,10 +25,23 @@ class TimeSlotsRequest extends FormRequest
      */
     public function rules(): array
     {
+        $open = (string) config('sicma.operating_hours.start', '07:30');
+        $close = (string) config('sicma.operating_hours.end', '17:30');
+
         return [
             'slots' => ['required', 'array'],
-            'slots.*.start' => ['required', 'date_format:H:i'],
-            'slots.*.end' => ['required', 'date_format:H:i'],
+            'slots.*.start' => ['required', 'date_format:H:i', "after_or_equal:{$open}", "before:{$close}"],
+            'slots.*.end' => ['required', 'date_format:H:i', 'after:slots.*.start', "before_or_equal:{$close}"],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'slots.*.end.after' => 'Jam selesai slot harus setelah jam mulai slot.',
         ];
     }
 

@@ -17,6 +17,7 @@ class RoomCardPresenter
     public static function card(AvailabilityResult $result): array
     {
         $isAvailable = $result->isAvailable() || $result->status === RoomStatus::Uncertain;
+        $isClosed = $result->status === RoomStatus::Closed;
         $minutes = $result->minutesRemaining();
 
         return [
@@ -26,8 +27,18 @@ class RoomCardPresenter
             'location' => $result->locationLabel(),
             'capacity' => $result->room->capacity,
             'facilities' => $result->room->relationLoaded('facilities') ? $result->room->facilities->pluck('name')->all() : [],
-            'time_label' => $isAvailable ? 'Tersedia sampai' : 'Selesai pukul',
-            'time' => $isAvailable ? Wita::clock($result->freeUntil) : self::busyTime($result),
+            'time_label' => match (true) {
+                $isAvailable => 'Tersedia sampai',
+                $isClosed && $result->busyUntil !== null => 'Buka kembali',
+                $isClosed => 'Status',
+                default => 'Selesai pukul',
+            },
+            'time' => match (true) {
+                $isAvailable => Wita::clock($result->freeUntil),
+                $isClosed && $result->busyUntil !== null => Wita::clock($result->busyUntil),
+                $isClosed => 'Ditutup',
+                default => self::busyTime($result),
+            },
             'note' => self::publicNote($result),
             'remaining' => $minutes === null ? null : Wita::duration($minutes).' lagi',
             'status' => $result->status->value,

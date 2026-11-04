@@ -51,7 +51,11 @@ class ReservationController extends Controller
         }
 
         if ($request->expectsJson()) {
-            return response()->json(['ok' => true, 'reservation_id' => $reservation->id], 201);
+            return response()->json([
+                'ok' => true,
+                'reservation_id' => $reservation->id,
+                'redirect_url' => route('keti.reservations.show', $reservation),
+            ], 201);
         }
 
         return redirect()->route('keti.reservations.show', $reservation);

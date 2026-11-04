@@ -8,6 +8,8 @@ use App\Enums\RoomBlockSource;
 use App\Enums\SessionMode;
 use App\Enums\SessionPhase;
 use App\Models\Lecturer;
+use App\Models\LecturerAvailability;
+use App\Models\Period;
 use App\Models\RoomBlock;
 use App\Models\ScheduleIssue;
 use App\Models\ScheduleSession;
@@ -25,7 +27,11 @@ use Illuminate\Support\Facades\DB;
  */
 class ScheduleValidator
 {
-    public function __construct(private ScheduleBlockBuilder $blocks) {}
+    public function __construct(
+        private ScheduleBlockBuilder $blocks,
+        private TeachingLoadService $teachingLoads,
+        private PhpScheduleSolver $solver,
+    ) {}
 
     /**
      * Periksa ulang seluruh draf; masalah lama yang belum diselesaikan diganti hasil terbaru.
@@ -41,12 +47,15 @@ class ScheduleValidator
             'sessions.lecturers.leadershipTerms',
             'sessions.lecturers.loadTargets',
             'sessions.courseOffering.course',
+            'sessions.courseOffering.teachingAssignments',
         ]);
 
         $findings = collect()
+            ->merge($this->sourceConsistency($version))
             ->merge($this->incomplete($version->sessions))
             ->merge($this->conflicts($version->sessions))
             ->merge($this->leadershipThursday($version))
+            ->merge($this->availability($version))
             ->merge($this->capacity($version->sessions))
             ->merge($this->unverifiedLecturers($version->sessions))
             ->merge($this->lecturerLoad($version))
@@ -57,6 +66,32 @@ class ScheduleValidator
 
             return $findings->map(fn (array $finding): ScheduleIssue => $version->issues()->create($finding));
         });
+    }
+
+    /**
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function sourceConsistency(ScheduleVersion $version): Collection
+    {
+        $findings = collect();
+
+        if ($version->period->start_date === null || $version->period->end_date === null) {
+            $findings->push($this->finding('PERIOD_CALENDAR_MISSING', IssueSeverity::Error, [], 'Tanggal mulai dan akhir semester belum lengkap. Lengkapi kalender sebelum menetapkan jadwal.'));
+        }
+        if ($version->sessions->contains(fn (ScheduleSession $session): bool => $session->phase !== SessionPhase::Full)
+            && ($version->period->uts_start === null || $version->period->uts_end === null || $version->period->uts_end->lessThan($version->period->uts_start))) {
+            $findings->push($this->finding('UTS_CALENDAR_MISSING', IssueSeverity::Error, [], 'Lengkapi rentang UTS yang valid sebelum memakai pembagian sesi sebelum/setelah UTS.'));
+        }
+
+        foreach ($version->sessions as $session) {
+            $sourceSks = $session->source_raw['sks'] ?? null;
+            $course = $session->courseOffering?->course;
+            if (is_numeric($sourceSks) && $course !== null && (int) $sourceSks !== $course->sks) {
+                $findings->push($this->finding('SOURCE_SKS_CONFLICT', IssueSeverity::Error, [$session->id], "{$course->code}: sumber memuat {$sourceSks} SKS, sedangkan master memuat {$course->sks} SKS. Periksa data sumber sebelum menetapkan jadwal."));
+            }
+        }
+
+        return $findings;
     }
 
     /**
@@ -145,19 +180,49 @@ class ScheduleValidator
      */
     private function leadershipThursday(ScheduleVersion $version): Collection
     {
+        if ($version->period->start_date === null || $version->period->end_date === null) {
+            return collect();
+        }
+
         $from = CarbonImmutable::parse($version->effective_from->toDateString());
         $to = CarbonImmutable::parse(($version->effective_to ?? $version->period->end_date)->toDateString());
 
         return $version->sessions
-            ->filter(fn (ScheduleSession $session): bool => $session->day_of_week === 4)
-            ->flatMap(fn (ScheduleSession $session): Collection => $session->lecturers
-                ->filter(fn (Lecturer $lecturer): bool => $this->isLeaderDuring($lecturer, $from, $to))
-                ->map(fn (Lecturer $lecturer): array => $this->finding(
-                    'LEADERSHIP_THURSDAY',
-                    IssueSeverity::Error,
-                    [$session->id],
-                    "{$lecturer->name} (pimpinan) dijadwalkan pada hari Kamis: {$this->label($session)}.",
-                )));
+            ->filter(fn (ScheduleSession $session): bool => $session->mode !== SessionMode::Unscheduled && $session->day_of_week === 4)
+            ->flatMap(function (ScheduleSession $session) use ($version, $from, $to): Collection {
+                [$phaseFrom, $phaseTo] = $this->phaseWindow($version->period, $session->phase, $from, $to);
+
+                if ($phaseFrom->greaterThan($phaseTo)) {
+                    return collect();
+                }
+
+                return $session->lecturers
+                    ->filter(fn (Lecturer $lecturer): bool => $this->isLeaderDuring($lecturer, $phaseFrom, $phaseTo))
+                    ->map(fn (Lecturer $lecturer): array => $this->finding(
+                        'LEADERSHIP_THURSDAY',
+                        IssueSeverity::Error,
+                        [$session->id],
+                        "{$lecturer->name} (pimpinan) dijadwalkan pada hari Kamis: {$this->label($session)}.",
+                    ));
+            });
+    }
+
+    /**
+     * @return array{0: CarbonImmutable, 1: CarbonImmutable}
+     */
+    private function phaseWindow(Period $period, SessionPhase $phase, CarbonImmutable $from, CarbonImmutable $to): array
+    {
+        return match ($phase) {
+            SessionPhase::BeforeUts => [
+                $from,
+                $period->uts_start !== null ? $to->min(CarbonImmutable::parse($period->uts_start->toDateString())->subDay()) : $to,
+            ],
+            SessionPhase::AfterUts => [
+                $period->uts_end !== null ? $from->max(CarbonImmutable::parse($period->uts_end->toDateString())->addDay()) : $from,
+                $to,
+            ],
+            SessionPhase::Full => [$from, $to],
+        };
     }
 
     /**
@@ -224,11 +289,45 @@ class ScheduleValidator
             }
 
             $sessions = $version->sessions->filter(fn (ScheduleSession $session): bool => $session->lecturers->contains('id', $lecturer->id));
-            $load = $sessions->unique('course_offering_id')->sum(fn (ScheduleSession $session): int => $session->courseOffering?->course?->sks ?? 0);
+            $load = 0.0;
+            $pending = 0;
+            foreach ($sessions->unique('course_offering_id') as $session) {
+                $offering = $session->courseOffering;
+                if ($offering === null) {
+                    $pending++;
 
-            return $load > (float) $max
-                ? [$this->finding('LOAD_EXCEEDED', IssueSeverity::Error, $sessions->pluck('id')->values()->all(), "{$lecturer->name} mendapat {$load} SKS, melebihi batas maksimum {$max} SKS.")]
-                : [];
+                    continue;
+                }
+                $assignments = $offering->teachingAssignments->where('lecturer_id', $lecturer->id);
+                if ($assignments->isEmpty()) {
+                    $teachers = $version->sessions->where('course_offering_id', $offering->id)->flatMap->lecturers->unique('id');
+                    if ($offering->teachingAssignments->isEmpty() && $teachers->count() === 1) {
+                        $load += $offering->course->sks;
+                    } else {
+                        $pending++;
+                    }
+
+                    continue;
+                }
+                foreach ($assignments as $assignment) {
+                    $assignment->setRelation('courseOffering', $offering);
+                    $credit = $this->teachingLoads->credit($assignment);
+                    if ($credit === null) {
+                        $pending++;
+                    } else {
+                        $load += $credit;
+                    }
+                }
+            }
+            $issues = [];
+            if ($load > (float) $max) {
+                $issues[] = $this->finding('LOAD_EXCEEDED', IssueSeverity::Error, $sessions->pluck('id')->values()->all(), "{$lecturer->name} mendapat {$load} SKS, melebihi batas maksimum {$max} SKS.");
+            }
+            if ($pending > 0) {
+                $issues[] = $this->finding('LOAD_UNCONFIRMED', IssueSeverity::Error, $sessions->pluck('id')->values()->all(), "Beban {$lecturer->name} belum lengkap pada {$pending} penugasan. Tetapkan pembagian SKS sebelum memeriksa maksimum {$max} SKS.");
+            }
+
+            return $issues;
         });
     }
 
@@ -241,7 +340,7 @@ class ScheduleValidator
     {
         $reservationBlocks = RoomBlock::query()
             ->active()
-            ->where('source_type', RoomBlockSource::Reservation)
+            ->whereIn('source_type', [RoomBlockSource::Reservation, RoomBlockSource::Closure])
             ->where('end_at', '>', $version->effective_from)
             ->get()
             ->groupBy('room_id');
@@ -260,10 +359,10 @@ class ScheduleValidator
                 return $reservationBlocks->get($occurrence['room_id'], collect())
                     ->filter(fn (RoomBlock $block): bool => $block->start_at->lessThan($end) && $block->end_at->greaterThan($start))
                     ->map(fn (RoomBlock $block): array => $this->finding(
-                        'RESERVATION_CONFLICT',
+                        $block->source_type === RoomBlockSource::Closure ? 'ROOM_CLOSED' : 'RESERVATION_CONFLICT',
                         IssueSeverity::Error,
                         [$occurrence['source_id']],
-                        $this->label($sessions[$occurrence['source_id']]).' bentrok dengan reservasi di '.$sessions[$occurrence['source_id']]->room->name.' pada '.Wita::date($block->start_at).' '.Wita::range($block->start_at, $block->end_at).'. Reservasi tidak dibatalkan otomatis.',
+                        $this->label($sessions[$occurrence['source_id']]).' bentrok dengan '.($block->source_type === RoomBlockSource::Closure ? 'penutupan ruang' : 'reservasi').' di '.$sessions[$occurrence['source_id']]->room->name.' pada '.Wita::date($block->start_at).' '.Wita::range($block->start_at, $block->end_at).'.',
                     ))
                     ->all();
             })
@@ -274,6 +373,21 @@ class ScheduleValidator
     {
         return $lecturer->leadershipTerms->contains(fn ($term): bool => $term->valid_from->toDateString() <= $to->toDateString()
             && ($term->valid_to === null || $term->valid_to->toDateString() >= $from->toDateString()));
+    }
+
+    /** @return Collection<int, array<string, mixed>> */
+    private function availability(ScheduleVersion $version): Collection
+    {
+        $availability = LecturerAvailability::query()->where('period_id', $version->period_id)->get()
+            ->map(fn (LecturerAvailability $entry): array => ['lecturer' => $entry->lecturer_id, 'day' => $entry->day_of_week,
+                'start' => $entry->start_minute, 'end' => $entry->end_minute, 'type' => $entry->type->value])->all();
+
+        return $version->sessions->filter(fn (ScheduleSession $session): bool => $session->mode !== SessionMode::Unscheduled
+            && $session->day_of_week !== null && $session->start_minute !== null && $session->end_minute !== null)
+            ->filter(fn (ScheduleSession $session): bool => ! $this->solver->available(['lecturers' => $session->lecturers->pluck('id')->all()],
+                $session->day_of_week, $session->start_minute, $session->end_minute, ['availability' => $availability]))
+            ->map(fn (ScheduleSession $session): array => $this->finding('LECTURER_UNAVAILABLE', IssueSeverity::Error, [$session->id],
+                $this->label($session).' berada di luar ketersediaan pengajar.'))->values();
     }
 
     private function phasesOverlap(SessionPhase $a, SessionPhase $b): bool

@@ -173,7 +173,7 @@ class ScheduleImportService
     /**
      * @return list<array{row_no: int, raw: array<string, string>}>
      */
-    private function readRows(string $path, string $extension): array
+    public function readRows(string $path, string $extension): array
     {
         $reader = IOFactory::createReader(match ($extension) {
             'csv', 'txt' => 'Csv',
@@ -183,7 +183,9 @@ class ScheduleImportService
         });
         $reader->setReadDataOnly(true);
 
-        $sheet = $reader->load($path)->getActiveSheet()->toArray(null, true, false, false);
+        $workbook = $reader->load($path);
+        $sheet = ($workbook->getSheetByName('Jadwal Perkuliahan') ?? $workbook->getActiveSheet())->toArray(null, false, false, false);
+        $workbook->disconnectWorksheets();
 
         $headerIndex = null;
         $map = [];
@@ -193,9 +195,13 @@ class ScheduleImportService
 
             if (in_array('kelas', $normalized, true) && (in_array('mata kuliah', $normalized, true) || in_array('kode mk', $normalized, true))) {
                 $headerIndex = $index;
+                $columns = [...self::COLUMNS, 'wita' => 'time', 'sks' => 'sks', 'dosen pengampu' => 'lecturer_lead', 'dosen mitra' => 'lecturer_partner', 'dosen mitra 2' => 'lecturer_partner_2', 'kategori' => 'category', 'angkatan' => 'category'];
+                if (in_array('wita', $normalized, true)) {
+                    $columns['jam'] = 'slot';
+                }
                 foreach ($normalized as $column => $name) {
-                    if (isset(self::COLUMNS[$name])) {
-                        $map[$column] = self::COLUMNS[$name];
+                    if (isset($columns[$name])) {
+                        $map[$column] = $columns[$name];
                     }
                 }
                 break;
@@ -214,8 +220,12 @@ class ScheduleImportService
                 $raw[$key] = trim((string) ($cells[$column] ?? ''));
             }
 
-            if (implode('', $raw) === '') {
+            if (($raw['class'] ?? '') === '' && ($raw['course_code'] ?? '') === '' && ($raw['course_name'] ?? '') === '') {
                 continue;
+            }
+
+            if (array_key_exists('lecturer_lead', $raw)) {
+                $raw['lecturers'] = implode('; ', array_filter([$raw['lecturer_lead'], $raw['lecturer_partner'] ?? '', $raw['lecturer_partner_2'] ?? '']));
             }
 
             $rows[] = ['row_no' => $index + 1, 'raw' => $raw];
@@ -296,12 +306,15 @@ class ScheduleImportService
         $issues = [];
         $same = fn (?string $a, ?string $b): bool => $a !== null && $b !== null && Str::lower(Str::squish($a)) === Str::lower(Str::squish($b));
 
-        $class = $lookups['classes']->first(fn (ClassGroup $group): bool => $same($group->name, $raw['class'] ?? null) || $same($group->code, $raw['class'] ?? null));
+        $class = $lookups['classes']->first(fn (ClassGroup $group): bool => $same($group->name, $raw['class'] ?? null) || $same($group->code, $raw['class'] ?? null)
+            || $same($group->code, Str::slug($raw['class'] ?? '')));
         if ($class === null) {
             $issues[] = ['level' => 'error', 'message' => 'Kelas "'.($raw['class'] ?? '').'" belum terdata. Tambahkan di Data Akademik › Kelas.'];
         }
 
-        $course = $lookups['courses']->first(fn (Course $course): bool => $same($course->code, $raw['course_code'] ?? null) || $same($course->name, $raw['course_name'] ?? null));
+        $course = ($raw['course_code'] ?? '') !== ''
+            ? $lookups['courses']->first(fn (Course $course): bool => $same($course->code, $raw['course_code']))
+            : $lookups['courses']->first(fn (Course $course): bool => $same($course->name, $raw['course_name'] ?? null));
         if ($course === null) {
             $issues[] = ['level' => 'error', 'message' => 'Mata kuliah "'.($raw['course_code'] ?? '').' '.($raw['course_name'] ?? '').'" belum terdata.'];
         }
@@ -354,15 +367,22 @@ class ScheduleImportService
             $issues[] = ['level' => 'warning', 'message' => 'Ruang kosong; sesi masuk draf tanpa ruang.'];
         }
 
-        $names = collect(preg_split('/\s*[;\n]\s*/', $raw['lecturers'] ?? '') ?: [])->map(fn ($name): string => Str::squish($name))->filter()->values();
-        $lecturers = $names->map(function (string $name, int $index) use ($lookups, $same, &$issues): array {
-            $lecturer = $lookups['lecturers']->first(fn (Lecturer $lecturer): bool => $same($lecturer->name, $name) || $same($lecturer->source_name, $name));
+        $entries = array_key_exists('lecturer_lead', $raw)
+            ? collect(['lecturer_lead' => TeachingRole::Lead->value, 'lecturer_partner' => TeachingRole::Partner->value, 'lecturer_partner_2' => TeachingRole::Partner->value])
+                ->map(fn (string $role, string $key): array => ['name' => Str::squish($raw[$key] ?? ''), 'role' => $role])->filter(fn (array $entry): bool => $entry['name'] !== '')->values()
+            : collect(preg_split('/\s*[;\n]\s*/', $raw['lecturers'] ?? '') ?: [])->map(fn ($name): string => Str::squish($name))->filter()->values()
+                ->map(fn (string $name, int $index): array => ['name' => $name, 'role' => $index === 0 ? TeachingRole::Lead->value : TeachingRole::Partner->value]);
+        $names = $entries->pluck('name');
+        $lecturers = $entries->map(function (array $entry) use ($lookups, $same, &$issues): array {
+            $name = $entry['name'];
+            $lecturer = $lookups['lecturers']->first(fn (Lecturer $lecturer): bool => $same($lecturer->name, $name) || $same($lecturer->source_name, $name)
+                || collect($lecturer->source_data['aliases'] ?? [])->contains(fn (string $alias): bool => $same($alias, $name)));
 
             if ($lecturer === null) {
                 $issues[] = ['level' => 'warning', 'message' => "Nama dosen \"{$name}\" belum terpetakan; akan ditambahkan sebagai Perlu verifikasi."];
             }
 
-            return ['name' => $name, 'lecturer_id' => $lecturer?->id, 'role' => $index === 0 ? TeachingRole::Lead->value : TeachingRole::Partner->value];
+            return ['name' => $name, 'lecturer_id' => $lecturer?->id, 'role' => $entry['role']];
         })->all();
 
         if ($names->isEmpty()) {
@@ -381,7 +401,7 @@ class ScheduleImportService
         return [[
             'class_group_id' => $class?->id,
             'course_id' => $course?->id,
-            'title' => $course?->name ?? ($raw['course_name'] ?? ''),
+            'title' => ($raw['course_name'] ?? '') !== '' ? $raw['course_name'] : ($course?->name ?? ''),
             'mode' => $mode->value,
             'day' => $day,
             'start_minute' => $mode === SessionMode::Unscheduled ? null : $start,

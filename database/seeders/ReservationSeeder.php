@@ -37,8 +37,8 @@ class ReservationSeeder extends Seeder
         $closureRoom = Room::query()->where('code', 'LAB-ANIMASI')->firstOrFail();
         $closure = RoomClosure::create([
             'room_id' => $closureRoom->id,
-            'start_at' => $now->startOfDay()->setTime(7, 0),
-            'end_at' => $now->addDays(3)->setTime(21, 30),
+            'start_at' => $now->startOfDay()->setTime(7, 30),
+            'end_at' => $now->addDays(3)->setTime(17, 30),
             'reason' => 'Perawatan perangkat komputer',
             'created_by' => $admin->id,
         ]);

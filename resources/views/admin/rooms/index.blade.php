@@ -16,7 +16,7 @@
 
     <div class="flex flex-col gap-6">
         <x-page-header title="Data ruang"
-                       :subtitle="$totalRooms.' ruang terdaftar'.($periodName ? ' dari jadwal '.$periodName : '').'. Lengkapi kapasitas dan lokasi tiap ruang.'">
+                        :subtitle="$totalRooms.' ruang terdaftar'.($periodName ? ' dari jadwal '.$periodName : '').'. Lengkapi kapasitas dan lokasi tiap ruang.'">
             <x-slot:actions>
                 <x-button variant="secondary" icon="lock" x-data x-on:click="$dispatch('open-modal', 'close-room')">Tutup ruang</x-button>
                 <x-button icon="plus" x-data x-on:click="$dispatch('open-modal', 'add-room')">Tambah ruang</x-button>

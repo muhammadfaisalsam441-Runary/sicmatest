@@ -38,11 +38,14 @@ class UpdateSessionRequest extends FormRequest
      */
     public function rules(): array
     {
+        $open = (string) config('sicma.operating_hours.start', '07:30');
+        $close = (string) config('sicma.operating_hours.end', '17:30');
+
         return [
             'mode' => ['required', Rule::enum(SessionMode::class)],
             'day_of_week' => ['nullable', 'required_unless:mode,unscheduled', 'integer', 'between:1,6'],
-            'start_time' => ['nullable', 'required_unless:mode,unscheduled', 'date_format:H:i'],
-            'end_time' => ['nullable', 'required_unless:mode,unscheduled', 'date_format:H:i', 'after:start_time'],
+            'start_time' => ['nullable', 'required_unless:mode,unscheduled', 'date_format:H:i', "after_or_equal:{$open}", "before:{$close}"],
+            'end_time' => ['nullable', 'required_unless:mode,unscheduled', 'date_format:H:i', 'after:start_time', "before_or_equal:{$close}"],
             'room_id' => ['nullable', 'required_if:mode,offline', Rule::exists('rooms', 'id')->whereNull('deleted_at')],
             'note' => ['nullable', 'string', 'max:255'],
         ];

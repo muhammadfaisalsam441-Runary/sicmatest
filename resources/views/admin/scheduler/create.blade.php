@@ -17,7 +17,7 @@
 
     <div class="flex flex-col gap-6">
         <x-page-header title="Susun jadwal otomatis"
-                       :subtitle="($period?->name ?? 'Semester aktif').' • Pilih bagian yang boleh berubah.'.($official ? ' Jadwal resmi v'.$official->version_no.' tetap dilindungi.' : '')" />
+                        :subtitle="($period?->name ?? 'Semester aktif').' • Pilih bagian yang boleh berubah.'.($official ? ' Jadwal resmi v'.$official->version_no.' tetap dilindungi.' : '')" />
 
         <x-card>
             <x-stepper :steps="['Data', 'Tim mengajar', 'Draf jadwal', 'Periksa', 'Tetapkan']" :current="3" />

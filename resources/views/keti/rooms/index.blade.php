@@ -18,7 +18,7 @@
             </label>
             <x-select name="gedung" :options="$buildings->pluck('name', 'id')->put('lainnya', 'Gedung belum didata')" :value="$filters['gedung'] ?? null" placeholder="Semua gedung" class="w-48" aria-label="Gedung" />
             <x-select name="lantai" :options="$floors->mapWithKeys(fn ($floor) => [$floor => 'Lantai '.$floor])" :value="$filters['lantai'] ?? null" placeholder="Semua lantai" class="w-40" aria-label="Lantai" />
-            <x-select name="status" :options="['tersedia' => 'Tersedia', 'digunakan' => 'Digunakan']" :value="$filters['status'] ?? null" placeholder="Semua status" class="w-40" aria-label="Status" />
+            <x-select name="status" :options="['tersedia' => 'Tersedia', 'digunakan' => 'Digunakan', 'tutup' => 'Tutup']" :value="$filters['status'] ?? null" placeholder="Semua status" class="w-40" aria-label="Status" />
             <x-button type="submit">Terapkan</x-button>
             <x-button variant="secondary" :href="route('keti.rooms.index')">Reset</x-button>
         </form>

@@ -39,6 +39,8 @@ class LecturerService
                     ['position' => $data['leadership_position']],
                     ['valid_from' => $data['leadership_from'], 'valid_to' => $data['leadership_to'] ?? null],
                 );
+            } elseif (array_key_exists('leadership_position', $data)) {
+                $lecturer->leadershipTerms()->delete();
             }
 
             $period = Period::query()->active()->first();
@@ -93,7 +95,11 @@ class LecturerService
                 };
 
                 $lecturer = Lecturer::query()
-                    ->when($nidn, fn ($query) => $query->where('nidn', $nidn), fn ($query) => $query->where('name', $name)->orWhere('source_name', $name))
+                    ->when(
+                        $nidn,
+                        fn ($query) => $query->where('nidn', $nidn),
+                        fn ($query) => $query->where(fn ($sub) => $sub->where('name', $name)->orWhere('source_name', $name)),
+                    )
                     ->first();
 
                 $attributes = array_filter([

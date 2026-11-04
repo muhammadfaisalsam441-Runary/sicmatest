@@ -28,6 +28,7 @@
 
 use App\Enums\ScheduleSource;
 use App\Enums\ScheduleVersionStatus;
+use App\Enums\SolverStatus;
 use App\Exceptions\DomainException;
 use App\Models\ClassGroup;
 use App\Models\LeadershipTerm;
@@ -41,6 +42,7 @@ use App\Services\DraftService;
 use App\Services\ScheduleBlockBuilder;
 use App\Services\SchedulePublisher;
 use App\Services\SchedulerService;
+use App\Services\ScheduleValidator;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\File;
 
@@ -87,13 +89,18 @@ test('skenario 4: hasil susun otomatis yang menempatkan pimpinan di hari Kamis t
     $leader = Lecturer::factory()->create();
     LeadershipTerm::factory()->for($leader)->create();
     $this->session->lecturers()->sync([$leader->id => ['role' => 'lead']]);
+    $this->period->timeSlots()->create(['label' => 'II', 'start_minute' => 600, 'end_minute' => 750]);
 
     $scheduler = app(SchedulerService::class);
     $job = $scheduler->finalize($scheduler->start($this->period, ['type' => 'semester'], 15, $this->admin), [
         'status' => 'FEASIBLE',
         'assignments' => [['id' => $this->session->id, 'day' => 4, 'start_minute' => 600, 'end_minute' => 750, 'room_id' => $this->ae107->id]],
     ]);
-    $draft = ScheduleVersion::query()->findOrFail($job->result['draft_version_id']);
+    expect($job->solver_status)->toBe(SolverStatus::ModelInvalid)
+        ->and($job->result)->not->toHaveKey('draft_version_id');
+    $draft = app(DraftService::class)->create($this->period, ScheduleSource::Manual, $this->official);
+    $draft->sessions()->sole()->update(['day_of_week' => 4]);
+    app(ScheduleValidator::class)->validate($draft);
 
     expect($draft->status)->toBe(ScheduleVersionStatus::Draft)
         ->and($draft->issues()->blocking()->where('code', 'LEADERSHIP_THURSDAY')->exists())->toBeTrue()

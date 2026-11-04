@@ -34,7 +34,7 @@ test('ruang kosong tersedia sampai agenda berikutnya', function () {
 test('ruang tanpa agenda tersedia sampai jam operasional berakhir', function () {
     $result = $this->availability->forRoom(Room::factory()->create(), now());
 
-    expect($result->freeUntil->format('H:i'))->toBe('21:30');
+    expect($result->freeUntil->format('H:i'))->toBe('17:30');
 });
 
 test('kuliah resmi yang sedang berlangsung memblokir ruang meski belum check-in', function () {
@@ -110,10 +110,11 @@ test('status mengikuti sumber blok', function (string $kind, RoomStatus $expecte
     ['dibatalkan', RoomStatus::Available],
 ]);
 
-test('di luar jam operasional ruang tidak tersedia', function () {
+test('di luar jam operasional ruang tidak tersedia dan statusnya tutup', function () {
     $result = $this->availability->forRoom(Room::factory()->create(), CarbonImmutable::parse('2026-11-04 22:00'));
 
     expect($result->status)->toBe(RoomStatus::Closed)
+        ->and($result->badge())->toBe('Tutup')
         ->and($result->reason)->toContain('Di luar jam operasional');
 });
 

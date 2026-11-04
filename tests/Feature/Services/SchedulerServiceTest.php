@@ -6,12 +6,15 @@ use App\Enums\ScheduleVersionStatus;
 use App\Enums\SessionMode;
 use App\Enums\SolverStatus;
 use App\Exceptions\DomainException;
+use App\Jobs\RunScheduleOptimization;
 use App\Models\ClassGroup;
 use App\Models\LeadershipTerm;
 use App\Models\Lecturer;
+use App\Models\LecturerAvailability;
 use App\Models\OptimizationJob;
 use App\Models\Period;
 use App\Models\Room;
+use App\Models\RoomBlock;
 use App\Models\ScheduleSession;
 use App\Models\ScheduleVersion;
 use App\Models\User;
@@ -19,6 +22,7 @@ use App\Services\SchedulerService;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Queue;
 
 beforeEach(function () {
     config(['sicma.scheduler.run_mode' => 'manual']);
@@ -81,7 +85,7 @@ test('periksa kesiapan menolak cakupan kelas tanpa kelas dan cakupan terdampak t
     expect(fn () => $scheduler->start($this->period, ['type' => 'terdampak'], 60, $this->admin))->toThrow(DomainException::class);
 });
 
-test('hasil OPTIMAL selalu menjadi draf baru tanpa mengubah jadwal resmi', function () {
+test('hasil lengkap selalu menjadi draf layak tanpa mengubah jadwal resmi', function () {
     $scheduler = app(SchedulerService::class);
     $job = $scheduler->start($this->period, ['type' => 'semester'], 15, $this->admin);
 
@@ -92,6 +96,7 @@ test('hasil OPTIMAL selalu menjadi draf baru tanpa mengubah jadwal resmi', funct
         'message' => 'Susunan terbaik ditemukan.',
         'assignments' => [
             ['id' => $this->leaderSession->id, 'day' => 3, 'start_minute' => 450, 'end_minute' => 600, 'room_id' => $this->room->id],
+            ['id' => $this->otherSession->id, 'day' => 2, 'start_minute' => 450, 'end_minute' => 600, 'room_id' => $this->room->id],
             ['id' => $this->unscheduled->id, 'day' => 5, 'start_minute' => 450, 'end_minute' => 550, 'room_id' => $this->room->id],
         ],
     ]);
@@ -100,7 +105,7 @@ test('hasil OPTIMAL selalu menjadi draf baru tanpa mengubah jadwal resmi', funct
     $placed = $draft->sessions()->whereHas('participants', fn ($query) => $query->whereKey($this->ptikB->id))->where('day_of_week', 5)->sole();
 
     expect($job->status)->toBe(OptimizationJobStatus::Finished)
-        ->and($job->solver_status)->toBe(SolverStatus::Optimal)
+        ->and($job->solver_status)->toBe(SolverStatus::Feasible)
         ->and($draft->status)->toBe(ScheduleVersionStatus::Draft)
         ->and($draft->source)->toBe(ScheduleSource::Generated)
         ->and($draft->based_on_version_id)->toBe($this->official->id)
@@ -113,7 +118,7 @@ test('hasil OPTIMAL selalu menjadi draf baru tanpa mengubah jadwal resmi', funct
 
 test('FEASIBLE disimpan terpisah dan tidak disebut optimal', function () {
     $scheduler = app(SchedulerService::class);
-    $job = $scheduler->finalize($scheduler->start($this->period, ['type' => 'semester'], 15, $this->admin), ['status' => 'FEASIBLE', 'assignments' => []]);
+    $job = $scheduler->runNow($scheduler->start($this->period, ['type' => 'semester'], 15, $this->admin));
 
     expect($job->solver_status)->toBe(SolverStatus::Feasible)
         ->and($job->solver_status->label())->not->toContain('Optimal');
@@ -156,15 +161,12 @@ test('klik berulang dengan masukan yang sama tidak membuat pekerjaan ganda', fun
         ->and(OptimizationJob::query()->count())->toBe(1);
 });
 
-test('polling membaca keluaran worker dan menggagalkan proses yang melewati batas', function () {
+test('polling membedakan antrean yang menunggu dan proses yang melewati batas', function () {
     $scheduler = app(SchedulerService::class);
     $job = $scheduler->start($this->period, ['type' => 'semester'], 15, $this->admin);
     $job->update(['status' => OptimizationJobStatus::Running, 'started_at' => now()]);
 
     expect($scheduler->poll($job)->status)->toBe(OptimizationJobStatus::Running);
-
-    File::put($scheduler->outputPath($job), json_encode(['status' => 'INFEASIBLE', 'assignments' => []]));
-    expect($scheduler->poll($job->fresh())->solver_status)->toBe(SolverStatus::Infeasible);
 
     $late = $scheduler->start($this->period, ['type' => 'kelas', 'class_ids' => [$this->tekomC->id]], 15, $this->admin);
     $late->update(['status' => OptimizationJobStatus::Running, 'started_at' => now()]);
@@ -173,20 +175,15 @@ test('polling membaca keluaran worker dan menggagalkan proses yang melewati bata
     expect($scheduler->poll($late->fresh())->status)->toBe(OptimizationJobStatus::Failed);
 });
 
-test('mode sync menjalankan worker dan menyimpan hasilnya', function () {
+test('mode sync menjalankan PHP tanpa proses eksternal dan menyimpan hasilnya', function () {
     config(['sicma.scheduler.run_mode' => 'sync']);
-    Process::fake(function () {
-        $job = OptimizationJob::query()->latest('id')->first();
-        File::put(app(SchedulerService::class)->outputPath($job), json_encode(['status' => 'OPTIMAL', 'assignments' => []]));
-
-        return Process::result('');
-    });
+    Process::fake();
 
     $job = app(SchedulerService::class)->start($this->period, ['type' => 'semester'], 15, $this->admin);
 
-    expect($job->solver_status)->toBe(SolverStatus::Optimal)
+    expect($job->solver_status)->toBe(SolverStatus::Feasible)
         ->and($job->result['draft_version_id'])->not->toBeNull();
-    Process::assertRan(fn ($process) => str_contains(implode(' ', (array) $process->command), 'solve.py'));
+    Process::assertNothingRan();
 });
 
 test('halaman susun jadwal: pengaturan, periksa kesiapan, mulai, riwayat', function () {
@@ -204,14 +201,7 @@ test('halaman susun jadwal: pengaturan, periksa kesiapan, mulai, riwayat', funct
     $this->getJson(route('admin.scheduler.status', OptimizationJob::query()->sole()))->assertJson(['status' => 'queued']);
 });
 
-test('worker Python sungguhan menghasilkan draf tanpa pimpinan di hari Kamis', function () {
-    $python = config('sicma.scheduler.python_bin');
-    $check = Process::run([$python, '-c', 'import ortools']);
-
-    if (! $check->successful()) {
-        $this->markTestSkipped('Python dengan OR-Tools tidak tersedia di lingkungan ini.');
-    }
-
+test('generator PHP sungguhan menghasilkan draf tanpa pimpinan di hari Kamis', function () {
     config(['sicma.scheduler.run_mode' => 'sync']);
     $this->leaderSession->update(['day_of_week' => 4]);
 
@@ -225,4 +215,145 @@ test('worker Python sungguhan menghasilkan draf tanpa pimpinan di hari Kamis', f
     expect($leaderCopy->day_of_week)->not->toBe(4)
         ->and($draft->sessions()->where('mode', SessionMode::Unscheduled)->exists())->toBeFalse()
         ->and($draft->issues()->blocking()->count())->toBe(0);
+});
+
+test('antrean membawa pekerjaan PHP dan proses duplikat tidak membuat draf kedua', function () {
+    config(['sicma.scheduler.run_mode' => 'queue']);
+    Queue::fake([RunScheduleOptimization::class]);
+    $scheduler = app(SchedulerService::class);
+    $job = $scheduler->start($this->period, ['type' => 'semester'], 15, $this->admin);
+    Queue::assertPushed(RunScheduleOptimization::class, fn ($queued): bool => $queued->optimizationJob->id === $job->id);
+    (new RunScheduleOptimization($job))->handle($scheduler);
+    $firstDraft = $job->fresh()->result['draft_version_id'];
+    $scheduler->runNow($job);
+    expect($job->fresh()->result['draft_version_id'])->toBe($firstDraft)
+        ->and(ScheduleVersion::query()->where('source', ScheduleSource::Generated)->count())->toBe(1);
+});
+
+test('hasil parsial disimpan sebagai draf yang belum layak dengan sesi tersisa tanpa jadwal', function () {
+    $scheduler = app(SchedulerService::class);
+    $job = $scheduler->start($this->period, ['type' => 'semester'], 15, $this->admin);
+    $job = $scheduler->finalize($job, ['status' => 'UNKNOWN', 'assignments' => [
+        ['id' => $this->leaderSession->id, 'day' => 1, 'start_minute' => 450, 'end_minute' => 600, 'room_id' => $this->room->id],
+    ]]);
+    $draft = ScheduleVersion::query()->findOrFail($job->result['draft_version_id']);
+    expect($job->solver_status)->toBe(SolverStatus::Unknown)
+        ->and($job->result['publishable'])->toBeFalse()
+        ->and($job->result['unplaced'])->toHaveCount(2)
+        ->and($draft->sessions()->where('mode', SessionMode::Unscheduled)->count())->toBe(2);
+    $this->withoutVite()->actingAs($this->admin)->get(route('admin.scheduler.show', $job))
+        ->assertOk()->assertSee('Draf masih perlu diperbaiki')->assertDontSee('Seluruh aturan wajib terpenuhi');
+});
+
+test('keluaran tidak boleh memindahkan sesi di luar cakupan atau mengabaikan kunci', function (bool $outsideScope) {
+    $this->leaderSession->update(['is_locked' => true]);
+    $scheduler = app(SchedulerService::class);
+    $job = $scheduler->start($this->period, ['type' => 'kelas', 'class_ids' => [$this->tekomC->id]], 15, $this->admin);
+    $job = $scheduler->finalize($job, ['status' => 'FEASIBLE', 'assignments' => [
+        ['id' => $outsideScope ? $this->otherSession->id : $this->leaderSession->id, 'day' => 3, 'start_minute' => 450, 'end_minute' => 600, 'room_id' => $this->room->id],
+    ]]);
+    expect($job->solver_status)->toBe(SolverStatus::ModelInvalid)
+        ->and($job->result)->not->toHaveKey('draft_version_id');
+})->with([true, false]);
+
+test('pembatalan dan kegagalan terlambat tidak menimpa status akhir', function () {
+    $scheduler = app(SchedulerService::class);
+    $job = $scheduler->start($this->period, ['type' => 'semester'], 15, $this->admin);
+    $scheduler->cancel($job, $this->admin);
+    $scheduler->runNow($job);
+    $scheduler->fail($job, 'Gagal terlambat');
+    expect($job->fresh()->status)->toBe(OptimizationJobStatus::Cancelled)
+        ->and(ScheduleVersion::query()->where('source', ScheduleSource::Generated)->count())->toBe(0);
+});
+
+test('sesi terkunci tanpa waktu harus dilengkapi sebelum generator dijalankan', function () {
+    $this->unscheduled->update(['is_locked' => true]);
+    expect(app(SchedulerService::class)->readiness($this->period, ['type' => 'semester'])['errors'])
+        ->toContain('Lengkapi waktu sesi terkunci atau buka kuncinya sebelum menyusun jadwal.');
+});
+
+test('masukan dasar yang diubah saat antrean menunggu tidak menghasilkan draf kedaluwarsa', function () {
+    $scheduler = app(SchedulerService::class);
+    $job = $scheduler->start($this->period, ['type' => 'semester'], 15, $this->admin);
+    $this->official->increment('lock_version');
+    $job = $scheduler->runNow($job);
+    expect($job->solver_status)->toBe(SolverStatus::ModelInvalid)
+        ->and($job->result)->not->toHaveKey('draft_version_id');
+});
+
+test('generator menghindari reservasi dan penutupan ruang tanpa memindahkan sesi di luar cakupan', function () {
+    foreach ([['reservation', '2026-11-09 07:30', '2026-11-09 10:00'], ['closure', '2026-11-16 10:00', '2026-11-16 12:30']] as [$type, $start, $end]) {
+        RoomBlock::factory()->for($this->room)->create(['source_type' => $type, 'start_at' => $start, 'end_at' => $end]);
+    }
+    $scheduler = app(SchedulerService::class);
+    $job = $scheduler->runNow($scheduler->start($this->period, ['type' => 'kelas', 'class_ids' => [$this->tekomC->id]], 15, $this->admin));
+    $draft = ScheduleVersion::query()->findOrFail($job->result['draft_version_id']);
+    $session = $draft->sessions()->whereHas('participants', fn ($query) => $query->whereKey($this->tekomC->id))->sole();
+    $fixed = $draft->sessions()->where('title', $this->otherSession->title)->sole();
+    expect($session->day_of_week)->not->toBe(1)
+        ->and([$fixed->day_of_week, $fixed->start_minute, $fixed->end_minute])->toBe([2, 450, 600]);
+});
+
+test('waktu menunggu antrean terpisah dari waktu pencarian dan kegagalan job tercatat', function () {
+    $scheduler = app(SchedulerService::class);
+    $job = $scheduler->start($this->period, ['type' => 'semester'], 15, $this->admin);
+    $this->travel(60)->seconds();
+    expect($scheduler->poll($job)->status)->toBe(OptimizationJobStatus::Queued);
+    (new RunScheduleOptimization($job))->failed(new RuntimeException('Queue timeout'));
+    expect($job->fresh()->status)->toBe(OptimizationJobStatus::Failed)
+        ->and($job->fresh()->result['message'])->toContain('generator PHP');
+});
+
+test('hasil dengan jam di luar slot ditolak walaupun status solver menyatakan layak', function () {
+    $scheduler = app(SchedulerService::class);
+    $job = $scheduler->start($this->period, ['type' => 'kelas', 'class_ids' => [$this->tekomC->id]], 15, $this->admin);
+    $job = $scheduler->finalize($job, ['status' => 'FEASIBLE', 'assignments' => [
+        ['id' => $this->leaderSession->id, 'day' => 1, 'start_minute' => 0, 'end_minute' => 150, 'room_id' => $this->room->id],
+    ]]);
+    expect($job->solver_status)->toBe(SolverStatus::ModelInvalid)
+        ->and($job->result)->not->toHaveKey('draft_version_id');
+});
+
+test('perubahan ketersediaan saat menunggu membatalkan snapshot lama', function () {
+    $scheduler = app(SchedulerService::class);
+    $job = $scheduler->start($this->period, ['type' => 'semester'], 15, $this->admin);
+    LecturerAvailability::create(['lecturer_id' => $this->leader->id, 'period_id' => $this->period->id,
+        'day_of_week' => 1, 'start_minute' => 450, 'end_minute' => 600, 'type' => 'unavailable']);
+    $job = $scheduler->runNow($job);
+    expect($job->solver_status)->toBe(SolverStatus::ModelInvalid)
+        ->and($job->result)->not->toHaveKey('draft_version_id');
+});
+
+test('snapshot yang rusak tidak dijalankan', function () {
+    $scheduler = app(SchedulerService::class);
+    $job = $scheduler->start($this->period, ['type' => 'semester'], 15, $this->admin);
+    File::put($scheduler->inputPath($job), '{}');
+    $job = $scheduler->runNow($job);
+    expect($job->status)->toBe(OptimizationJobStatus::Failed)
+        ->and($job->result['message'])->toContain('Snapshot masukan berubah atau rusak');
+});
+
+test('sesi tersisa pada draf parsial mempertahankan durasi aslinya untuk pencarian berikutnya', function () {
+    $this->otherSession->update(['end_minute' => 610]);
+    $scheduler = app(SchedulerService::class);
+    $job = $scheduler->start($this->period, ['type' => 'semester'], 15, $this->admin);
+    $job = $scheduler->finalize($job, ['status' => 'UNKNOWN', 'assignments' => [
+        ['id' => $this->leaderSession->id, 'day' => 1, 'start_minute' => 450, 'end_minute' => 600, 'room_id' => $this->room->id],
+    ]]);
+    $draft = ScheduleVersion::query()->findOrFail($job->result['draft_version_id']);
+    $copy = $draft->sessions()->where('title', $this->otherSession->title)->sole();
+    $input = $scheduler->snapshot($draft, ['type' => 'belum-terjadwal'], 15);
+    expect(collect($input['sessions'])->firstWhere('id', $copy->id)['duration'])->toBe(160)
+        ->and($copy->mode)->toBe(SessionMode::Unscheduled);
+});
+
+test('kesiapan menolak pembagian fase tanpa kalender UTS dan semester yang telah berakhir', function () {
+    $this->leaderSession->update(['phase' => 'before_uts']);
+    $this->period->update(['uts_start' => null, 'uts_end' => null]);
+    $scheduler = app(SchedulerService::class);
+    expect($scheduler->readiness($this->period, ['type' => 'semester'])['errors'])
+        ->toContain('Lengkapi rentang UTS yang valid untuk membedakan sesi sebelum dan setelah UTS.');
+    $this->period->update(['end_date' => '2026-10-31']);
+    expect($scheduler->readiness($this->period, ['type' => 'semester'])['errors'])
+        ->toContain('Rentang semester tidak valid atau sudah berakhir. Periksa kalender semester.');
 });

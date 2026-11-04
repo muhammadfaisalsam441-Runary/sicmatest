@@ -1,6 +1,7 @@
 import Alpine from 'alpinejs';
 import { createIcons } from 'lucide';
 import * as icons from './icons';
+import { installPortalNavigation, registerStatusPolling } from './navigation';
 
 window.Alpine = Alpine;
 
@@ -10,6 +11,9 @@ window.Alpine = Alpine;
  */
 window.renderIcons = (root = document) => createIcons({ icons, root });
 
-document.addEventListener('DOMContentLoaded', () => window.renderIcons());
+window.renderIcons();
+
+const navigation = installPortalNavigation(Alpine, (root = document) => window.renderIcons(root));
+registerStatusPolling(Alpine, navigation);
 
 Alpine.start();

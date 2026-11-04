@@ -142,7 +142,7 @@ test('penutupan ruang yang berdampak meminta konfirmasi dan tidak membatalkan re
     expect(RoomBlock::query()->where('source_type', RoomBlockSource::Closure)->where('is_active', true)->count())->toBe(1)
         ->and($reservation->fresh()->status)->toBe(ReservationStatus::Booked)
         ->and(AppNotification::query()->where('user_id', $keti->id)->where('type', 'room.closed')->exists())->toBeTrue()
-        ->and(app(AvailabilityService::class)->forRoom($room, now()->setTime(15, 0))->badge())->toBe('Digunakan');
+        ->and(app(AvailabilityService::class)->forRoom($room, now()->setTime(15, 0))->badge())->toBe('Tutup');
 });
 
 test('membuka kembali ruang menonaktifkan blok penutupan', function () {

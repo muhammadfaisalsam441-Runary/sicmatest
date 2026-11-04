@@ -101,6 +101,31 @@ test('jadwal resmi tidak bisa diubah langsung', function () {
         ->assertSessionHas('error_code', 'INVALID_STATUS_TRANSITION');
 });
 
+test('form admin yang dikirim tanpa navigasi mengembalikan error JSON dan menjaga data lama', function () {
+    $classGroup = ClassGroup::factory()->create(['name' => 'Tekom C']);
+
+    $this->actingAs($this->admin)
+        ->putJson(route('admin.academic.classes.update', $classGroup), [
+            'name' => '', 'code' => $classGroup->code, 'study_program' => 'TEKOM', 'cohort_year' => 2025,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('name');
+
+    expect($classGroup->fresh()->name)->toBe('Tekom C');
+});
+
+test('menyimpan form admin lewat fetch tetap mengikuti tujuan tab dari server', function () {
+    $classGroup = ClassGroup::factory()->create();
+
+    $this->actingAs($this->admin)
+        ->putJson(route('admin.academic.classes.update', $classGroup), [
+            'name' => 'Tekom C diperbarui', 'code' => $classGroup->code, 'study_program' => 'TEKOM', 'cohort_year' => 2025,
+        ])
+        ->assertRedirect(route('admin.academic.index', ['tab' => 'kelas']));
+
+    expect($classGroup->fresh()->name)->toBe('Tekom C diperbarui');
+});
+
 test('admin mengelola kelas, mata kuliah, penawaran, dan hari libur', function () {
     $this->actingAs($this->admin)
         ->post(route('admin.academic.classes.store'), ['name' => 'PTIK C', 'study_program' => 'PTIK', 'cohort_year' => 2026, 'student_count' => ''])
@@ -128,6 +153,10 @@ test('admin mengelola kelas, mata kuliah, penawaran, dan hari libur', function (
 test('admin mengubah slot jam dan kalender semester', function () {
     $slot = $this->period->timeSlots()->create(['label' => 'X', 'start_minute' => 940, 'end_minute' => 990]);
 
+    $this->actingAs($this->admin)
+        ->put(route('admin.academic.slots.update', $this->period), ['slots' => [$slot->id => ['start' => '16:35', 'end' => '15:45']]])
+        ->assertSessionHasErrors("slots.{$slot->id}.end");
+
     $this->actingAs($this->admin)->put(route('admin.academic.slots.update', $this->period), ['slots' => [$slot->id => ['start' => '15:45', 'end' => '16:35']]]);
     $this->put(route('admin.academic.periods.update', $this->period), ['name' => 'Ganjil 2026/2027', 'start_date' => '2026-09-01', 'end_date' => '2027-01-15', 'uts_start' => '2026-10-26', 'uts_end' => '2026-10-24'])
         ->assertSessionHasErrors('uts_end');
@@ -142,6 +171,16 @@ test('admin menambah dosen pimpinan dengan target beban kosong', function () {
         'homebase' => 'jtik',
         'leadership_position' => 'Ketua Jurusan',
         'leadership_from' => '2025-01-01',
+        'target_sks' => 16,
+        'max_sks' => 12,
+    ])->assertSessionHasErrors('max_sks');
+
+    $this->actingAs($this->admin)->post(route('admin.lecturers.store'), [
+        'name' => 'Dr. Hendra Saputra',
+        'profile_status' => 'verified',
+        'homebase' => 'jtik',
+        'leadership_position' => 'Ketua Jurusan',
+        'leadership_from' => '2025-01-01',
     ])->assertRedirect(route('admin.lecturers.index'));
 
     $lecturer = Lecturer::query()->where('name', 'Dr. Hendra Saputra')->sole();
@@ -150,6 +189,15 @@ test('admin menambah dosen pimpinan dengan target beban kosong', function () {
         ->and($lecturer->loadTargets()->value('target_sks'))->toBeNull();
 
     $this->get(route('admin.lecturers.index', ['filter' => 'pimpinan']))->assertSee('Dr. Hendra Saputra')->assertSee('tidak dijadwalkan Kamis');
+
+    $this->put(route('admin.lecturers.update', $lecturer), [
+        'name' => 'Dr. Hendra Saputra',
+        'profile_status' => 'verified',
+        'homebase' => 'jtik',
+        'leadership_position' => '',
+    ])->assertRedirect(route('admin.lecturers.index', ['filter' => 'pimpinan']));
+
+    expect($lecturer->fresh()->isLeaderOn(now()))->toBeFalse();
 });
 
 test('impor dosen dari CSV memperbarui nama yang ada dan menandai yang tanpa NIDN', function () {

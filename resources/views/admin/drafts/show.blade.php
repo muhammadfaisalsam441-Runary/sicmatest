@@ -150,10 +150,10 @@
                         <x-select name="day_of_week" :options="[1 => 'Senin', 2 => 'Selasa', 3 => 'Rabu', 4 => 'Kamis', 5 => 'Jumat', 6 => 'Sabtu']" :value="$editing->day_of_week" placeholder="Pilih hari" />
                     </x-field>
                     <x-field label="Jam mulai" name="start_time">
-                        <x-input type="time" name="start_time" :value="$editing->start_minute !== null ? sprintf('%02d:%02d', intdiv($editing->start_minute, 60), $editing->start_minute % 60) : null" />
+                        <x-input type="time" name="start_time" :min="config('sicma.operating_hours.start')" :max="config('sicma.operating_hours.end')" :value="$editing->start_minute !== null ? sprintf('%02d:%02d', intdiv($editing->start_minute, 60), $editing->start_minute % 60) : null" />
                     </x-field>
                     <x-field label="Jam selesai" name="end_time">
-                        <x-input type="time" name="end_time" :value="$editing->end_minute !== null ? sprintf('%02d:%02d', intdiv($editing->end_minute, 60), $editing->end_minute % 60) : null" />
+                        <x-input type="time" name="end_time" :min="config('sicma.operating_hours.start')" :max="config('sicma.operating_hours.end')" :value="$editing->end_minute !== null ? sprintf('%02d:%02d', intdiv($editing->end_minute, 60), $editing->end_minute % 60) : null" />
                     </x-field>
                 </div>
                 <div x-show="mode === 'offline'" class="flex flex-col gap-2">

@@ -64,6 +64,12 @@ return [
         // Kapasitas ruang kurang dari jumlah peserta: masalah wajib (true) atau peringatan (false). BELUM DITETAPKAN
         'capacity_blocks_publish' => false,
         'python_bin' => env('SICMA_PYTHON', 'python3'),
+        'worker_path' => base_path('scheduler-worker/solve.py'),
+        // detached = proses Python terpisah, dipantau halaman proses (tanpa queue worker);
+        // queue = job RunScheduleOptimization (butuh `php artisan queue:work`); sync = tunggu di request.
+        'run_mode' => env('SICMA_SCHEDULER_MODE', 'detached'),
+        'grace_seconds' => 30,
+        'days' => [1, 2, 3, 4, 5], // Senin–Jumat. BELUM DITETAPKAN
     ],
 
     'polling_seconds' => 30,

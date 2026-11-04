@@ -42,21 +42,36 @@ class DraftService
             ]);
 
             if ($base !== null) {
-                $base->loadMissing(['sessions.participants', 'sessions.lecturers']);
-
-                foreach ($base->sessions as $session) {
-                    $copy = $session->replicate(['schedule_version_id']);
-                    $copy->schedule_version_id = $draft->id;
-                    $copy->save();
-                    $copy->participants()->sync($session->participants->pluck('id'));
-                    $copy->lecturers()->sync($session->lecturers->mapWithKeys(fn ($lecturer): array => [$lecturer->id => ['role' => $lecturer->pivot->role]]));
-                }
+                $this->copySessions($base, $draft);
             }
 
             $this->audit->log('schedule.draft_created', $draft, null, ['version_no' => $versionNo, 'based_on' => $base?->version_no, 'source' => $source->value]);
 
             return $draft;
         });
+    }
+
+    /**
+     * Salin seluruh sesi (beserta peserta & pengajar) dari satu versi ke versi lain.
+     *
+     * @return array<int, int> Peta id sesi asal → id sesi salinan.
+     */
+    public function copySessions(ScheduleVersion $from, ScheduleVersion $to): array
+    {
+        $map = [];
+
+        DB::transaction(function () use ($from, $to, &$map): void {
+            foreach ($from->sessions()->with(['participants', 'lecturers'])->get() as $session) {
+                $copy = $session->replicate(['schedule_version_id']);
+                $copy->schedule_version_id = $to->id;
+                $copy->save();
+                $copy->participants()->sync($session->participants->pluck('id'));
+                $copy->lecturers()->sync($session->lecturers->mapWithKeys(fn ($lecturer): array => [$lecturer->id => ['role' => $lecturer->pivot->role]]));
+                $map[$session->id] = $copy->id;
+            }
+        });
+
+        return $map;
     }
 
     /**

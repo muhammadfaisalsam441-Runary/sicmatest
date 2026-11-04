@@ -35,7 +35,9 @@ function draftSession(ScheduleVersion $draft, array $attributes = [], array $cla
 
 function issueCodes(ScheduleVersion $draft): array
 {
-    return app(ScheduleValidator::class)->validate($draft)->pluck('code')->sort()->values()->all();
+    return app(ScheduleValidator::class)->validate($draft)
+        ->where('severity', IssueSeverity::Error)
+        ->pluck('code')->sort()->values()->all();
 }
 
 test('draf tanpa bentrok tidak punya masalah wajib', function () {

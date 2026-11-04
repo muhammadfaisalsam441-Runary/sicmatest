@@ -12,6 +12,7 @@ use App\Http\Controllers\Admin\ProfileController;
 use App\Http\Controllers\Admin\ReservationController;
 use App\Http\Controllers\Admin\RoomController;
 use App\Http\Controllers\Admin\ScheduleController;
+use App\Http\Controllers\Admin\SchedulerController;
 use App\Http\Controllers\Admin\TeachingAssignmentController;
 use App\Http\Controllers\Admin\UsageLogController;
 use Illuminate\Support\Facades\Route;
@@ -95,3 +96,11 @@ Route::get('/pembagian-mengajar', [TeachingAssignmentController::class, 'index']
 Route::post('/pembagian-mengajar', [TeachingAssignmentController::class, 'store'])->name('teaching.store');
 Route::post('/pembagian-mengajar/{assignment}/kunci', [TeachingAssignmentController::class, 'toggleLock'])->name('teaching.lock');
 Route::delete('/pembagian-mengajar/{assignment}', [TeachingAssignmentController::class, 'destroy'])->name('teaching.destroy');
+
+Route::get('/susun-jadwal', [SchedulerController::class, 'create'])->name('scheduler.create');
+Route::post('/susun-jadwal/periksa', [SchedulerController::class, 'check'])->name('scheduler.check');
+Route::post('/susun-jadwal', [SchedulerController::class, 'store'])->middleware('throttle:10,1')->name('scheduler.store');
+Route::get('/susun-jadwal/riwayat', [SchedulerController::class, 'history'])->name('scheduler.history');
+Route::get('/susun-jadwal/proses/{job}', [SchedulerController::class, 'show'])->name('scheduler.show');
+Route::get('/susun-jadwal/proses/{job}/status', [SchedulerController::class, 'status'])->name('scheduler.status');
+Route::post('/susun-jadwal/proses/{job}/batal', [SchedulerController::class, 'cancel'])->name('scheduler.cancel');

@@ -10,7 +10,9 @@
 @endsection
 
 @section('content')
-    @php($clock = fn (int $minutes) => sprintf('%02d:%02d', intdiv($minutes, 60), $minutes % 60))
+    @php
+        $clock = fn (int $minutes) => sprintf('%02d:%02d', intdiv($minutes, 60), $minutes % 60);
+    @endphp
 
     <div class="flex flex-col gap-6">
         <x-page-header :title="AcademicController::TABS[$tab]" :subtitle="$period ? 'Semester aktif: '.$period->name.'. Data yang belum diketahui dibiarkan kosong dan ditandai Perlu dilengkapi.' : 'Belum ada semester aktif.'">
@@ -103,15 +105,23 @@
                 </form>
             </x-card>
         @elseif ($tab === 'kelas')
-            <x-card class="flex flex-col gap-4">
-                <p class="text-sm text-muted">Jumlah peserta yang belum tersedia ditandai "Belum diisi". Lengkapi sebelum memeriksa kapasitas dan bentrok kelas.</p>
+            <x-card class="flex flex-col gap-4" x-data="{ search: '' }">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <p class="text-sm text-muted">Jumlah peserta yang belum tersedia ditandai "Belum diisi". Lengkapi sebelum memeriksa kapasitas dan bentrok kelas.</p>
+                    <div class="relative w-full sm:w-72">
+                        <i data-lucide="search" class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted"></i>
+                        <input type="search" x-model="search" placeholder="Cari kelas, prodi, atau angkatan..." aria-label="Cari kelas"
+                               class="w-full rounded-control border border-border bg-surface py-2 pl-9 pr-3 text-sm text-ink focus:border-primary focus:outline-none">
+                    </div>
+                </div>
                 <table class="w-full text-left text-sm">
                     <thead class="border-b border-border text-xs text-muted">
                         <tr><th class="py-3 pr-4 font-medium">Kelas</th><th class="py-3 pr-4 font-medium">Prodi</th><th class="py-3 pr-4 font-medium">Angkatan</th><th class="py-3 pr-4 font-medium">Jadwal</th><th class="py-3 pr-4 font-medium">Peserta</th><th class="py-3 pr-4 font-medium">Data</th><th class="py-3 font-medium">Aksi</th></tr>
                     </thead>
                     <tbody class="divide-y divide-border">
                         @foreach ($classGroups as $classGroup)
-                            <tr>
+                            <tr data-search="{{ mb_strtolower($classGroup->name.' '.$classGroup->study_program.' '.$classGroup->cohort_year) }}"
+                                x-show="!search.trim() || $el.dataset.search.includes(search.trim().toLowerCase())">
                                 <td class="py-3 pr-4 font-semibold">{{ $classGroup->name }}</td>
                                 <td class="py-3 pr-4 text-muted">{{ $classGroup->study_program }}</td>
                                 <td class="py-3 pr-4">{{ $classGroup->cohort_year }}</td>
@@ -136,15 +146,23 @@
                 </table>
             </x-card>
         @elseif ($tab === 'mata-kuliah')
-            <x-card class="flex flex-col gap-4">
-                <p class="text-sm text-muted">Kode kurikulum dipertahankan. Nama mirip dengan kode berbeda tidak digabung otomatis.</p>
+            <x-card class="flex flex-col gap-4" x-data="{ search: '' }">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <p class="text-sm text-muted">Kode kurikulum dipertahankan. Nama mirip dengan kode berbeda tidak digabung otomatis.</p>
+                    <div class="relative w-full sm:w-72">
+                        <i data-lucide="search" class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted"></i>
+                        <input type="search" x-model="search" placeholder="Cari kode atau nama mata kuliah..." aria-label="Cari mata kuliah"
+                               class="w-full rounded-control border border-border bg-surface py-2 pl-9 pr-3 text-sm text-ink focus:border-primary focus:outline-none">
+                    </div>
+                </div>
                 <table class="w-full text-left text-sm">
                     <thead class="border-b border-border text-xs text-muted">
                         <tr><th class="py-3 pr-4 font-medium">Kode MK</th><th class="py-3 pr-4 font-medium">Mata kuliah</th><th class="py-3 pr-4 font-medium">SKS</th><th class="py-3 pr-4 font-medium">Kurikulum</th><th class="py-3 pr-4 font-medium">Penawaran</th><th class="py-3 font-medium">Aksi</th></tr>
                     </thead>
                     <tbody class="divide-y divide-border">
                         @foreach ($courses as $course)
-                            <tr>
+                            <tr data-search="{{ mb_strtolower($course->code.' '.$course->name.' '.($course->curriculum ?? '')) }}"
+                                x-show="!search.trim() || $el.dataset.search.includes(search.trim().toLowerCase())">
                                 <td class="py-3 pr-4 font-mono text-xs">{{ $course->code }}</td>
                                 <td class="py-3 pr-4 font-semibold">{{ $course->name }}</td>
                                 <td class="py-3 pr-4">{{ $course->sks }}</td>
@@ -164,18 +182,31 @@
                 </table>
             </x-card>
         @elseif ($tab === 'penawaran')
-            <x-card class="flex flex-col gap-4">
+            <x-card class="flex flex-col gap-4" x-data="{ search: '' }">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <p class="text-sm text-muted">Daftar kelas dan mata kuliah yang ditawarkan pada semester aktif ({{ number_format($offerings->count()) }} penawaran).</p>
+                    <div class="relative w-full sm:w-80">
+                        <i data-lucide="search" class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted"></i>
+                        <input type="search" x-model="search" placeholder="Cari kelas, mata kuliah, atau dosen..." aria-label="Cari penawaran"
+                               class="w-full rounded-control border border-border bg-surface py-2 pl-9 pr-3 text-sm text-ink focus:border-primary focus:outline-none">
+                    </div>
+                </div>
                 <table class="w-full text-left text-sm">
                     <thead class="border-b border-border text-xs text-muted">
                         <tr><th class="py-3 pr-4 font-medium">Kelas</th><th class="py-3 pr-4 font-medium">Mata kuliah</th><th class="py-3 pr-4 font-medium">SKS</th><th class="py-3 pr-4 font-medium">Tim pengajar</th><th class="py-3 font-medium">Aksi</th></tr>
                     </thead>
                     <tbody class="divide-y divide-border">
                         @forelse ($offerings as $offering)
-                            <tr>
+                            @php
+                                $teamNames = $offering->teachingAssignments->map(fn ($assignment) => $assignment->lecturer->name)->implode(', ');
+                                $offeringSearchText = mb_strtolower($offering->classGroup->name.' '.$offering->course->code.' '.$offering->course->name.' '.$teamNames);
+                            @endphp
+                            <tr data-search="{{ $offeringSearchText }}"
+                                x-show="!search.trim() || $el.dataset.search.includes(search.trim().toLowerCase())">
                                 <td class="py-3 pr-4 font-semibold">{{ $offering->classGroup->name }}</td>
                                 <td class="py-3 pr-4">{{ $offering->course->name }}</td>
                                 <td class="py-3 pr-4">{{ $offering->course->sks }}</td>
-                                <td class="py-3 pr-4 text-muted">{{ $offering->teachingAssignments->map(fn ($assignment) => $assignment->lecturer->name)->implode(', ') ?: 'Belum ada pengampu' }}</td>
+                                <td class="py-3 pr-4 text-muted">{{ $teamNames ?: 'Belum ada pengampu' }}</td>
                                 <td class="py-3">
                                     <a href="{{ route('admin.teaching.index', ['penawaran' => $offering->id]) }}" class="font-semibold text-primary hover:underline">Atur tim</a>
                                     <form method="POST" action="{{ route('admin.academic.offerings.destroy', $offering) }}" class="ml-3 inline">

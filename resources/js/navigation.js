@@ -217,10 +217,8 @@ export function installPortalNavigation(Alpine, renderIcons) {
         if (silent && current.hasAttribute('data-modal-name')) return;
 
         const hasAlpine = current.hasAttribute('x-data') || next.hasAttribute('x-data');
-        if (hasAlpine && (current.hasAttribute('x-init') || next.hasAttribute('x-init')
-            || current.hasAttribute('data-modal-name')
-            || current.getAttribute('x-data') !== next.getAttribute('x-data'))) {
-            if (current.outerHTML !== next.outerHTML) {
+        if (hasAlpine) {
+            if (!silent || current.outerHTML !== next.outerHTML) {
                 Alpine.destroyTree(current);
                 current.replaceWith(next);
                 Alpine.initTree(next);

@@ -10,7 +10,26 @@
 @endsection
 
 @section('content')
-    <div class="flex flex-col gap-6" x-data="roomManager()">
+    @php
+        $roomManagerDefaults = [
+            'formModalOpen' => ($errors->any() && old('form') !== 'closure') || request()->boolean('tambah'),
+            'closureModalOpen' => (bool) (session('closure_impact') || old('form') === 'closure'),
+            'closureRoomId' => old('room_id', ''),
+            'closureStart' => old('start_at', now()->format('Y-m-d\TH:i')),
+            'closureEnd' => old('end_at', now()->addHours(4)->format('Y-m-d\TH:i')),
+            'closureReason' => old('reason', ''),
+            'name' => old('name', ''),
+            'code' => old('code', ''),
+            'type' => old('type', 'classroom'),
+            'capacity' => old('capacity', ''),
+            'floor' => old('floor', ''),
+            'building' => old('building', ''),
+            'facilities' => old('facilities', ''),
+        ];
+    @endphp
+    <div class="flex flex-col gap-6"
+         x-data="roomManager(@js($rooms->pluck('id')->all()), @js($roomManagerDefaults))"
+         @sicma:navigated.document="formModalOpen = false; closureModalOpen = false; deleteModalOpen = false; batchFacilityModalOpen = false">
         <x-page-header title="Data ruang"
                        :subtitle="$totalRooms.' ruang terdaftar'.($periodName ? ' dari jadwal '.$periodName : '').'. Kelola profil ruangan, kapasitas kursi, fasilitas, lokasi gedung, serta status penutupan ruang.'">
             <x-slot:actions>
@@ -172,7 +191,7 @@
 
                 <div class="sm:col-span-3">
                     <label class="mb-1 block text-xs font-medium text-muted">Filter Gedung</label>
-                    <select name="gedung" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
+                    <select name="gedung" @change="$el.form.requestSubmit()" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
                         <option value="">Semua Gedung</option>
                         @foreach ($buildings as $b)
                             <option value="{{ $b->name }}" @selected($buildingFilter === $b->name)>Gedung {{ $b->name }}</option>
@@ -183,7 +202,7 @@
 
                 <div class="sm:col-span-2">
                     <label class="mb-1 block text-xs font-medium text-muted">Baris / Halaman</label>
-                    <select name="per_page" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
+                    <select name="per_page" @change="$el.form.requestSubmit()" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
                         @foreach ([15, 30, 50, 100] as $n)
                             <option value="{{ $n }}" @selected($perPage == $n)>{{ $n }} baris</option>
                         @endforeach
@@ -235,7 +254,7 @@
                                 <td class="px-4 py-3 text-center">
                                     <input type="checkbox"
                                            value="{{ $room->id }}"
-                                           x-model="selectedIds"
+                                           x-model.number="selectedIds"
                                            class="size-4 rounded border-border text-primary focus:ring-primary cursor-pointer">
                                 </td>
 
@@ -474,7 +493,7 @@
         </form>
 
         {{-- MODAL 1: EDIT / TAMBAH RUANG DINAMIS TUNGGAL --}}
-        <div x-show="formModalOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div x-show="formModalOpen" x-cloak data-modal-name="room-form" class="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-ink/80 backdrop-blur-sm" @click="formModalOpen = false"></div>
             <div class="relative w-full max-w-lg rounded-2xl bg-surface p-6 shadow-2xl">
                 <div class="flex items-start justify-between border-b border-border pb-3">
@@ -558,7 +577,7 @@
         </div>
 
         {{-- MODAL 2: PENUTUPAN RUANG SEMENTARA --}}
-        <div x-show="closureModalOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div x-show="closureModalOpen" x-cloak data-modal-name="room-closure" class="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-ink/80 backdrop-blur-sm" @click="closureModalOpen = false"></div>
             <div class="relative w-full max-w-lg rounded-2xl bg-surface p-6 shadow-2xl">
                 <div class="flex items-start justify-between border-b border-border pb-3">
@@ -633,7 +652,7 @@
         </div>
 
         {{-- MODAL 3: KONFIRMASI HAPUS DINAMIS TUNGGAL --}}
-        <div x-show="deleteModalOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div x-show="deleteModalOpen" x-cloak data-modal-name="room-delete" class="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-ink/80 backdrop-blur-sm" @click="deleteModalOpen = false"></div>
             <div class="relative w-full max-w-md rounded-2xl bg-surface p-6 shadow-2xl">
                 <div class="flex items-start justify-between border-b border-border pb-3">
@@ -661,7 +680,7 @@
         </div>
 
         {{-- MODAL 4: BATCH TAMBAH FASILITAS --}}
-        <div x-show="batchFacilityModalOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div x-show="batchFacilityModalOpen" x-cloak data-modal-name="room-batch-facility" class="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-ink/80 backdrop-blur-sm" @click="batchFacilityModalOpen = false"></div>
             <div class="relative w-full max-w-md rounded-2xl bg-surface p-6 shadow-2xl">
                 <div class="flex items-start justify-between border-b border-border pb-3">
@@ -695,135 +714,4 @@
             </div>
         </div>
     </div>
-
-    <script>
-        function roomManager() {
-            const pageRoomIds = @js($rooms->pluck('id')->all());
-
-            return {
-                selectedIds: [],
-                formModalOpen: {{ ($errors->any() && old('form') !== 'closure') ? 'true' : 'false' }},
-                closureModalOpen: {{ (session('closure_impact') || old('form') === 'closure') ? 'true' : 'false' }},
-                deleteModalOpen: false,
-                batchFacilityModalOpen: false,
-                batchAction: '',
-                batchParams: {
-                    building: '',
-                    type: ''
-                },
-                closureRoomId: '{{ old('room_id', '') }}',
-                closureStart: '{{ old('start_at', now()->format('Y-m-d\TH:i')) }}',
-                closureEnd: '{{ old('end_at', now()->addHours(4)->format('Y-m-d\TH:i')) }}',
-                closureReason: '{{ old('reason', '') }}',
-                roomToDelete: {
-                    id: null,
-                    name: ''
-                },
-                formRoom: {
-                    id: null,
-                    name: '{{ old('name', '') }}',
-                    code: '{{ old('code', '') }}',
-                    type: '{{ old('type', 'classroom') }}',
-                    capacity: '{{ old('capacity', '') }}',
-                    floor: '{{ old('floor', '') }}',
-                    building: '{{ old('building', '') }}',
-                    facilities: '{{ old('facilities', '') }}',
-                    is_bookable: true
-                },
-
-                isAllSelected() {
-                    return pageRoomIds.length > 0 && pageRoomIds.every(id => this.selectedIds.includes(id));
-                },
-
-                toggleSelectAll(checked) {
-                    if (checked) {
-                        pageRoomIds.forEach(id => {
-                            if (!this.selectedIds.includes(id)) {
-                                this.selectedIds.push(id);
-                            }
-                        });
-                    } else {
-                        this.selectedIds = this.selectedIds.filter(id => !pageRoomIds.includes(id));
-                    }
-                },
-
-                openCreateModal() {
-                    this.formRoom = {
-                        id: null,
-                        name: '',
-                        code: '',
-                        type: 'classroom',
-                        capacity: '',
-                        floor: '',
-                        building: '',
-                        facilities: '',
-                        is_bookable: true
-                    };
-                    this.formModalOpen = true;
-                    this.$nextTick(() => {
-                        if (window.renderIcons) window.renderIcons();
-                    });
-                },
-
-                openEditModal(data) {
-                    this.formRoom = {
-                        id: data.id,
-                        name: data.name || '',
-                        code: data.code || '',
-                        type: data.type || 'classroom',
-                        capacity: data.capacity ?? '',
-                        floor: data.floor ?? '',
-                        building: data.building || '',
-                        facilities: data.facilities || '',
-                        is_bookable: data.is_bookable ?? true
-                    };
-                    this.formModalOpen = true;
-                    this.$nextTick(() => {
-                        if (window.renderIcons) window.renderIcons();
-                    });
-                },
-
-                openClosureModal(roomId) {
-                    if (roomId) {
-                        this.closureRoomId = roomId;
-                    }
-                    this.closureModalOpen = true;
-                    this.$nextTick(() => {
-                        if (window.renderIcons) window.renderIcons();
-                    });
-                },
-
-                openDeleteModal(id, name) {
-                    this.roomToDelete = { id: id, name: name };
-                    this.deleteModalOpen = true;
-                    this.$nextTick(() => {
-                        if (window.renderIcons) window.renderIcons();
-                    });
-                },
-
-                openDeleteFromEdit() {
-                    if (!this.formRoom.id) return;
-                    this.openDeleteModal(this.formRoom.id, this.formRoom.name);
-                    this.formModalOpen = false;
-                },
-
-                addFacilityTag(tag) {
-                    let current = (this.formRoom.facilities || '').split(',').map(s => s.trim()).filter(Boolean);
-                    if (!current.includes(tag)) {
-                        current.push(tag);
-                        this.formRoom.facilities = current.join(', ');
-                    }
-                },
-
-                submitBatch(action, params = {}) {
-                    if (this.selectedIds.length === 0) return;
-                    this.batchAction = action;
-                    this.batchParams = params;
-                    this.$nextTick(() => {
-                        this.$refs.batchForm.submit();
-                    });
-                }
-            };
-        }
-    </script>
 @endsection

@@ -95,8 +95,11 @@ Route::put('/dosen/{lecturer}', [LecturerController::class, 'update'])->name('le
 Route::post('/dosen/impor', [LecturerController::class, 'import'])->name('lecturers.import');
 
 Route::get('/pembagian-mengajar', [TeachingAssignmentController::class, 'index'])->name('teaching.index');
+Route::get('/pembagian-mengajar/sks-otomatis', [TeachingAssignmentController::class, 'previewPhases'])->name('teaching.phases.preview');
+Route::post('/pembagian-mengajar/sks-otomatis', [TeachingAssignmentController::class, 'applyPhases'])->name('teaching.phases.apply');
 Route::post('/pembagian-mengajar', [TeachingAssignmentController::class, 'store'])->name('teaching.store');
 Route::post('/pembagian-mengajar/batch', [TeachingAssignmentController::class, 'batchStore'])->name('teaching.batch');
+Route::put('/pembagian-mengajar/{assignment}', [TeachingAssignmentController::class, 'update'])->name('teaching.update');
 Route::post('/pembagian-mengajar/{assignment}/kunci', [TeachingAssignmentController::class, 'toggleLock'])->name('teaching.lock');
 Route::delete('/pembagian-mengajar/{assignment}', [TeachingAssignmentController::class, 'destroy'])->name('teaching.destroy');
 

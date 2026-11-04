@@ -11,7 +11,9 @@
 @endsection
 
 @section('content')
-    <div class="flex flex-col gap-6" x-data="lecturerManager()">
+    <div class="flex flex-col gap-6"
+         x-data="lecturerManager(@js($lecturers->pluck('id')->all()))"
+         @sicma:navigated.document="formModalOpen = false; batchTargetModalOpen = false; importModalOpen = false">
         <x-page-header title="Data dosen dari jadwal" subtitle="Kelola profil dosen, status verifikasi, penugasan pimpinan, serta target beban SKS untuk penjadwalan.">
             <x-slot:actions>
                 <x-button variant="secondary" icon="upload" @click="importModalOpen = true">Impor spreadsheet</x-button>
@@ -117,7 +119,7 @@
 
                 <div class="sm:col-span-3">
                     <label class="mb-1 block text-xs font-medium text-muted">Tampilkan Per Halaman</label>
-                    <select name="per_page" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
+                    <select name="per_page" @change="$el.form.requestSubmit()" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
                         @foreach ([25, 50, 100] as $n)
                             <option value="{{ $n }}" @selected($perPage == $n)>{{ $n }} baris</option>
                         @endforeach
@@ -151,7 +153,7 @@
                                        title="Pilih semua di halaman ini">
                             </th>
                             <th class="px-4 py-3 font-semibold">Nama Dosen & NIDN</th>
-                            <th class="px-3 py-3 text-center font-semibold">Beban MK</th>
+                            <th class="px-3 py-3 text-center font-semibold">Jumlah MK</th>
                             <th class="px-4 py-3 font-semibold">Homebase</th>
                             <th class="px-4 py-3 font-semibold">Target / Maks SKS</th>
                             <th class="px-4 py-3 font-semibold">Status Profil</th>
@@ -160,16 +162,34 @@
                     </thead>
                     <tbody class="divide-y divide-border">
                         @forelse ($lecturers as $lecturer)
-                            @php($term = $lecturer->leadershipTerms->first(fn ($term) => $term->isActiveOn(now())))
-                            @php($target = $lecturer->loadTargets->first())
-                            @php($isVerified = $lecturer->profile_status === LecturerProfileStatus::Verified)
+                            @php
+                                $term = $lecturer->leadershipTerms->first(fn ($term) => $term->isActiveOn(now()));
+                                $target = $lecturer->loadTargets->first();
+                                $isVerified = $lecturer->profile_status === LecturerProfileStatus::Verified;
+                                $selection = $courseSelections[$lecturer->id];
+                                $editData = [
+                                    'id' => $lecturer->id,
+                                    'updateUrl' => route('admin.lecturers.update', $lecturer),
+                                    'name' => $lecturer->name,
+                                    'nidn' => $lecturer->nidn,
+                                    'homebase' => $lecturer->homebase?->value,
+                                    'profile_status' => $lecturer->profile_status->value,
+                                    'leadership_position' => $term?->position,
+                                    'leadership_from' => $term?->valid_from?->toDateString(),
+                                    'leadership_to' => $term?->valid_to?->toDateString(),
+                                    'target_sks' => $target?->target_sks,
+                                    'max_sks' => $target?->max_sks,
+                                    'course_ids' => array_map('strval', $selection['manual']),
+                                    'source_course_ids' => array_map('strval', $selection['source']),
+                                ];
+                            @endphp
 
                             <tr class="transition hover:bg-primary-soft/20" :class="{ 'bg-primary-soft/30': selectedIds.includes({{ $lecturer->id }}) }">
                                 {{-- Checkbox --}}
                                 <td class="px-4 py-3 text-center">
                                     <input type="checkbox"
                                            value="{{ $lecturer->id }}"
-                                           x-model="selectedIds"
+                                           x-model.number="selectedIds"
                                            class="size-4 rounded border-border text-primary focus:ring-primary cursor-pointer">
                                 </td>
 
@@ -202,7 +222,7 @@
                                 {{-- Beban MK --}}
                                 <td class="px-3 py-3 text-center">
                                     <span class="inline-flex items-center rounded-md bg-page px-2.5 py-0.5 text-xs font-medium text-ink ring-1 ring-border">
-                                        {{ $lecturer->course_count }} MK
+                                        {{ $selection['count'] }} MK
                                     </span>
                                 </td>
 
@@ -257,23 +277,10 @@
                                             </form>
                                         @endunless
 
-                                        {{-- Tombol Edit Modal --}}
-                                        <button type="button"
-                                                @click="openEditModal({{ json_encode([
-                                                    'id' => $lecturer->id,
-                                                    'name' => $lecturer->name,
-                                                    'nidn' => $lecturer->nidn,
-                                                    'homebase' => $lecturer->homebase?->value,
-                                                    'profile_status' => $lecturer->profile_status->value,
-                                                    'leadership_position' => $term?->position,
-                                                    'leadership_from' => $term?->valid_from?->toDateString(),
-                                                    'leadership_to' => $term?->valid_to?->toDateString(),
-                                                    'target_sks' => $target?->target_sks,
-                                                    'max_sks' => $target?->max_sks,
-                                                ]) }})"
-                                                class="rounded p-1 text-muted hover:bg-page hover:text-primary transition"
-                                                title="Ubah data lengkap">
+                                        <button type="button" @click="openEditModal(@js($editData))"
+                                                class="inline-flex items-center gap-1 rounded-control border border-border px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary-soft">
                                             <i data-lucide="edit-3" class="size-4"></i>
+                                            Edit
                                         </button>
                                     </div>
                                 </td>
@@ -365,9 +372,9 @@
         </form>
 
         {{-- MODAL 1: EDIT / CREATE DINAMIS TUNGGAL --}}
-        <div x-show="formModalOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div x-show="formModalOpen" x-cloak data-modal-name="lecturer-profile" class="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-ink/80 backdrop-blur-sm" @click="formModalOpen = false"></div>
-            <div class="relative w-full max-w-lg rounded-2xl bg-surface p-6 shadow-2xl">
+            <div class="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-surface p-6 shadow-2xl">
                 <div class="flex items-start justify-between border-b border-border pb-3">
                     <div>
                         <span class="text-xs font-semibold text-primary" x-text="formLecturer.id ? 'Perbarui Profil Dosen' : 'Dosen Baru'"></span>
@@ -378,7 +385,7 @@
                     </button>
                 </div>
 
-                <form method="POST" :action="formLecturer.id ? '/admin/dosen/' + formLecturer.id : '{{ route('admin.lecturers.store') }}'" class="mt-4 flex flex-col gap-4">
+                <form method="POST" action="{{ route('admin.lecturers.store') }}" :action="formLecturer.updateUrl || @js(route('admin.lecturers.store'))" class="mt-4 flex flex-col gap-4">
                     @csrf
                     <template x-if="formLecturer.id">
                         <input type="hidden" name="_method" value="PUT">
@@ -443,6 +450,33 @@
                         </div>
                     </div>
 
+                    <fieldset x-show="formLecturer.id" :disabled="!formLecturer.id" class="rounded-control border border-border p-3">
+                        <legend class="px-1 text-sm font-semibold text-ink">Mata kuliah yang bisa diampu</legend>
+                        <input type="hidden" name="course_selection_present" value="1">
+                        <p class="mb-3 text-xs text-muted">Mata kuliah dari spreadsheet dan jadwal semester aktif sudah tercentang. Centang pilihan tambahan agar dosen tersedia di Pembagian Mengajar.</p>
+                        <p class="mb-2 text-sm font-medium text-ink"><span x-text="selectedCourseIds.length"></span> MK dipilih</p>
+                        <template x-for="id in formLecturer.course_ids" :key="id">
+                            <input type="hidden" name="course_ids[]" :value="id">
+                        </template>
+                        <label for="lecturer-course-search" class="sr-only">Cari mata kuliah</label>
+                        <input id="lecturer-course-search" type="search" x-model="courseQuery" placeholder="Cari nama atau kode mata kuliah"
+                               class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
+                        <div class="mt-2 max-h-48 overflow-y-auto rounded-control border border-border">
+                            @forelse ($courses as $course)
+                                <label x-show="@js(mb_strtolower($course->code.' '.$course->name)).includes(courseQuery.trim().toLowerCase())" class="flex items-start gap-2 border-b border-border px-3 py-2 text-sm last:border-b-0">
+                                    <input type="checkbox" value="{{ $course->id }}" :checked="selectedCourseIds.includes($el.value)"
+                                           :disabled="formLecturer.source_course_ids?.includes($el.value)"
+                                           @change="toggleCourse($el.value, $event.target.checked)" class="mt-0.5">
+                                    <span>{{ $course->name }} <span class="text-xs text-muted">{{ $course->code }}</span>
+                                        <span x-show="formLecturer.source_course_ids?.includes('{{ $course->id }}')" class="text-xs text-muted">· Sudah tercatat</span>
+                                    </span>
+                                </label>
+                            @empty
+                                <p class="p-3 text-sm text-muted">Belum ada mata kuliah di katalog.</p>
+                            @endforelse
+                        </div>
+                    </fieldset>
+
                     <div class="mt-2 flex items-center justify-end gap-2 border-t border-border pt-4">
                         <x-button variant="secondary" type="button" @click="formModalOpen = false">Batal</x-button>
                         <x-button variant="primary" type="submit" icon="check">Simpan Data Dosen</x-button>
@@ -452,7 +486,7 @@
         </div>
 
         {{-- MODAL 2: BATCH ATUR TARGET SKS --}}
-        <div x-show="batchTargetModalOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div x-show="batchTargetModalOpen" x-cloak data-modal-name="lecturer-batch-target" class="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-ink/80 backdrop-blur-sm" @click="batchTargetModalOpen = false"></div>
             <div class="relative w-full max-w-md rounded-2xl bg-surface p-6 shadow-2xl">
                 <div class="flex items-start justify-between border-b border-border pb-3">
@@ -491,7 +525,7 @@
         </div>
 
         {{-- MODAL 3: IMPOR EXCEL / CSV --}}
-        <div x-show="importModalOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div x-show="importModalOpen" x-cloak data-modal-name="lecturer-import" class="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-ink/80 backdrop-blur-sm" @click="importModalOpen = false"></div>
             <div class="relative w-full max-w-md rounded-2xl bg-surface p-6 shadow-2xl">
                 <div class="flex items-start justify-between border-b border-border pb-3">
@@ -520,91 +554,4 @@
         </div>
     </div>
 
-    <script>
-        function lecturerManager() {
-            const pageLecturerIds = @js($lecturers->pluck('id')->all());
-
-            return {
-                selectedIds: [],
-                formModalOpen: false,
-                batchTargetModalOpen: false,
-                importModalOpen: false,
-                batchAction: '',
-                formLecturer: {
-                    id: null,
-                    name: '',
-                    nidn: '',
-                    homebase: '',
-                    profile_status: 'verified',
-                    leadership_position: '',
-                    leadership_from: '',
-                    leadership_to: '',
-                    target_sks: '',
-                    max_sks: ''
-                },
-
-                isAllSelected() {
-                    return pageLecturerIds.length > 0 && pageLecturerIds.every(id => this.selectedIds.includes(id));
-                },
-
-                toggleSelectAll(checked) {
-                    if (checked) {
-                        pageLecturerIds.forEach(id => {
-                            if (!this.selectedIds.includes(id)) {
-                                this.selectedIds.push(id);
-                            }
-                        });
-                    } else {
-                        this.selectedIds = this.selectedIds.filter(id => !pageLecturerIds.includes(id));
-                    }
-                },
-
-                openCreateModal() {
-                    this.formLecturer = {
-                        id: null,
-                        name: '',
-                        nidn: '',
-                        homebase: 'jtik',
-                        profile_status: 'verified',
-                        leadership_position: '',
-                        leadership_from: '',
-                        leadership_to: '',
-                        target_sks: '12',
-                        max_sks: '16'
-                    };
-                    this.formModalOpen = true;
-                    this.$nextTick(() => {
-                        if (window.renderIcons) window.renderIcons();
-                    });
-                },
-
-                openEditModal(data) {
-                    this.formLecturer = {
-                        id: data.id,
-                        name: data.name || '',
-                        nidn: data.nidn || '',
-                        homebase: data.homebase || '',
-                        profile_status: data.profile_status || 'unverified',
-                        leadership_position: data.leadership_position || '',
-                        leadership_from: data.leadership_from || '',
-                        leadership_to: data.leadership_to || '',
-                        target_sks: data.target_sks ?? '',
-                        max_sks: data.max_sks ?? ''
-                    };
-                    this.formModalOpen = true;
-                    this.$nextTick(() => {
-                        if (window.renderIcons) window.renderIcons();
-                    });
-                },
-
-                submitBatch(action) {
-                    if (this.selectedIds.length === 0) return;
-                    this.batchAction = action;
-                    this.$nextTick(() => {
-                        this.$refs.batchForm.submit();
-                    });
-                }
-            };
-        }
-    </script>
 @endsection

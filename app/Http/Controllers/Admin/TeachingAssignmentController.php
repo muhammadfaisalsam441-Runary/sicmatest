@@ -10,12 +10,16 @@ use App\Http\Requests\Admin\TeachingAssignmentRequest;
 use App\Models\ClassGroup;
 use App\Models\CourseOffering;
 use App\Models\Lecturer;
+use App\Models\LecturerExpertise;
 use App\Models\Period;
 use App\Models\TeachingAssignment;
 use App\Services\AuditLogger;
+use App\Services\LecturerService;
 use App\Services\TeachingLoadService;
+use App\Services\TeachingPhasePlanner;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -26,7 +30,7 @@ class TeachingAssignmentController extends Controller
 {
     public function __construct(private AuditLogger $audit) {}
 
-    public function index(Request $request, TeachingLoadService $loads): View
+    public function index(Request $request, TeachingLoadService $loads, LecturerService $lecturerService): View
     {
         $period = Period::query()->active()->first();
         $keyword = trim((string) $request->query('q'));
@@ -50,6 +54,8 @@ class TeachingAssignmentController extends Controller
                 })->orWhereHas('classGroup', function ($gq) use ($keyword) {
                     $gq->where('name', 'like', "%{$keyword}%")
                         ->orWhere('study_program', 'like', "%{$keyword}%");
+                })->orWhereHas('teachingAssignments.lecturer', function ($lq) use ($keyword) {
+                    $lq->where('name', 'like', "%{$keyword}%");
                 });
             });
         }
@@ -62,17 +68,25 @@ class TeachingAssignmentController extends Controller
             $query->whereDoesntHave('teachingAssignments', fn ($aq) => $aq->where('role', TeachingRole::Lead));
         } elseif ($filter === 'lengkap') {
             $query->whereHas('teachingAssignments', fn ($aq) => $aq->where('role', TeachingRole::Lead));
+        } elseif ($filter === 'tunggal') {
+            $query->whereHas('teachingAssignments', fn ($aq) => $aq->where('role', TeachingRole::Lead))
+                ->whereDoesntHave('teachingAssignments', fn ($aq) => $aq->where('role', TeachingRole::Partner));
+        } elseif ($filter === 'tim_mitra') {
+            $query->whereHas('teachingAssignments', fn ($aq) => $aq->where('role', TeachingRole::Lead))
+                ->whereHas('teachingAssignments', fn ($aq) => $aq->where('role', TeachingRole::Partner));
         }
+
+        $selectedId = $request->integer('penawaran');
 
         $offerings = $query->join('class_groups', 'course_offerings.class_group_id', '=', 'class_groups.id')
             ->join('courses', 'course_offerings.course_id', '=', 'courses.id')
             ->select('course_offerings.*')
+            ->when($selectedId > 0, fn ($q) => $q->orderByRaw('CASE WHEN course_offerings.id = ? THEN 0 ELSE 1 END', [$selectedId]))
             ->orderBy('class_groups.name')
             ->orderBy('courses.name')
             ->paginate($perPage)
             ->withQueryString();
 
-        $selectedId = $request->integer('penawaran');
         $selected = $selectedId > 0
             ? CourseOffering::with(['course', 'classGroup', 'teachingAssignments.lecturer'])->find($selectedId)
             : $offerings->first();
@@ -94,7 +108,8 @@ class TeachingAssignmentController extends Controller
             $status = $load['status'] ?? 'Belum ada beban';
             $tone = $load['tone'] ?? 'neutral';
 
-            $sksInfo = $max !== null ? "{$assigned}/{$max} SKS" : "{$assigned} SKS";
+            $meetingSks = $load['meeting_sks'] ?? 0;
+            $sksInfo = "{$meetingSks} SKS × pertemuan";
 
             return [$lecturer->id => [
                 'id' => $lecturer->id,
@@ -119,8 +134,15 @@ class TeachingAssignmentController extends Controller
             ->get()
             ->groupBy(fn (TeachingAssignment $assignment): string => $assignment->period_id.':'.$assignment->course_id);
 
-        $lecturerOptionsByOffering = $offerings->getCollection()->mapWithKeys(function (CourseOffering $offering) use ($instructorsByCourseAndPeriod, $lecturerOptionsById): array {
+        $rosterInstructors = $lecturerService->rosterInstructorIds($lecturers, $offerings->pluck('period_id')->unique()->all());
+        $manualInstructors = LecturerExpertise::query()->where('field', LecturerExpertise::ADMIN_TEACHING)
+            ->whereIn('course_id', $offerings->pluck('course_id')->unique())
+            ->get(['course_id', 'lecturer_id'])->groupBy('course_id');
+        $lecturerOptionsByOffering = $offerings->getCollection()->mapWithKeys(function (CourseOffering $offering) use ($instructorsByCourseAndPeriod, $lecturerOptionsById, $rosterInstructors, $manualInstructors): array {
             $instructorIds = $instructorsByCourseAndPeriod->get($offering->period_id.':'.$offering->course_id, collect())->pluck('lecturer_id');
+            $courseName = Str::lower(Str::squish($offering->course->name));
+            $instructorIds = $instructorIds->merge($rosterInstructors[$offering->period_id][$courseName] ?? []);
+            $instructorIds = $instructorIds->merge($manualInstructors->get($offering->course_id, collect())->pluck('lecturer_id'));
 
             return [$offering->id => $lecturerOptionsById->only($instructorIds->all())->values()->all()];
         });
@@ -131,6 +153,14 @@ class TeachingAssignmentController extends Controller
         $totalCount = (clone $baseCountQuery)->count();
         $withoutLeadCount = (clone $baseCountQuery)->whereDoesntHave('teachingAssignments', fn ($aq) => $aq->where('role', TeachingRole::Lead))->count();
         $withLeadCount = $totalCount - $withoutLeadCount;
+        $singleTeacherCount = (clone $baseCountQuery)
+            ->whereHas('teachingAssignments', fn ($aq) => $aq->where('role', TeachingRole::Lead))
+            ->whereDoesntHave('teachingAssignments', fn ($aq) => $aq->where('role', TeachingRole::Partner))
+            ->count();
+        $teamTeacherCount = (clone $baseCountQuery)
+            ->whereHas('teachingAssignments', fn ($aq) => $aq->where('role', TeachingRole::Lead))
+            ->whereHas('teachingAssignments', fn ($aq) => $aq->where('role', TeachingRole::Partner))
+            ->count();
 
         return view('admin.teaching.index', [
             'period' => $period,
@@ -140,6 +170,8 @@ class TeachingAssignmentController extends Controller
             'loads' => $allLoads,
             'withoutLead' => $withoutLeadCount,
             'withLead' => $withLeadCount,
+            'singleTeacherCount' => $singleTeacherCount,
+            'teamTeacherCount' => $teamTeacherCount,
             'totalCount' => $totalCount,
             'keyword' => $keyword,
             'filter' => $filter,
@@ -147,16 +179,113 @@ class TeachingAssignmentController extends Controller
             'perPage' => $perPage,
             'studyPrograms' => $studyPrograms,
             'lecturerOptionsEnriched' => $lecturerOptionsEnriched,
+            'allLecturerOptions' => $lecturerOptionsById->values(),
             'lecturerOptionsByOffering' => $lecturerOptionsByOffering,
+        ]);
+    }
+
+    public function previewPhases(TeachingPhasePlanner $planner): View
+    {
+        $period = Period::query()->active()->firstOrFail();
+
+        return view('admin.teaching.phase-preview', ['period' => $period, 'plan' => $planner->preview($period)]);
+    }
+
+    public function applyPhases(Request $request, TeachingPhasePlanner $planner): RedirectResponse
+    {
+        $validated = $request->validate(['fingerprint' => ['required', 'string', 'regex:/^[a-f0-9]{64}$/']]);
+        $count = $planner->apply($validated['fingerprint']);
+
+        return to_route('admin.teaching.index')->with('toast', [
+            'type' => 'success',
+            'title' => "Fase mengajar untuk {$count} penawaran telah disimpan.",
         ]);
     }
 
     public function store(TeachingAssignmentRequest $request): RedirectResponse
     {
-        $assignment = TeachingAssignment::create($request->validated());
-        $this->audit->log('teaching_assignment.created', $assignment, null, $request->validated());
+        $validated = $request->validated();
+
+        if ($validated['role'] === TeachingRole::Lead->value) {
+            $existingLead = TeachingAssignment::query()
+                ->where('course_offering_id', $validated['course_offering_id'])
+                ->where('role', TeachingRole::Lead)
+                ->first();
+
+            if ($existingLead) {
+                if ($existingLead->is_locked) {
+                    return back()->with('error', 'Pengampu utama terkunci. Buka kunci dulu sebelum mengganti pengampu.');
+                }
+
+                $before = $existingLead->only(['lecturer_id', 'role', 'phase', 'credited_sks']);
+                $existingLead->update([
+                    'lecturer_id' => $validated['lecturer_id'],
+                    'phase' => $validated['phase'],
+                    'credited_sks' => $validated['credited_sks'] ?? null,
+                ]);
+                $this->audit->log('teaching_assignment.updated', $existingLead, $before, $validated);
+
+                return back()->with('toast', ['type' => 'success', 'title' => 'Dosen pengampu utama berhasil diperbarui']);
+            }
+        }
+
+        $assignment = TeachingAssignment::create($validated);
+        $this->audit->log('teaching_assignment.created', $assignment, null, $validated);
 
         return back()->with('toast', ['type' => 'success', 'title' => 'Pengajar ditambahkan ke tim']);
+    }
+
+    public function update(Request $request, TeachingAssignment $assignment): RedirectResponse
+    {
+        if ($assignment->is_locked) {
+            return back()->with('error', 'Penugasan terkunci. Buka kunci dulu sebelum mengubah data.');
+        }
+
+        $validated = $request->validate([
+            'lecturer_id' => [
+                'required',
+                Rule::exists('lecturers', 'id')->whereNull('deleted_at'),
+                Rule::unique('teaching_assignments')
+                    ->ignore($assignment->id)
+                    ->where(fn ($query) => $query
+                        ->where('course_offering_id', $assignment->course_offering_id)
+                        ->where('phase', $request->input('phase', 'full'))
+                    ),
+            ],
+            'role' => ['required', Rule::enum(TeachingRole::class)],
+            'phase' => ['required', Rule::enum(SessionPhase::class)],
+            'credited_sks' => ['nullable', 'integer', 'min:0', 'max:12'],
+        ], [
+            'lecturer_id.unique' => 'Dosen ini sudah ada di tim pengajar untuk periode tersebut.',
+        ]);
+
+        if ($validated['role'] === TeachingRole::Lead->value) {
+            $otherLead = TeachingAssignment::query()
+                ->where('course_offering_id', $assignment->course_offering_id)
+                ->where('id', '!=', $assignment->id)
+                ->where('role', TeachingRole::Lead)
+                ->first();
+
+            if ($otherLead) {
+                if ($otherLead->is_locked) {
+                    return back()->with('error', 'Pengampu utama saat ini sedang terkunci.');
+                }
+
+                $otherLead->update(['role' => TeachingRole::Partner]);
+            }
+        }
+
+        $before = $assignment->only(['lecturer_id', 'role', 'phase', 'credited_sks']);
+        $assignment->update([
+            'lecturer_id' => $validated['lecturer_id'],
+            'role' => $validated['role'],
+            'phase' => $validated['phase'],
+            'credited_sks' => $validated['credited_sks'] ?? null,
+        ]);
+
+        $this->audit->log('teaching_assignment.updated', $assignment, $before, $validated);
+
+        return back()->with('toast', ['type' => 'success', 'title' => 'Penugasan mengajar berhasil diperbarui']);
     }
 
     public function batchStore(Request $request): RedirectResponse
@@ -167,13 +296,46 @@ class TeachingAssignmentController extends Controller
             'lecturer_id' => ['required', 'exists:lecturers,id'],
             'role' => ['required', Rule::enum(TeachingRole::class)],
             'phase' => ['required', Rule::enum(SessionPhase::class)],
-            'credited_sks' => ['nullable', 'numeric', 'min:0', 'max:12'],
+            'credited_sks' => ['nullable', 'integer', 'min:0', 'max:12'],
         ]);
 
         $lecturer = Lecturer::findOrFail($validated['lecturer_id']);
         $assignedCount = 0;
 
         foreach ($validated['offering_ids'] as $offeringId) {
+            if ($validated['role'] === TeachingRole::Lead->value) {
+                $existingLead = TeachingAssignment::query()
+                    ->where('course_offering_id', $offeringId)
+                    ->where('role', TeachingRole::Lead)
+                    ->first();
+
+                if ($existingLead) {
+                    if ($existingLead->is_locked) {
+                        continue;
+                    }
+
+                    $conflict = TeachingAssignment::query()
+                        ->where('course_offering_id', $offeringId)
+                        ->where('id', '!=', $existingLead->id)
+                        ->where('lecturer_id', $validated['lecturer_id'])
+                        ->where('phase', $validated['phase'])
+                        ->exists();
+
+                    if (! $conflict) {
+                        $before = $existingLead->only(['lecturer_id', 'role', 'phase', 'credited_sks']);
+                        $existingLead->update([
+                            'lecturer_id' => $validated['lecturer_id'],
+                            'phase' => $validated['phase'],
+                            'credited_sks' => $validated['credited_sks'] ?? $existingLead->credited_sks,
+                        ]);
+                        $this->audit->log('teaching_assignment.updated', $existingLead, $before, $existingLead->toArray());
+                        $assignedCount++;
+                    }
+
+                    continue;
+                }
+            }
+
             $exists = TeachingAssignment::query()
                 ->where('course_offering_id', $offeringId)
                 ->where('lecturer_id', $validated['lecturer_id'])

@@ -8,6 +8,7 @@ use App\Models\AuditLog;
 use App\Models\ClassGroup;
 use App\Models\Course;
 use App\Models\CourseOffering;
+use App\Models\Import;
 use App\Models\Lecturer;
 use App\Models\Period;
 use App\Models\Room;
@@ -242,6 +243,43 @@ test('admin dapat melakukan aksi massal verifikasi, set homebase, dan target sks
         ->and((float) $dosen2->loadTargets()->where('period_id', $this->period->id)->value('max_sks'))->toBe(16.0);
 });
 
+test('admin dapat mengedit beberapa pilihan mata kuliah dosen tanpa mengubah penugasan kelas', function () {
+    $lecturer = Lecturer::factory()->create();
+    $first = CourseOffering::factory()->for($this->period)->create();
+    $second = CourseOffering::factory()->for($this->period)->create();
+    $existing = CourseOffering::factory()->for($this->period)->create();
+    $assignment = TeachingAssignment::factory()->for($existing, 'courseOffering')->for($lecturer)->create();
+    $parallel = CourseOffering::factory()->for($this->period)->for($existing->course)->create();
+    TeachingAssignment::factory()->for($parallel, 'courseOffering')->for($lecturer)->create();
+    $profile = ['name' => $lecturer->name, 'nidn' => $lecturer->nidn, 'homebase' => 'jtik', 'profile_status' => 'verified'];
+    $update = route('admin.lecturers.update', $lecturer);
+
+    $dataDosen = route('admin.lecturers.index');
+    $initial = $this->actingAs($this->admin)->get($dataDosen)->assertOk()->assertSee('Mata kuliah yang bisa diampu');
+    expect($initial->viewData('courseSelections')->get($lecturer->id))->toBe(['source' => [$existing->course_id], 'manual' => [], 'count' => 1]);
+
+    $this->put($update, [...$profile, 'course_selection_present' => '1', 'course_ids' => [$first->course_id, $second->course_id, $existing->course_id]])
+        ->assertSessionHasNoErrors();
+    $this->put($update, $profile)->assertSessionHasNoErrors();
+
+    $updated = $this->get($dataDosen)->assertOk()->assertSee('3 MK')->viewData('courseSelections')->get($lecturer->id);
+    expect($updated['count'])->toBe(3)
+        ->and($updated['manual'])->toEqualCanonicalizing([$first->course_id, $second->course_id, $existing->course_id]);
+
+    $options = $this->get(route('admin.teaching.index'))->assertOk()->viewData('lecturerOptionsByOffering');
+    foreach ([$first, $second] as $offering) {
+        expect(array_column($options->get($offering->id), 'id'))->toBe([$lecturer->id]);
+    }
+
+    $this->put($update, [...$profile, 'course_selection_present' => '1'])->assertSessionHasNoErrors();
+    expect($this->get($dataDosen)->assertOk()->viewData('courseSelections')->get($lecturer->id)['count'])->toBe(1);
+    $options = $this->get(route('admin.teaching.index'))->assertOk()->viewData('lecturerOptionsByOffering');
+
+    expect($options->get($first->id))->toBe([])
+        ->and($options->get($second->id))->toBe([])
+        ->and($assignment->fresh())->not->toBeNull();
+});
+
 test('dropdown penugasan menampilkan pengajar aktif dari mata kuliah dan semester yang sama', function () {
     $offering = CourseOffering::factory()->for($this->period)->create();
     $parallel = CourseOffering::factory()->for($this->period)->for($offering->course)->create();
@@ -261,6 +299,103 @@ test('dropdown penugasan menampilkan pengajar aktif dari mata kuliah dan semeste
 
     expect($options->pluck('id')->all())->toBe([$sourceLecturer->id])
         ->and($options->sole()['verified'])->toBeFalse();
+});
+
+test('dropdown menyertakan dosen dari daftar impor semester yang sama walau penugasannya memakai kode lain', function () {
+    $course = Course::factory()->create(['name' => 'Pemrograman Web']);
+    $offering = CourseOffering::factory()->for($this->period)->for($course)->create();
+    $parallelCourse = Course::factory()->create(['name' => 'Pemrograman Web']);
+    $parallel = CourseOffering::factory()->for($this->period)->for($parallelCourse)->create();
+    $assigned = TeachingAssignment::factory()->for($offering, 'courseOffering')->create()->lecturer;
+    $past = Period::factory()->create(['is_active' => false]);
+    foreach ([[$this->period, 'Ganjil.xlsx'], [$past, 'Genap.xlsx']] as [$period, $file]) {
+        Import::create([
+            'period_id' => $period->id,
+            'original_name' => $file,
+            'file_path' => 'imports/'.$file,
+            'file_hash' => hash('sha256', $file),
+            'status' => 'committed',
+            'created_by' => $this->admin->id,
+        ]);
+    }
+    $roster = fn (string $file, string $courses): array => ['rosters' => [$file => ['raw' => ['MATA KULIAH YANG DIAMPU (SESUAI JADWAL)' => $courses]]]];
+    $rosterLecturer = Lecturer::factory()->unverified()->create(['source_data' => $roster('Ganjil.xlsx', "- Basis Data\r\n• PEMROGRAMAN   WEB")]);
+    TeachingAssignment::factory()->for($parallel, 'courseOffering')->for($rosterLecturer)->create();
+    Lecturer::factory()->create(['source_data' => $roster('Genap.xlsx', '- Pemrograman Web')]);
+    Lecturer::factory()->create(['source_data' => $roster('Ganjil.xlsx', '- Pemrograman Web Lanjut')]);
+
+    $response = $this->actingAs($this->admin)->get(route('admin.teaching.index'))->assertOk();
+    $options = collect($response->viewData('lecturerOptionsByOffering')->get($offering->id));
+
+    expect($options->pluck('id')->all())->toEqualCanonicalizing([$assigned->id, $rosterLecturer->id]);
+
+    $rosterSelection = $this->get(route('admin.lecturers.index'))->assertOk()->viewData('courseSelections')->get($rosterLecturer->id);
+    expect($rosterSelection['source'])->toEqualCanonicalizing([$offering->course_id, $parallel->course_id]);
+});
+
+test('pembagian 14 pertemuan menyimpan fase pengampu dan mitra dengan SKS per pertemuan tetap utuh', function (int $sks) {
+    $offering = CourseOffering::factory()->for($this->period)->create();
+    $offering->course->update(['sks' => $sks]);
+    $lead = TeachingAssignment::factory()->for($offering, 'courseOffering')->create(['credited_sks' => 1.5]);
+    $partner = TeachingAssignment::factory()->for($offering, 'courseOffering')->create(['role' => 'partner']);
+    $preview = route('admin.teaching.phases.preview');
+
+    $plan = $this->actingAs($this->admin)->get($preview)->assertOk()
+        ->assertSee('UTS pada pertemuan ke-7')->assertSee('UAS pada pertemuan ke-14')
+        ->assertSee($sks.' SKS')->assertSee(($sks * 7).' SKS × pertemuan')->viewData('plan');
+    expect($plan['rows'])->toHaveCount(1)
+        ->and($plan['rows'][0]['sks'])->toBe($sks)
+        ->and($lead->fresh()->phase->value)->toBe('full');
+
+    $this->from($preview)->post(route('admin.teaching.phases.apply'), ['fingerprint' => $plan['fingerprint']])
+        ->assertRedirect(route('admin.teaching.index'))->assertSessionHasNoErrors();
+
+    expect($lead->fresh()->phase->value)->toBe('before_uts')
+        ->and($partner->fresh()->phase->value)->toBe('after_uts')
+        ->and($offering->course->fresh()->sks)->toBe($sks)
+        ->and($lead->fresh()->credited_sks)->toBe('1.50')
+        ->and($partner->fresh()->credited_sks)->toBeNull();
+
+    $loads = $this->get(route('admin.teaching.index'))->assertOk()->viewData('loads');
+    expect($loads->pluck('meeting_sks')->all())->toBe([$sks * 7, $sks * 7])
+        ->and($loads->pluck('pending_phases')->all())->toBe([0, 0]);
+
+    expect($this->get($preview)->assertOk()->viewData('plan')['already_set'])->toBe(1);
+})->with([2, 3]);
+
+test('pembagian pertemuan melewati tim yang belum lengkap dan menolak usulan yang berubah setelah ditinjau', function () {
+    $offering = CourseOffering::factory()->for($this->period)->create();
+    $lead = TeachingAssignment::factory()->for($offering, 'courseOffering')->create();
+    $partner = TeachingAssignment::factory()->for($offering, 'courseOffering')->create(['role' => 'partner']);
+    $incomplete = CourseOffering::factory()->for($this->period)->create();
+    TeachingAssignment::factory()->for($incomplete, 'courseOffering')->create();
+    $preview = route('admin.teaching.phases.preview');
+
+    $plan = $this->actingAs($this->admin)->get($preview)->assertOk()->viewData('plan');
+    expect($plan['rows'])->toHaveCount(1)
+        ->and(collect($plan['skipped'])->pluck('reason')->all())->toBe(['Tetapkan tepat satu pengampu dan satu mitra yang berbeda.']);
+
+    $lead->update(['is_locked' => true]);
+    $this->from($preview)->post(route('admin.teaching.phases.apply'), ['fingerprint' => $plan['fingerprint']])
+        ->assertRedirect($preview)->assertSessionHasErrors('fingerprint');
+
+    expect($lead->fresh()->phase->value)->toBe('full')
+        ->and($partner->fresh()->phase->value)->toBe('full');
+    expect(collect($this->get($preview)->assertOk()->viewData('plan')['skipped'])->pluck('reason'))
+        ->toContain('Fase yang perlu diubah berada pada penugasan terkunci.');
+});
+
+test('penugasan tunggal dan massal menolak SKS pecahan', function () {
+    $offering = CourseOffering::factory()->for($this->period)->create();
+    $lecturer = Lecturer::factory()->create();
+    $data = ['lecturer_id' => $lecturer->id, 'role' => 'lead', 'phase' => 'full', 'credited_sks' => '1.5'];
+
+    $this->actingAs($this->admin)->post(route('admin.teaching.store'), [...$data, 'course_offering_id' => $offering->id])
+        ->assertSessionHasErrors('credited_sks');
+    $this->post(route('admin.teaching.batch'), [...$data, 'offering_ids' => [$offering->id]])
+        ->assertSessionHasErrors('credited_sks');
+
+    expect($offering->teachingAssignments()->exists())->toBeFalse();
 });
 
 test('rekap beban tidak memberi SKS penuh ke setiap anggota tim', function () {
@@ -283,4 +418,102 @@ test('rekap beban tidak memberi SKS penuh ke setiap anggota tim', function () {
     $this->post(route('admin.teaching.lock', $assignment));
     $this->delete(route('admin.teaching.destroy', $assignment))->assertSessionHas('error');
     expect($assignment->fresh())->not->toBeNull();
+});
+
+test('rekap beban pertemuan mengikuti penyimpanan dan penghapusan penugasan manual', function () {
+    $offering = CourseOffering::factory()->for($this->period)->create();
+    $offering->course->update(['sks' => 3]);
+    $lead = Lecturer::factory()->create();
+    $partner = Lecturer::factory()->create();
+    $store = route('admin.teaching.store');
+    $index = route('admin.teaching.index');
+
+    $this->actingAs($this->admin)->post($store, [
+        'course_offering_id' => $offering->id,
+        'lecturer_id' => $lead->id,
+        'role' => 'lead',
+        'phase' => 'before_uts',
+        'credited_sks' => 2,
+    ])->assertSessionHasNoErrors();
+
+    $load = $this->get($index)->assertOk()->viewData('loads')->sole();
+    expect($load['meeting_sks'])->toBe(0)->and($load['pending_phases'])->toBe(1);
+
+    $this->post($store, [
+        'course_offering_id' => $offering->id,
+        'lecturer_id' => $partner->id,
+        'role' => 'partner',
+        'phase' => 'after_uts',
+    ])->assertSessionHasNoErrors();
+
+    $loads = $this->get($index)->assertOk()->assertSee('SKS × Pertemuan')->viewData('loads');
+    expect($loads->pluck('meeting_sks')->all())->toBe([21, 21])
+        ->and($loads->pluck('pending_phases')->all())->toBe([0, 0]);
+
+    $assignment = $offering->teachingAssignments()->whereBelongsTo($partner, 'lecturer')->sole();
+    $this->delete(route('admin.teaching.destroy', $assignment))->assertSessionHasNoErrors();
+
+    $load = $this->get($index)->assertOk()->viewData('loads')->sole();
+    expect($load['meeting_sks'])->toBe(0)->and($load['pending_phases'])->toBe(1);
+});
+
+test('admin dapat mengubah penugasan mengajar yang sudah ada dan mengganti pengampu secara massal tanpa duplikasi', function () {
+    $offering = CourseOffering::factory()->for($this->period)->create();
+    $dosenLama = Lecturer::factory()->create(['name' => 'Dr. Dosen Lama']);
+    $dosenBaru = Lecturer::factory()->create(['name' => 'Dr. Dosen Baru']);
+    $dosenMitra = Lecturer::factory()->create(['name' => 'Ir. Dosen Mitra']);
+
+    $leadAssignment = TeachingAssignment::factory()->for($offering, 'courseOffering')->for($dosenLama)->create([
+        'role' => 'lead',
+        'phase' => 'full',
+    ]);
+
+    // Ubah dosen pengampu, fase, dan credited_sks melalui route update
+    $this->actingAs($this->admin)->put(route('admin.teaching.update', $leadAssignment), [
+        'lecturer_id' => $dosenBaru->id,
+        'role' => 'lead',
+        'phase' => 'before_uts',
+        'credited_sks' => 2,
+    ])->assertRedirect()->assertSessionHasNoErrors();
+
+    expect($leadAssignment->fresh())
+        ->lecturer_id->toBe($dosenBaru->id)
+        ->phase->value->toBe('before_uts')
+        ->credited_sks->toBe('2.00');
+
+    // Penugasan massal peran lead menggantikan pengampu yang tidak terkunci tanpa membuat baris lead ganda
+    $this->post(route('admin.teaching.batch'), [
+        'offering_ids' => [$offering->id],
+        'lecturer_id' => $dosenLama->id,
+        'role' => 'lead',
+        'phase' => 'full',
+        'credited_sks' => 3,
+    ])->assertRedirect()->assertSessionHasNoErrors();
+
+    expect($offering->teachingAssignments()->where('role', 'lead')->count())->toBe(1)
+        ->and($leadAssignment->fresh()->lecturer_id)->toBe($dosenLama->id);
+
+    // Jika dikunci, tidak bisa diubah
+    $leadAssignment->update(['is_locked' => true]);
+    $this->put(route('admin.teaching.update', $leadAssignment), [
+        'lecturer_id' => $dosenBaru->id,
+        'role' => 'lead',
+        'phase' => 'full',
+    ])->assertSessionHas('error');
+
+    expect($leadAssignment->fresh()->lecturer_id)->toBe($dosenLama->id);
+
+    // Pencarian berdasarkan nama dosen dan filter tunggal / tim_mitra
+    $this->get(route('admin.teaching.index', ['q' => 'Dosen Lama', 'filter' => 'tunggal']))
+        ->assertOk()
+        ->assertSee($offering->course->name);
+
+    TeachingAssignment::factory()->for($offering, 'courseOffering')->for($dosenMitra)->create([
+        'role' => 'partner',
+        'phase' => 'after_uts',
+    ]);
+
+    $this->get(route('admin.teaching.index', ['filter' => 'tim_mitra']))
+        ->assertOk()
+        ->assertSee($offering->course->name);
 });

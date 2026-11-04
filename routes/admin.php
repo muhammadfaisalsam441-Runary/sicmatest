@@ -68,6 +68,8 @@ Route::post('/jadwal/impor/{import}/simpan', [ImportController::class, 'commit']
 
 Route::post('/draf', [DraftController::class, 'store'])->name('drafts.store');
 Route::get('/draf/{version}', [DraftController::class, 'show'])->name('drafts.show');
+Route::get('/draf/{version}/unduh/excel', [DraftController::class, 'excel'])->name('drafts.excel');
+Route::get('/draf/{version}/unduh/pdf', [DraftController::class, 'pdf'])->name('drafts.pdf');
 Route::put('/draf/{version}/sesi/{session}', [DraftController::class, 'updateSession'])->scopeBindings()->name('drafts.sessions.update');
 Route::post('/draf/{version}/sesi/{session}/kunci', [DraftController::class, 'toggleLock'])->scopeBindings()->name('drafts.sessions.lock');
 Route::post('/draf/{version}/periksa', [DraftController::class, 'validateDraft'])->name('drafts.validate');
@@ -83,6 +85,8 @@ Route::post('/akademik/mata-kuliah', [AcademicController::class, 'storeCourse'])
 Route::put('/akademik/mata-kuliah/{course}', [AcademicController::class, 'updateCourse'])->name('academic.courses.update');
 Route::delete('/akademik/mata-kuliah/{course}', [AcademicController::class, 'destroyCourse'])->name('academic.courses.destroy');
 Route::post('/akademik/kelas', [AcademicController::class, 'storeClassGroup'])->name('academic.classes.store');
+Route::post('/akademik/kelas/batch', [AcademicController::class, 'batchUpdateClassGroups'])->name('academic.classes.batch');
+Route::put('/akademik/kelas/massal', [AcademicController::class, 'bulkUpdateClasses'])->name('academic.classes.bulk-update');
 Route::put('/akademik/kelas/{classGroup}', [AcademicController::class, 'updateClassGroup'])->name('academic.classes.update');
 Route::delete('/akademik/kelas/{classGroup}', [AcademicController::class, 'destroyClassGroup'])->name('academic.classes.destroy');
 Route::post('/akademik/penawaran', [AcademicController::class, 'storeOffering'])->name('academic.offerings.store');

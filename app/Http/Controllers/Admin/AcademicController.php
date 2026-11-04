@@ -20,6 +20,7 @@ use App\Support\AvailabilityCache;
 use Carbon\CarbonPeriod;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 /**
@@ -39,12 +40,38 @@ class AcademicController extends Controller
         $tab = array_key_exists((string) $request->query('tab'), self::TABS) ? (string) $request->query('tab') : 'semester';
         $period = Period::query()->active()->with(['calendarExceptions' => fn ($query) => $query->orderBy('date'), 'timeSlots' => fn ($query) => $query->orderBy('start_minute')])->first();
 
+        $classGroups = $tab === 'kelas' ? ClassGroup::query()->withCount('scheduleSessions')->orderBy('cohort_year', 'desc')->orderBy('name')->get() : collect();
+        $courses = $tab === 'mata-kuliah' ? Course::query()->withCount('offerings')->orderBy('code')->get() : collect();
+        $offerings = $tab === 'penawaran' && $period ? $period->courseOfferings()->with(['course', 'classGroup'])->get()->sortBy(['classGroup.name', 'course.name']) : collect();
+
+        $classStats = [
+            'total' => $classGroups->count(),
+            'needs_attention' => $classGroups->whereNull('student_count')->count(),
+            'complete' => $classGroups->whereNotNull('student_count')->count(),
+            'inactive' => $classGroups->where('is_active', false)->count(),
+        ];
+        $distinctPrograms = $classGroups->pluck('study_program')->filter()->unique()->sort()->values();
+        $distinctCohorts = $classGroups->pluck('cohort_year')->filter()->unique()->sortDesc()->values();
+        $classesPayload = $classGroups->mapWithKeys(fn (ClassGroup $c) => [$c->id => [
+            'id' => $c->id,
+            'name' => $c->name,
+            'code' => $c->code,
+            'study_program' => $c->study_program,
+            'cohort_year' => $c->cohort_year,
+            'student_count' => $c->student_count,
+            'is_active' => (bool) $c->is_active,
+        ]])->all();
+
         return view('admin.academic.index', [
             'tab' => $tab,
             'period' => $period,
-            'classGroups' => $tab === 'kelas' ? ClassGroup::query()->withCount('scheduleSessions')->orderBy('cohort_year', 'desc')->orderBy('name')->get() : collect(),
-            'courses' => $tab === 'mata-kuliah' ? Course::query()->withCount('offerings')->orderBy('code')->get() : collect(),
-            'offerings' => $tab === 'penawaran' && $period ? $period->courseOfferings()->with(['course', 'classGroup', 'teachingAssignments.lecturer'])->get()->sortBy(['classGroup.name', 'course.name']) : collect(),
+            'classGroups' => $classGroups,
+            'classStats' => $classStats,
+            'distinctPrograms' => $distinctPrograms,
+            'distinctCohorts' => $distinctCohorts,
+            'classesPayload' => $classesPayload,
+            'courses' => $courses,
+            'offerings' => $offerings,
             'courseOptions' => Course::query()->orderBy('name')->get()->mapWithKeys(fn (Course $course) => [$course->id => "{$course->code} • {$course->name}"]),
             'classOptions' => ClassGroup::query()->where('is_active', true)->orderBy('name')->pluck('name', 'id'),
         ]);
@@ -171,6 +198,107 @@ class AcademicController extends Controller
         $classGroup->delete();
 
         return back()->with('toast', ['type' => 'success', 'title' => 'Kelas dihapus']);
+    }
+
+    public function batchUpdateClassGroups(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'action' => ['required', 'string', 'in:set_student_count,set_cohort_year,set_study_program,activate,archive'],
+            'class_ids' => ['required', 'array', 'min:1'],
+            'class_ids.*' => ['integer', 'exists:class_groups,id'],
+            'student_count' => ['nullable', 'integer', 'min:1', 'max:500'],
+            'cohort_year' => ['nullable', 'integer', 'between:2000,2100'],
+            'study_program' => ['nullable', 'string', 'max:120'],
+        ]);
+
+        $ids = $validated['class_ids'];
+        $action = $validated['action'];
+        $count = count($ids);
+
+        match ($action) {
+            'set_student_count' => ClassGroup::query()->whereIn('id', $ids)->update(['student_count' => $validated['student_count'] ?? null]),
+            'set_cohort_year' => (function () use ($ids, $validated): void {
+                if (! empty($validated['cohort_year'])) {
+                    foreach (ClassGroup::query()->whereIn('id', $ids)->get() as $class) {
+                        $code = Str::upper(Str::slug($class->name.' '.$validated['cohort_year']));
+                        if (ClassGroup::query()->where('code', $code)->where('id', '!=', $class->id)->exists()) {
+                            $code = $code.'-'.$class->id;
+                        }
+                        $class->update(['cohort_year' => $validated['cohort_year'], 'code' => $code]);
+                    }
+                }
+            })(),
+            'set_study_program' => (function () use ($ids, $validated): void {
+                $prodi = trim((string) ($validated['study_program'] ?? ''));
+                if ($prodi !== '') {
+                    ClassGroup::query()->whereIn('id', $ids)->update(['study_program' => $prodi]);
+                }
+            })(),
+            'activate' => ClassGroup::query()->whereIn('id', $ids)->update(['is_active' => true]),
+            'archive' => ClassGroup::query()->whereIn('id', $ids)->update(['is_active' => false]),
+        };
+
+        if ($count > 0 && ($firstClass = ClassGroup::find($ids[0]))) {
+            $this->audit->log('class_group.batch_updated', $firstClass, null, $validated);
+        }
+
+        return to_route('admin.academic.index', ['tab' => 'kelas'])->with('toast', [
+            'type' => 'success',
+            'title' => "Berhasil memperbarui {$count} kelas",
+        ]);
+    }
+
+    public function bulkUpdateClasses(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'classes' => ['required', 'array', 'min:1'],
+            'classes.*.id' => ['required', 'integer', 'exists:class_groups,id'],
+            'classes.*.name' => ['required', 'string', 'max:60'],
+            'classes.*.study_program' => ['required', 'string', 'max:120'],
+            'classes.*.cohort_year' => ['required', 'integer', 'between:2000,2100'],
+            'classes.*.student_count' => ['nullable'],
+            'classes.*.is_active' => ['nullable'],
+        ]);
+
+        $updatedCount = 0;
+        foreach ($validated['classes'] as $item) {
+            $classGroup = ClassGroup::find($item['id']);
+            if (! $classGroup) {
+                continue;
+            }
+
+            $isActive = ! empty($item['is_active']);
+            $cohortYear = (int) $item['cohort_year'];
+            $name = trim($item['name']);
+            $studentCount = is_numeric($item['student_count'] ?? null) && (int) $item['student_count'] > 0
+                ? (int) $item['student_count']
+                : null;
+            $studyProgram = trim($item['study_program']);
+
+            $code = Str::upper(Str::slug($name.' '.$cohortYear));
+            if (ClassGroup::query()->where('code', $code)->where('id', '!=', $classGroup->id)->exists()) {
+                $code = $code.'-'.$classGroup->id;
+            }
+
+            $classGroup->update([
+                'name' => $name,
+                'code' => $code,
+                'study_program' => $studyProgram,
+                'cohort_year' => $cohortYear,
+                'student_count' => $studentCount,
+                'is_active' => $isActive,
+            ]);
+            $updatedCount++;
+        }
+
+        if (! empty($validated['classes']) && ($firstClass = ClassGroup::find($validated['classes'][0]['id']))) {
+            $this->audit->log('class_group.bulk_updated', $firstClass, null, ['count' => $updatedCount]);
+        }
+
+        return to_route('admin.academic.index', ['tab' => 'kelas'])->with('toast', [
+            'type' => 'success',
+            'title' => "Berhasil menyimpan {$updatedCount} kelas",
+        ]);
     }
 
     public function storeOffering(OfferingRequest $request): RedirectResponse

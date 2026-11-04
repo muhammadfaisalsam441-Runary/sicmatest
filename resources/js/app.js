@@ -21,7 +21,6 @@ Alpine.data('teachingManager', (pageOfferingIds, lecturerOptionsByOffering, allL
     quickModalOpen: false,
     quickLecturerId: '',
     quickPhase: 'full',
-    quickCreditedSks: '',
     quickSearch: '',
     editingAssignmentId: null,
     batchModalOpen: false,
@@ -61,7 +60,6 @@ Alpine.data('teachingManager', (pageOfferingIds, lecturerOptionsByOffering, allL
         this.quickLecturerId = '';
         const hasBeforeUts = (team ?? []).some((m) => m.phase === 'before_uts');
         this.quickPhase = phase || (role === 'partner' && hasBeforeUts ? 'after_uts' : 'full');
-        this.quickCreditedSks = '';
         this.quickSearch = '';
         this.activeOffering = { id, course, classGroup, sks, role, team: team ?? [] };
         this.quickModalOpen = true;
@@ -72,7 +70,6 @@ Alpine.data('teachingManager', (pageOfferingIds, lecturerOptionsByOffering, allL
         this.editingAssignmentId = assignment.id;
         this.quickLecturerId = String(assignment.lecturer_id);
         this.quickPhase = assignment.phase || 'full';
-        this.quickCreditedSks = assignment.credited_sks ?? '';
         this.quickSearch = '';
         this.activeOffering = {
             id: offering.id,
@@ -91,7 +88,6 @@ Alpine.data('teachingManager', (pageOfferingIds, lecturerOptionsByOffering, allL
         this.quickLecturerId = '';
         const hasBeforeUts = (this.activeOffering.team ?? []).some((m) => m.phase === 'before_uts');
         this.quickPhase = role === 'partner' && hasBeforeUts ? 'after_uts' : 'full';
-        this.quickCreditedSks = '';
         this.activeOffering.role = role;
     },
 }));
@@ -248,6 +244,64 @@ Alpine.data('roomManager', (pageRoomIds = [], defaults = {}) => ({
         this.batchAction = action;
         this.batchParams.building = params.building || '';
         this.batchParams.type = params.type || '';
+        this.$nextTick(() => this.$refs.batchForm.submit());
+    },
+}));
+
+Alpine.data('classManager', (initialClasses = {}) => ({
+    editMode: false,
+    selectedIds: [],
+    search: '',
+    statusFilter: 'semua',
+    prodiFilter: '',
+    batchModalOpen: false,
+    batchAction: '',
+    batchLabel: '',
+    batchValue: '',
+    fillEmptyValue: 40,
+    classesData: initialClasses,
+
+    isAllSelected() {
+        const rows = Array.from(document.querySelectorAll('tr[data-id]'))
+            .filter((r) => r.offsetParent !== null)
+            .map((r) => Number(r.dataset.id));
+        if (!rows.length) return false;
+        const current = this.selectedIds.map(Number);
+        return rows.every((id) => current.includes(id));
+    },
+
+    toggleSelectAll(checked) {
+        const rows = Array.from(document.querySelectorAll('tr[data-id]'))
+            .filter((r) => r.offsetParent !== null)
+            .map((r) => Number(r.dataset.id));
+        const current = this.selectedIds.map(Number);
+        this.selectedIds = checked
+            ? [...new Set([...current, ...rows])]
+            : current.filter((id) => !rows.includes(id));
+    },
+
+    applyFillEmpty() {
+        const val = Number(this.fillEmptyValue);
+        if (!val || val <= 0) return;
+        Object.values(this.classesData).forEach((cls) => {
+            if (cls.student_count === '' || cls.student_count === null || cls.student_count === undefined) {
+                cls.student_count = val;
+            }
+        });
+    },
+
+    openBatchModal(action, label) {
+        this.batchAction = action;
+        this.batchLabel = label;
+        this.batchValue = '';
+        this.batchModalOpen = true;
+        this.$nextTick(() => window.renderIcons());
+    },
+
+    submitBatch(action = null, value = null) {
+        if (this.selectedIds.length === 0) return;
+        if (action) this.batchAction = action;
+        if (value !== null) this.batchValue = value;
         this.$nextTick(() => this.$refs.batchForm.submit());
     },
 }));

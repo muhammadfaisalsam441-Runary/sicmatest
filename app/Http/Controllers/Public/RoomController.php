@@ -44,7 +44,6 @@ class RoomController extends Controller
             return [
                 'rooms' => $results->map(RoomCardPresenter::card(...))->values()->all(),
                 'summary' => $availability->summary($now),
-                'checkedAt' => $now,
             ];
         });
 
@@ -65,6 +64,7 @@ class RoomController extends Controller
 
         return view('public.rooms', [
             ...$data,
+            'checkedAt' => $now,
             'title' => $title,
             'keyword' => $keyword,
             'building' => $building,

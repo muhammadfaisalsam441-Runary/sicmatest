@@ -22,10 +22,10 @@ class HomeController extends Controller
             return [
                 'availableCount' => $available->count(),
                 'preview' => $available->take(3)->map(RoomCardPresenter::card(...))->values()->all(),
-                'checkedAt' => $now,
             ];
         });
 
-        return view('public.home', $data);
+        // Hanya data skalar yang disimpan di cache: Laravel 13 tidak membongkar objek dari cache.
+        return view('public.home', [...$data, 'checkedAt' => $now]);
     }
 }

@@ -12,10 +12,24 @@ use Illuminate\Support\Str;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
 /**
- * Data dosen: simpan profil, masa jabatan pimpinan (B11), target beban, dan impor dari spreadsheet.
+ * Data dosen: simpan profil & data kepegawaian, masa jabatan pimpinan (B11), target beban, dan impor dari spreadsheet.
  */
 class LecturerService
 {
+    /**
+     * Kolom profil yang dicatat di audit log.
+     *
+     * @var list<string>
+     */
+    private const AUDITED = ['name', 'nidn', 'nip', 'homebase', 'rank', 'grade', 'functional_position', 'profile_status'];
+
+    /**
+     * Kolom data kepegawaian yang hanya diubah bila dikirim formulir.
+     *
+     * @var list<string>
+     */
+    private const OPTIONAL = ['nip', 'rank', 'grade', 'functional_position'];
+
     public function __construct(private AuditLogger $audit) {}
 
     /**
@@ -24,7 +38,7 @@ class LecturerService
     public function save(?Lecturer $lecturer, array $data): Lecturer
     {
         return DB::transaction(function () use ($lecturer, $data): Lecturer {
-            $before = $lecturer?->only(['name', 'nidn', 'homebase', 'profile_status']);
+            $before = $lecturer?->only(self::AUDITED);
             $lecturer ??= new Lecturer(['is_active' => true]);
 
             $lecturer->fill([
@@ -32,6 +46,7 @@ class LecturerService
                 'nidn' => $data['nidn'] ?? null,
                 'homebase' => isset($data['homebase']) ? LecturerHomebase::from($data['homebase']) : null,
                 'profile_status' => LecturerProfileStatus::from($data['profile_status']),
+                ...array_intersect_key($data, array_flip(self::OPTIONAL)),
             ])->save();
 
             if (! empty($data['leadership_position'])) {
@@ -50,14 +65,15 @@ class LecturerService
                 );
             }
 
-            $this->audit->log($before === null ? 'lecturer.created' : 'lecturer.updated', $lecturer, $before, $lecturer->only(['name', 'nidn', 'homebase', 'profile_status']));
+            $this->audit->log($before === null ? 'lecturer.created' : 'lecturer.updated', $lecturer, $before, $lecturer->only(self::AUDITED));
 
             return $lecturer;
         });
     }
 
     /**
-     * Impor kolom Nama, NIDN, Homebase (JTIK/Luar) dari Excel/CSV. Dosen dengan NIDN dianggap terverifikasi.
+     * Impor kolom Nama, NIP, NIDN, Homebase (JTIK/Luar), Pangkat, Gol., Jabatan dari Excel/CSV.
+     * Baris dicocokkan lewat NIP, lalu NIDN, lalu nama. Dosen dengan NIP atau NIDN dianggap terverifikasi.
      *
      * @return array{created: int, updated: int}
      */
@@ -67,47 +83,78 @@ class LecturerService
         $rows = $reader->load($file->getRealPath())->getActiveSheet()->toArray(null, true, false, false);
 
         $header = array_map(fn ($cell): string => Str::lower(Str::squish((string) $cell)), array_shift($rows) ?? []);
-        $column = fn (string $name): ?int => ($index = array_search($name, $header, true)) === false ? null : $index;
-        [$nameColumn, $nidnColumn, $homebaseColumn] = [$column('nama'), $column('nidn'), $column('homebase')];
+        $column = function (string ...$names) use ($header): ?int {
+            foreach ($names as $name) {
+                if (($index = array_search($name, $header, true)) !== false) {
+                    return $index;
+                }
+            }
+
+            return null;
+        };
+
+        $columns = [
+            'name' => $column('nama'),
+            'nip' => $column('nip'),
+            'nidn' => $column('nidn'),
+            'homebase' => $column('homebase', 'asal'),
+            'rank' => $column('pangkat'),
+            'grade' => $column('gol.', 'gol', 'golongan'),
+            'functional_position' => $column('jabatan', 'jabatan fungsional'),
+        ];
 
         $result = ['created' => 0, 'updated' => 0];
 
-        if ($nameColumn === null) {
+        if ($columns['name'] === null) {
             return $result;
         }
 
-        DB::transaction(function () use ($rows, $nameColumn, $nidnColumn, $homebaseColumn, &$result): void {
+        DB::transaction(function () use ($rows, $columns, &$result): void {
             foreach ($rows as $cells) {
-                $name = Str::squish((string) ($cells[$nameColumn] ?? ''));
+                $value = fn (string $key): ?string => $columns[$key] === null ? null : (Str::squish((string) ($cells[$columns[$key]] ?? '')) ?: null);
+                $name = $value('name');
 
-                if ($name === '') {
+                if ($name === null) {
                     continue;
                 }
 
-                $nidn = $nidnColumn !== null ? (trim((string) ($cells[$nidnColumn] ?? '')) ?: null) : null;
-                $homebaseText = Str::lower((string) ($homebaseColumn !== null ? ($cells[$homebaseColumn] ?? '') : ''));
+                $nip = preg_replace('/\D/', '', (string) $value('nip')) ?: null;
+                $nidn = $value('nidn');
+                $homebaseText = Str::lower((string) $value('homebase'));
                 $homebase = match (true) {
-                    Str::contains($homebaseText, 'jtik') => LecturerHomebase::Jtik,
                     Str::contains($homebaseText, 'luar') => LecturerHomebase::External,
+                    Str::contains($homebaseText, 'jtik') => LecturerHomebase::Jtik,
                     default => null,
                 };
+                $position = $value('functional_position');
 
-                $lecturer = Lecturer::query()
-                    ->when($nidn, fn ($query) => $query->where('nidn', $nidn), fn ($query) => $query->where('name', $name)->orWhere('source_name', $name))
-                    ->first();
+                $lecturer = match (true) {
+                    $nip !== null && ($found = Lecturer::query()->where('nip', $nip)->first()) !== null => $found,
+                    $nidn !== null && ($found = Lecturer::query()->where('nidn', $nidn)->first()) !== null => $found,
+                    default => Lecturer::query()->where('name', $name)->orWhere('source_name', $name)->first(),
+                };
 
                 $attributes = array_filter([
-                    'name' => $name,
+                    'nip' => $nip,
                     'nidn' => $nidn,
                     'homebase' => $homebase,
-                    'profile_status' => $nidn ? LecturerProfileStatus::Verified : null,
-                ], fn ($value): bool => $value !== null);
+                    'rank' => $value('rank'),
+                    'grade' => $value('grade'),
+                    'functional_position' => $position !== null && Str::upper($position) === 'BELUM' ? 'Belum ada' : $position,
+                    'profile_status' => ($nip ?? $nidn) !== null ? LecturerProfileStatus::Verified : null,
+                ], fn ($attribute): bool => $attribute !== null);
 
                 if ($lecturer === null) {
-                    Lecturer::create([...$attributes, 'profile_status' => $attributes['profile_status'] ?? LecturerProfileStatus::Unverified, 'is_active' => true]);
+                    Lecturer::create([
+                        'name' => $name,
+                        ...$attributes,
+                        'profile_status' => $attributes['profile_status'] ?? LecturerProfileStatus::Unverified,
+                        'is_active' => true,
+                    ]);
                     $result['created']++;
                 } else {
-                    $lecturer->update($attributes);
+                    // Nama dari jadwal dipertahankan bila baris cocok lewat NIP/NIDN.
+                    $lecturer->update($nip !== null || $nidn !== null ? $attributes : ['name' => $name, ...$attributes]);
                     $result['updated']++;
                 }
             }

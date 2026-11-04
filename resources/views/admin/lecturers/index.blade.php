@@ -41,7 +41,7 @@
             @else
                 <table class="w-full text-left text-sm">
                     <thead class="border-b border-border text-xs text-muted">
-                        <tr><th class="py-3 pr-4 font-medium">Dosen</th><th class="py-3 pr-4 font-medium">Jumlah MK</th><th class="py-3 pr-4 font-medium">Homebase</th><th class="py-3 pr-4 font-medium">Target / maks. SKS</th><th class="py-3 pr-4 font-medium">Status profil</th><th class="py-3 font-medium">Aksi</th></tr>
+                        <tr><th class="py-3 pr-4 font-medium">Dosen</th><th class="py-3 pr-4 font-medium">Jumlah MK</th><th class="py-3 pr-4 font-medium">Homebase</th><th class="py-3 pr-4 font-medium">Jabatan fungsional</th><th class="py-3 pr-4 font-medium">Target / maks. SKS</th><th class="py-3 pr-4 font-medium">Status profil</th><th class="py-3 font-medium">Aksi</th></tr>
                     </thead>
                     <tbody class="divide-y divide-border">
                         @foreach ($lecturers as $lecturer)
@@ -50,11 +50,16 @@
                             <tr>
                                 <td class="py-3 pr-4">
                                     <span class="block font-semibold">{{ $lecturer->name }}</span>
+                                    @if ($lecturer->nip)<span class="block text-xs text-muted">NIP {{ $lecturer->nip }}</span>@endif
                                     @if ($term)<span class="text-xs text-danger">{{ $term->position }} • tidak dijadwalkan Kamis</span>@endif
                                     @if ($lecturer->source_name && $lecturer->source_name !== $lecturer->name)<span class="block text-xs text-muted">Nama pada sumber: {{ $lecturer->source_name }}</span>@endif
                                 </td>
                                 <td class="py-3 pr-4">{{ $lecturer->course_count }} MK</td>
                                 <td class="py-3 pr-4 text-muted">{{ $lecturer->homebase?->label() ?? 'Asal: belum diverifikasi' }}</td>
+                                <td class="py-3 pr-4">
+                                    <span class="block">{{ $lecturer->functional_position ?? '—' }}</span>
+                                    @if ($lecturer->rank || $lecturer->grade)<span class="block text-xs text-muted">{{ collect([$lecturer->rank, $lecturer->grade])->filter()->implode(' • ') }}</span>@endif
+                                </td>
                                 <td class="py-3 pr-4 text-muted">{{ $target?->target_sks !== null ? (float) $target->target_sks : '—' }} / {{ $target?->max_sks !== null ? (float) $target->max_sks : '—' }}</td>
                                 <td class="py-3 pr-4"><x-status-badge :variant="$lecturer->profile_status === LecturerProfileStatus::Verified ? 'success' : 'warning'">{{ $lecturer->profile_status->label() }}</x-status-badge></td>
                                 <td class="py-3"><button type="button" class="font-semibold text-primary hover:underline" x-data x-on:click="$dispatch('open-modal', 'lecturer-{{ $lecturer->id }}')">Detail</button></td>
@@ -77,6 +82,12 @@
                 @csrf
                 @if ($lecturer) @method('PUT') @endif
                 <x-field label="Nama dosen" name="name"><x-input name="name" :id="'lname-'.$key" :value="$lecturer?->name" required /></x-field>
+                <div class="grid grid-cols-2 gap-3">
+                    <x-field label="NIP" name="nip"><x-input name="nip" :id="'nip-'.$key" :value="$lecturer?->nip" placeholder="18 angka" inputmode="numeric" /></x-field>
+                    <x-field label="Jabatan fungsional" name="functional_position"><x-input name="functional_position" :id="'fpos-'.$key" :value="$lecturer?->functional_position" placeholder="Contoh: Lektor" /></x-field>
+                    <x-field label="Pangkat" name="rank"><x-input name="rank" :id="'rank-'.$key" :value="$lecturer?->rank" placeholder="Contoh: Penata Tingkat I" /></x-field>
+                    <x-field label="Golongan" name="grade"><x-input name="grade" :id="'grade-'.$key" :value="$lecturer?->grade" placeholder="Contoh: III/d" /></x-field>
+                </div>
                 <div class="grid grid-cols-2 gap-3">
                     <x-field label="NIDN" name="nidn"><x-input name="nidn" :id="'nidn-'.$key" :value="$lecturer?->nidn" placeholder="Belum diisi" /></x-field>
                     <x-field label="Asal dosen" name="homebase"><x-select name="homebase" :id="'homebase-'.$key" :options="collect(LecturerHomebase::cases())->mapWithKeys(fn ($case) => [$case->value => $case->label()])->all()" :value="$lecturer?->homebase?->value" placeholder="Belum diverifikasi" /></x-field>
@@ -104,7 +115,7 @@
     <x-modal name="lecturer-import" title="Impor dosen dari spreadsheet" width="max-w-[480px]">
         <form method="POST" action="{{ route('admin.lecturers.import') }}" enctype="multipart/form-data" class="flex flex-col gap-4">
             @csrf
-            <p class="text-sm text-muted">Kolom: Nama, NIDN, Homebase (JTIK / Luar JTIK). Dosen dengan NIDN dianggap terverifikasi; nama yang sudah ada diperbarui.</p>
+            <p class="text-sm text-muted">Kolom: Nama, NIP, NIDN, Homebase (JTIK / Luar JTIK), Pangkat, Gol., Jabatan. Baris dicocokkan lewat NIP, NIDN, lalu nama; dosen dengan NIP atau NIDN dianggap terverifikasi.</p>
             <input type="file" name="file" accept=".xlsx,.xls,.csv" required class="text-sm">
             <div class="flex justify-end gap-3">
                 <x-button variant="secondary" x-on:click="$dispatch('close-modal', 'lecturer-import')">Batal</x-button>

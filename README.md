@@ -91,7 +91,9 @@ Sumber: `database/data/jadwal-ganjil-2026-2027.csv`, salinan 364 baris PDF jadwa
 (berkas yang sama bisa diunggah di **Kelola Jadwal › Impor**). Seeder membentuk:
 
 - 21 ruang dari jadwal (12 gedung AE, 9 lab/ruang lain "Gedung belum didata"); lantai, kapasitas, dan fasilitas **Perlu verifikasi**.
-- 52 kelas, 103 mata kuliah, 102 dosen; Ketua Jurusan (dari lembar pengesahan) dicatat sebagai pimpinan.
+- 52 kelas, 103 mata kuliah, 107 dosen; Ketua Jurusan (dari lembar pengesahan) dicatat sebagai pimpinan.
+- Data kepegawaian 51 dosen homebase JTIK (NIP, pangkat, golongan, jabatan fungsional, TMT) dari `database/data/dosen-jtik.csv`
+  (salinan Daftar Dosen JTIK; nomor 27–30 tidak ada di dokumen sumber). Dosen jadwal di luar daftar: asal belum diverifikasi.
 - **Jadwal resmi v1**: 362 sesi (dua kuliah gabungan PTIK ULANG 2024 + PTIK F 2026 dihitung satu sesi).
 - **Draf v2** (salinan jadwal resmi) dengan masalah wajib: dua bentrok yang **memang ada di PDF** —
   PTIK ULANG 2025 hari Senin (Strategi Pembelajaran vs Inovasi Teknologi) dan Alifya NFH hari Rabu

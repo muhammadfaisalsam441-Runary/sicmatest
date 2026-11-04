@@ -15,7 +15,8 @@ use Illuminate\Support\Str;
  * Periode Ganjil 2026/2027 beserta kelas, mata kuliah, dan dosen dari Jadwal TA Ganjil JTIK 26-27.
  *
  * BELUM DITETAPKAN: tanggal semester, UTS/UAS, dan hari libur di bawah masih contoh (tidak ada di PDF).
- * Jumlah mahasiswa per kelas, NIDN, dan homebase dosen tidak ada di sumber sehingga disimpan NULL.
+ * Jumlah mahasiswa per kelas dan NIDN dosen tidak ada di sumber sehingga disimpan NULL. Homebase, NIP, pangkat,
+ * dan jabatan dosen JTIK diisi LecturerRosterSeeder dari Daftar Dosen JTIK.
  */
 class AcademicSeeder extends Seeder
 {
@@ -119,7 +120,7 @@ class AcademicSeeder extends Seeder
                 'name' => $name,
                 'nidn' => null,
                 'homebase' => null,
-                // Nama tercantum di jadwal resmi jurusan; NIDN & homebase dilengkapi di Data Dosen.
+                // Nama tercantum di jadwal resmi jurusan; NIDN dilengkapi di Data Dosen.
                 'profile_status' => LecturerProfileStatus::Verified,
                 'is_active' => true,
                 'source_name' => $name,

@@ -38,7 +38,7 @@ test('seeder memuat kelas, mata kuliah, dan dosen dari jadwal sumber', function 
     expect(ClassGroup::query()->count())->toBe(52)
         ->and(ClassGroup::query()->where('code', 'TEKOM-C-2025')->value('name'))->toBe('TEKOM C 2025')
         ->and(Course::query()->count())->toBe(103)
-        ->and(Lecturer::query()->count())->toBe(102)
+        ->and(Lecturer::query()->count())->toBe(107)
         ->and(Lecturer::query()->where('name', 'like', 'Alifya NFH%')->count())->toBe(1)
         ->and($head->leadershipTerms()->value('position'))->toBe('Ketua Jurusan');
 });

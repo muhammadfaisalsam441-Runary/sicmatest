@@ -34,7 +34,7 @@ class LecturerController extends Controller
         $lecturers = Lecturer::query()
             ->with(['leadershipTerms', 'loadTargets' => fn ($query) => $query->where('period_id', $period?->id)])
             ->withCount(['teachingAssignments as course_count' => fn (Builder $query) => $query->whereHas('courseOffering', fn (Builder $query) => $query->where('period_id', $period?->id))])
-            ->when($keyword !== '', fn (Builder $query) => $query->where(fn (Builder $query) => $query->where('name', 'like', "%{$keyword}%")->orWhere('source_name', 'like', "%{$keyword}%")))
+            ->when($keyword !== '', fn (Builder $query) => $query->where(fn (Builder $query) => $query->where('name', 'like', "%{$keyword}%")->orWhere('source_name', 'like', "%{$keyword}%")->orWhere('nip', 'like', "%{$keyword}%")))
             ->when($filter === 'jtik', fn (Builder $query) => $query->where('homebase', LecturerHomebase::Jtik))
             ->when($filter === 'luar', fn (Builder $query) => $query->where('homebase', LecturerHomebase::External))
             ->when($filter === 'pimpinan', fn (Builder $query) => $query->whereHas('leadershipTerms', fn (Builder $query) => $query->activeOn(now())))

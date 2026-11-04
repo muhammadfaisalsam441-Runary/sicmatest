@@ -560,80 +560,855 @@
                 </datalist>
             </div>
         @elseif ($tab === 'mata-kuliah')
-            <x-card class="flex flex-col gap-4" x-data="{ search: '' }">
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                    <p class="text-sm text-muted">Kode kurikulum dipertahankan. Nama mirip dengan kode berbeda tidak digabung otomatis.</p>
-                    <div class="relative w-full sm:w-72">
-                        <i data-lucide="search" class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted"></i>
-                        <input type="search" x-model="search" placeholder="Cari kode atau nama mata kuliah..." aria-label="Cari mata kuliah"
-                               class="w-full rounded-control border border-border bg-surface py-2 pl-9 pr-3 text-sm text-ink focus:border-primary focus:outline-none">
+            @php
+                $courseStats = [
+                    'total' => $courses->count(),
+                    'total_sks' => $courses->sum('sks'),
+                    'avg_sks' => $courses->count() > 0 ? round($courses->avg('sks'), 1) : 0,
+                    'offered' => $courses->where('offerings_count', '>', 0)->count(),
+                    'unoffered' => $courses->where('offerings_count', 0)->count(),
+                    'total_classes' => $courses->sum('offerings_count'),
+                ];
+                $distinctSks = $courses->pluck('sks')->unique()->sort()->values();
+            @endphp
+
+            <div class="flex flex-col gap-6"
+                 x-data="{
+                     search: '',
+                     statusFilter: 'semua',
+                     sksFilter: '',
+                     courseList: [
+                         @foreach ($courses as $c)
+                             { id: {{ $c->id }}, search: @js(mb_strtolower($c->code.' '.$c->name)), status: '{{ $c->offerings_count > 0 ? 'ditawarkan' : 'belum' }}', sks: '{{ $c->sks }}' },
+                         @endforeach
+                     ],
+                     isRowMatch(searchStr, status, sks) {
+                         const q = this.search.trim().toLowerCase();
+                         const matchesSearch = !q || searchStr.includes(q);
+                         const matchesStatus = this.statusFilter === 'semua' || status === this.statusFilter;
+                         const matchesSks = !this.sksFilter || sks === this.sksFilter;
+                         return matchesSearch && matchesStatus && matchesSks;
+                     },
+                     get matchCount() {
+                         const q = this.search.trim().toLowerCase();
+                         return this.courseList.filter(c => {
+                             const matchesSearch = !q || c.search.includes(q);
+                             const matchesStatus = this.statusFilter === 'semua' || c.status === this.statusFilter;
+                             const matchesSks = !this.sksFilter || c.sks === this.sksFilter;
+                             return matchesSearch && matchesStatus && matchesSks;
+                         }).length;
+                     },
+                     get hasActiveFilters() {
+                         return this.search.trim() !== '' || this.statusFilter !== 'semua' || this.sksFilter !== '';
+                     },
+                     resetFilters() {
+                         this.search = '';
+                         this.statusFilter = 'semua';
+                         this.sksFilter = '';
+                     }
+                 }">
+
+                {{-- Ringkasan Metrik / KPI Cards --}}
+                <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                    <button type="button" @click="statusFilter = 'semua'"
+                            :class="statusFilter === 'semua' ? 'border-primary ring-2 ring-primary/20 bg-primary-soft/10' : 'border-border bg-surface hover:bg-page'"
+                            class="rounded-card border p-4 text-left transition flex flex-col gap-1 cursor-pointer">
+                        <span class="text-xs font-medium text-muted">Total Mata Kuliah</span>
+                        <span class="text-2xl font-bold text-ink">{{ number_format($courseStats['total']) }}</span>
+                        <span class="text-xs text-muted">Terdaftar dalam kurikulum</span>
+                    </button>
+
+                    <div class="rounded-card border border-border bg-surface p-4 text-left flex flex-col gap-1">
+                        <span class="text-xs font-medium text-primary">Total Bobot SKS</span>
+                        <span class="text-2xl font-bold text-primary">{{ number_format($courseStats['total_sks']) }} <span class="text-sm font-semibold">SKS</span></span>
+                        <span class="text-xs text-muted">Rata-rata {{ $courseStats['avg_sks'] }} SKS / mata kuliah</span>
                     </div>
+
+                    <button type="button" @click="statusFilter = 'ditawarkan'"
+                            :class="statusFilter === 'ditawarkan' ? 'border-success ring-2 ring-success/20 bg-success-soft/20' : 'border-border bg-surface hover:bg-page'"
+                            class="rounded-card border p-4 text-left transition flex flex-col gap-1 cursor-pointer">
+                        <span class="text-xs font-medium text-success">Aktif Ditawarkan</span>
+                        <span class="text-2xl font-bold text-success">{{ number_format($courseStats['offered']) }}</span>
+                        <span class="text-xs text-success/80">{{ number_format($courseStats['total_classes']) }} rombel kelas</span>
+                    </button>
+
+                    <button type="button" @click="statusFilter = 'belum'"
+                            :class="statusFilter === 'belum' ? 'border-muted ring-2 ring-muted/20 bg-page' : 'border-border bg-surface hover:bg-page'"
+                            class="rounded-card border p-4 text-left transition flex flex-col gap-1 cursor-pointer">
+                        <span class="text-xs font-medium text-muted">Belum Ditawarkan</span>
+                        <span class="text-2xl font-bold text-ink">{{ number_format($courseStats['unoffered']) }}</span>
+                        <span class="text-xs text-muted">Belum masuk rombel aktif</span>
+                    </button>
                 </div>
-                <table class="w-full text-left text-sm">
-                    <thead class="border-b border-border text-xs text-muted">
-                        <tr><th class="py-3 pr-4 font-medium">Kode MK</th><th class="py-3 pr-4 font-medium">Mata kuliah</th><th class="py-3 pr-4 font-medium">SKS</th><th class="py-3 pr-4 font-medium">Kurikulum</th><th class="py-3 pr-4 font-medium">Penawaran</th><th class="py-3 font-medium">Aksi</th></tr>
-                    </thead>
-                    <tbody class="divide-y divide-border">
-                        @foreach ($courses as $course)
-                            <tr data-search="{{ mb_strtolower($course->code.' '.$course->name.' '.($course->curriculum ?? '')) }}"
-                                x-show="!search.trim() || $el.dataset.search.includes(search.trim().toLowerCase())">
-                                <td class="py-3 pr-4 font-mono text-xs">{{ $course->code }}</td>
-                                <td class="py-3 pr-4 font-semibold">{{ $course->name }}</td>
-                                <td class="py-3 pr-4">{{ $course->sks }}</td>
-                                <td class="py-3 pr-4 text-muted">{{ $course->curriculum ?? '—' }}</td>
-                                <td class="py-3 pr-4">{{ $course->offerings_count }} kelas</td>
-                                <td class="py-3">
-                                    <button type="button" class="font-semibold text-primary hover:underline" x-data x-on:click="$dispatch('open-modal', 'course-{{ $course->id }}')">Edit</button>
-                                    <form method="POST" action="{{ route('admin.academic.courses.destroy', $course) }}" class="ml-3 inline">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="text-danger hover:underline">Hapus</button>
-                                    </form>
-                                </td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </x-card>
+
+                {{-- Card Konten & Toolbar Filter --}}
+                <x-card class="flex flex-col gap-4">
+                    {{-- Baris Filter Tabs Status & Tombol Tambah --}}
+                    <div class="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-4">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <button type="button" @click="statusFilter = 'semua'"
+                                    :class="statusFilter === 'semua' ? 'bg-primary text-white' : 'bg-page text-muted hover:text-ink hover:bg-border'"
+                                    class="rounded-full px-3.5 py-1.5 text-xs font-semibold transition cursor-pointer">
+                                Semua ({{ $courseStats['total'] }})
+                            </button>
+                            <button type="button" @click="statusFilter = 'ditawarkan'"
+                                    :class="statusFilter === 'ditawarkan' ? 'bg-success text-white' : 'bg-success-soft/60 text-success hover:bg-success-soft'"
+                                    class="rounded-full px-3.5 py-1.5 text-xs font-semibold transition cursor-pointer">
+                                Aktif Ditawarkan ({{ $courseStats['offered'] }})
+                            </button>
+                            <button type="button" @click="statusFilter = 'belum'"
+                                    :class="statusFilter === 'belum' ? 'bg-primary text-white' : 'bg-page text-muted hover:text-ink hover:bg-border'"
+                                    class="rounded-full px-3.5 py-1.5 text-xs font-semibold transition cursor-pointer">
+                                Belum Ditawarkan ({{ $courseStats['unoffered'] }})
+                            </button>
+                        </div>
+
+                        <div class="flex items-center gap-2">
+                            <x-button icon="plus" x-data x-on:click="$dispatch('open-modal', 'course-new')" class="py-2! text-xs!">Tambah mata kuliah</x-button>
+                        </div>
+                    </div>
+
+                    {{-- Baris Input Pencarian, Filter SKS, dan Reset --}}
+                    <div class="grid grid-cols-1 items-end gap-3 sm:grid-cols-12">
+                        <div class="sm:col-span-6">
+                            <label class="mb-1 block text-xs font-medium text-muted">Cari Kode MK atau Nama Mata Kuliah</label>
+                            <div class="relative">
+                                <i data-lucide="search" class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted"></i>
+                                <input type="text" x-model="search" placeholder="Ketik kode (misal: TKM2301) atau nama mata kuliah..."
+                                       class="w-full rounded-control border border-border bg-surface pl-9 pr-8 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary">
+                                <button type="button" x-show="search.trim() !== ''" @click="search = ''" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-ink cursor-pointer" title="Bersihkan pencarian">
+                                    <i data-lucide="x" class="size-3.5"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="sm:col-span-4">
+                            <label class="mb-1 block text-xs font-medium text-muted">Filter Bobot SKS</label>
+                            <select x-model="sksFilter" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
+                                <option value="">Semua Bobot SKS</option>
+                                @foreach ($distinctSks as $sksVal)
+                                    <option value="{{ $sksVal }}">{{ $sksVal }} SKS</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div class="sm:col-span-2">
+                            <button type="button" @click="resetFilters()"
+                                    x-show="hasActiveFilters"
+                                    x-cloak
+                                    class="inline-flex h-[38px] w-full items-center justify-center gap-1.5 rounded-control border border-border px-3 text-xs font-semibold text-muted hover:text-ink hover:bg-page transition cursor-pointer">
+                                <i data-lucide="rotate-ccw" class="size-3.5"></i>
+                                <span>Reset Filter</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    {{-- Informasi Jumlah Tampil --}}
+                    <div class="flex items-center justify-between text-xs text-muted pt-1">
+                        <div>
+                            Menampilkan <span class="font-bold text-ink" x-text="matchCount"></span> dari {{ $courseStats['total'] }} mata kuliah terdaftar
+                        </div>
+                        <span x-show="hasActiveFilters" x-cloak class="text-xs text-primary font-medium">Filter sedang aktif</span>
+                    </div>
+
+                    {{-- TABEL MATA KULIAH --}}
+                    <div class="overflow-x-auto rounded-lg border border-border">
+                        <table class="w-full text-left text-sm">
+                            <thead class="border-b border-border bg-page text-xs font-semibold text-muted">
+                                <tr>
+                                    <th class="w-32 px-4 py-3">Kode MK</th>
+                                    <th class="px-4 py-3">Nama Mata Kuliah</th>
+                                    <th class="w-28 px-4 py-3 text-center">Bobot SKS</th>
+                                    <th class="w-48 px-4 py-3 text-center">Status Penawaran</th>
+                                    <th class="w-36 px-4 py-3 text-right">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-border">
+                                @forelse ($courses as $course)
+                                    @php
+                                        $searchStr = mb_strtolower($course->code.' '.$course->name);
+                                        $isOffered = $course->offerings_count > 0;
+                                        $statusKey = $isOffered ? 'ditawarkan' : 'belum';
+                                    @endphp
+                                    <tr data-search="{{ $searchStr }}"
+                                        data-status="{{ $statusKey }}"
+                                        data-sks="{{ $course->sks }}"
+                                        x-show="isRowMatch($el.dataset.search, $el.dataset.status, $el.dataset.sks)"
+                                        class="transition hover:bg-primary-soft/20">
+
+                                        {{-- Kode MK --}}
+                                        <td class="px-4 py-3">
+                                            <span class="inline-flex items-center rounded-md border border-border bg-page px-2 py-1 font-mono text-xs font-bold text-ink">
+                                                {{ $course->code }}
+                                            </span>
+                                        </td>
+
+                                        {{-- Nama Mata Kuliah --}}
+                                        <td class="px-4 py-3">
+                                            <div class="flex items-center gap-2.5">
+                                                <div class="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary-soft text-primary">
+                                                    <i data-lucide="book-open" class="size-3.5"></i>
+                                                </div>
+                                                <span class="font-semibold text-ink">{{ $course->name }}</span>
+                                            </div>
+                                        </td>
+
+                                        {{-- Bobot SKS --}}
+                                        <td class="px-4 py-3 text-center">
+                                            <span class="inline-flex items-center justify-center rounded-full bg-primary-soft px-2.5 py-0.5 text-xs font-bold text-primary">
+                                                {{ $course->sks }} SKS
+                                            </span>
+                                        </td>
+
+                                        {{-- Status Penawaran --}}
+                                        <td class="px-4 py-3 text-center">
+                                            @if ($isOffered)
+                                                <a href="{{ route('admin.academic.index', ['tab' => 'penawaran']) }}"
+                                                   class="inline-flex items-center gap-1.5 rounded-full border border-success/30 bg-success-soft/70 px-2.5 py-1 text-xs font-semibold text-success hover:bg-success-soft transition"
+                                                   title="Lihat rombel di tab Penawaran Perkuliahan">
+                                                    <span class="size-1.5 rounded-full bg-success"></span>
+                                                    <span>{{ $course->offerings_count }} Rombel Ditawarkan</span>
+                                                    <i data-lucide="arrow-up-right" class="size-3"></i>
+                                                </a>
+                                            @else
+                                                <span class="inline-flex items-center gap-1.5 rounded-full border border-border bg-page px-2.5 py-1 text-xs font-medium text-muted">
+                                                    <span class="size-1.5 rounded-full bg-muted/40"></span>
+                                                    <span>Belum Ditawarkan</span>
+                                                </span>
+                                            @endif
+                                        </td>
+
+                                        {{-- Aksi --}}
+                                        <td class="px-4 py-3 text-right">
+                                            <div class="flex items-center justify-end gap-1.5">
+                                                <button type="button"
+                                                        class="inline-flex items-center gap-1 rounded-control border border-border bg-surface px-2.5 py-1.5 text-xs font-semibold text-primary hover:bg-primary-soft hover:border-primary/40 transition cursor-pointer"
+                                                        x-data x-on:click="$dispatch('open-modal', 'course-{{ $course->id }}')">
+                                                    <i data-lucide="pencil" class="size-3.5"></i>
+                                                    <span>Edit</span>
+                                                </button>
+
+                                                @if ($isOffered)
+                                                    <span class="inline-flex items-center gap-1 rounded-control border border-border bg-page px-2.5 py-1.5 text-xs font-medium text-muted/50 cursor-not-allowed"
+                                                          title="Tidak dapat dihapus karena masih digunakan pada {{ $course->offerings_count }} rombel penawaran kelas. Hapus penawarannya terlebih dahulu.">
+                                                        <i data-lucide="trash-2" class="size-3.5"></i>
+                                                        <span>Hapus</span>
+                                                    </span>
+                                                @else
+                                                    <form method="POST" action="{{ route('admin.academic.courses.destroy', $course) }}" class="inline"
+                                                          onsubmit="return confirm('Apakah Anda yakin ingin menghapus mata kuliah {{ addslashes($course->name) }} ({{ $course->code }})? Tindakan ini tidak dapat dibatalkan.');">
+                                                        @csrf
+                                                        @method('DELETE')
+                                                        <button type="submit" class="inline-flex items-center gap-1 rounded-control border border-danger/30 bg-danger-soft/30 px-2.5 py-1.5 text-xs font-semibold text-danger hover:bg-danger hover:text-white transition cursor-pointer">
+                                                            <i data-lucide="trash-2" class="size-3.5"></i>
+                                                            <span>Hapus</span>
+                                                        </button>
+                                                    </form>
+                                                @endif
+                                            </div>
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="5" class="py-12 text-center text-muted">
+                                            <i data-lucide="book-x" class="mx-auto size-8 text-muted/60 mb-2"></i>
+                                            <p class="font-medium text-ink">Belum ada data mata kuliah.</p>
+                                        </td>
+                                    </tr>
+                                @endforelse
+
+                                {{-- Pesan jika pencarian menghasilkan 0 baris --}}
+                                <tr x-show="matchCount === 0" x-cloak>
+                                    <td colspan="5" class="py-12 text-center">
+                                        <div class="flex flex-col items-center justify-center gap-2">
+                                            <i data-lucide="search-x" class="size-8 text-muted/60"></i>
+                                            <p class="text-sm font-semibold text-ink">Tidak ada mata kuliah yang cocok</p>
+                                            <p class="text-xs text-muted">Tidak ditemukan mata kuliah dengan filter atau kata kunci tersebut.</p>
+                                            <button type="button" @click="resetFilters()"
+                                                    class="mt-2 inline-flex items-center gap-1.5 rounded-control border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary-soft transition cursor-pointer">
+                                                <i data-lucide="rotate-ccw" class="size-3.5"></i>
+                                                <span>Reset Filter</span>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </x-card>
+            </div>
         @elseif ($tab === 'penawaran')
-            <x-card class="flex flex-col gap-4" x-data="{ search: '' }">
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                    <p class="text-sm text-muted">Daftar kelas dan mata kuliah yang ditawarkan pada semester aktif ({{ number_format($offerings->count()) }} penawaran).</p>
-                    <div class="relative w-full sm:w-80">
-                        <i data-lucide="search" class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted"></i>
-                        <input type="search" x-model="search" placeholder="Cari kelas atau mata kuliah..." aria-label="Cari penawaran"
-                               class="w-full rounded-control border border-border bg-surface py-2 pl-9 pr-3 text-sm text-ink focus:border-primary focus:outline-none">
+            @if (! $period)
+                <div class="rounded-xl border border-warning/40 bg-warning-soft/30 p-6 text-center">
+                    <i data-lucide="triangle-alert" class="mx-auto size-8 text-warning-ink mb-2"></i>
+                    <h3 class="font-bold text-ink text-base">Belum Ada Semester Aktif</h3>
+                    <p class="text-xs text-muted mt-1 max-w-md mx-auto">Untuk mengelola penawaran perkuliahan, aktifkan atau buat semester terlebih dahulu di tab Semester & Kalender.</p>
+                    <div class="mt-4">
+                        <x-button variant="secondary" :href="route('admin.academic.index', ['tab' => 'semester'])">Buka Kalender Semester</x-button>
                     </div>
                 </div>
-                <table class="w-full text-left text-sm">
-                    <thead class="border-b border-border text-xs text-muted">
-                        <tr><th class="py-3 pr-4 font-medium">Kelas</th><th class="py-3 pr-4 font-medium">Mata kuliah</th><th class="py-3 pr-4 font-medium">SKS</th><th class="py-3 font-medium">Aksi</th></tr>
-                    </thead>
-                    <tbody class="divide-y divide-border">
-                        @forelse ($offerings as $offering)
-                            @php
-                                $offeringSearchText = mb_strtolower($offering->classGroup->name.' '.$offering->course->code.' '.$offering->course->name);
-                            @endphp
-                            <tr data-search="{{ $offeringSearchText }}"
-                                x-show="!search.trim() || $el.dataset.search.includes(search.trim().toLowerCase())">
-                                <td class="py-3 pr-4 font-semibold">{{ $offering->classGroup->name }}</td>
-                                <td class="py-3 pr-4">{{ $offering->course->name }}</td>
-                                <td class="py-3 pr-4">{{ $offering->course->sks }} SKS</td>
-                                <td class="py-3">
-                                    <a href="{{ route('admin.teaching.index', ['penawaran' => $offering->id]) }}" class="font-semibold text-primary hover:underline">Bagi SKS Dosen ↗</a>
-                                    <form method="POST" action="{{ route('admin.academic.offerings.destroy', $offering) }}" class="ml-3 inline">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="text-danger hover:underline">Hapus</button>
-                                    </form>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr><td colspan="4" class="py-10 text-center text-muted">Belum ada penawaran perkuliahan.</td></tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </x-card>
+            @else
+                <div x-data="{
+                    search: '',
+                    filterProdi: '',
+                    filterCohort: '',
+                    filterStatus: '',
+                    filterScheduled: '',
+                    filterSks: '',
+                    filterClass: '',
+                    selectedIds: [],
+                    visibleCount: {{ $offerings->count() }},
+                    deleteModalOpen: false,
+                    offeringToDelete: { id: null, name: '', deleteUrl: '' },
+                    batchDeleteModalOpen: false,
+
+                    matches(el) {
+                        if (!el || !el.dataset) return true;
+                        const q = this.search.trim().toLowerCase();
+                        if (q && !el.dataset.search.includes(q)) return false;
+                        if (this.filterProdi && el.dataset.prodi !== this.filterProdi) return false;
+                        if (this.filterCohort && el.dataset.cohort !== this.filterCohort) return false;
+                        if (this.filterStatus && el.dataset.status !== this.filterStatus) return false;
+                        if (this.filterScheduled && el.dataset.scheduled !== this.filterScheduled) return false;
+                        if (this.filterSks && el.dataset.sks !== this.filterSks) return false;
+                        if (this.filterClass && el.dataset.classId !== this.filterClass) return false;
+                        return true;
+                    },
+
+                    updateVisibleCount() {
+                        this.$nextTick(() => {
+                            const rows = this.$el.querySelectorAll('tbody tr[data-search]');
+                            let count = 0;
+                            rows.forEach(r => {
+                                if (this.matches(r)) count++;
+                            });
+                            this.visibleCount = count;
+                        });
+                    },
+
+                    resetFilters() {
+                        this.search = '';
+                        this.filterProdi = '';
+                        this.filterCohort = '';
+                        this.filterStatus = '';
+                        this.filterScheduled = '';
+                        this.filterSks = '';
+                        this.filterClass = '';
+                        this.updateVisibleCount();
+                    },
+
+                    hasActiveFilters() {
+                        return !!(this.search.trim() || this.filterProdi || this.filterCohort || this.filterStatus || this.filterScheduled || this.filterSks || this.filterClass);
+                    },
+
+                    toggleStatusFilter(val) {
+                        this.filterStatus = this.filterStatus === val ? '' : val;
+                        this.updateVisibleCount();
+                    },
+
+                    toggleScheduledFilter(val) {
+                        this.filterScheduled = this.filterScheduled === val ? '' : val;
+                        this.updateVisibleCount();
+                    },
+
+                    toggleSelectAll(checked) {
+                        const checkboxes = this.$el.querySelectorAll('tbody input[type=\'checkbox\'][data-offering-id]');
+                        let ids = [];
+                        checkboxes.forEach(cb => {
+                            const tr = cb.closest('tr');
+                            if (tr && this.matches(tr)) {
+                                ids.push(parseInt(cb.dataset.offeringId));
+                            }
+                        });
+                        if (checked) {
+                            this.selectedIds = Array.from(new Set([...this.selectedIds, ...ids]));
+                        } else {
+                            this.selectedIds = this.selectedIds.filter(id => !ids.includes(id));
+                        }
+                    },
+
+                    confirmDelete(id, name, deleteUrl) {
+                        this.offeringToDelete = { id, name, deleteUrl };
+                        this.deleteModalOpen = true;
+                    }
+                }"
+                x-init="
+                    $watch('search', () => updateVisibleCount());
+                    $watch('filterProdi', () => updateVisibleCount());
+                    $watch('filterCohort', () => updateVisibleCount());
+                    $watch('filterStatus', () => updateVisibleCount());
+                    $watch('filterScheduled', () => updateVisibleCount());
+                    $watch('filterSks', () => updateVisibleCount());
+                    $watch('filterClass', () => updateVisibleCount());
+                "
+                class="flex flex-col gap-5">
+
+                    {{-- Ringkasan Metrik Cepat Penawaran --}}
+                    <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                        <button type="button"
+                                @click="resetFilters()"
+                                class="group relative flex flex-col justify-between rounded-xl border p-4 text-left transition-all duration-150"
+                                :class="{
+                                    'border-primary bg-primary-soft/30 shadow-xs ring-1 ring-primary/40': !filterStatus && !filterScheduled,
+                                    'border-border bg-surface hover:border-primary/50 hover:bg-page hover:shadow-xs': filterStatus || filterScheduled
+                                }">
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="text-xs font-semibold text-muted group-hover:text-ink transition">Total Penawaran</span>
+                                <div class="flex size-7 items-center justify-center rounded-lg bg-page border border-border text-muted group-hover:text-primary group-hover:border-primary/40 transition">
+                                    <i data-lucide="book-open" class="size-4"></i>
+                                </div>
+                            </div>
+                            <div class="mt-3 flex flex-col">
+                                <span class="text-2xl font-bold tracking-tight text-ink">{{ number_format($offeringStats['total']) }}</span>
+                                <span class="text-[11px] text-muted">{{ number_format($offeringStats['total_sks']) }} Total SKS ditawarkan</span>
+                            </div>
+                        </button>
+
+                        <button type="button"
+                                @click="toggleStatusFilter('unassigned')"
+                                class="group relative flex flex-col justify-between rounded-xl border p-4 text-left transition-all duration-150"
+                                :class="{
+                                    'border-warning bg-warning-soft/40 shadow-xs ring-1 ring-warning/50': filterStatus === 'unassigned',
+                                    'border-warning/40 bg-warning-soft/20 hover:border-warning hover:bg-warning-soft/30 hover:shadow-xs': filterStatus !== 'unassigned' && {{ $offeringStats['unassigned'] }} > 0,
+                                    'border-border bg-surface hover:border-warning/50 hover:bg-page hover:shadow-xs': filterStatus !== 'unassigned' && {{ $offeringStats['unassigned'] }} === 0
+                                }">
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="text-xs font-semibold text-warning-ink">Belum Ada Dosen</span>
+                                <div class="flex size-7 items-center justify-center rounded-lg bg-warning-soft border border-warning/30 text-warning-ink">
+                                    <i data-lucide="triangle-alert" class="size-4"></i>
+                                </div>
+                            </div>
+                            <div class="mt-3 flex flex-col">
+                                <span class="text-2xl font-bold tracking-tight text-warning-ink">{{ number_format($offeringStats['unassigned']) }}</span>
+                                <span class="text-[11px] text-muted">Perlu pembagian SKS dosen</span>
+                            </div>
+                        </button>
+
+                        <button type="button"
+                                @click="toggleStatusFilter('assigned')"
+                                class="group relative flex flex-col justify-between rounded-xl border p-4 text-left transition-all duration-150"
+                                :class="{
+                                    'border-primary bg-primary-soft/30 shadow-xs ring-1 ring-primary/40': filterStatus === 'assigned',
+                                    'border-border bg-surface hover:border-primary/50 hover:bg-page hover:shadow-xs': filterStatus !== 'assigned'
+                                }">
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="text-xs font-semibold text-muted group-hover:text-ink transition">Sudah Ada Dosen</span>
+                                <div class="flex size-7 items-center justify-center rounded-lg bg-page border border-border text-muted group-hover:text-primary group-hover:border-primary/40 transition">
+                                    <i data-lucide="users" class="size-4"></i>
+                                </div>
+                            </div>
+                            <div class="mt-3 flex flex-col">
+                                <span class="text-2xl font-bold tracking-tight text-ink">{{ number_format($offeringStats['assigned']) }}</span>
+                                <span class="text-[11px] text-muted">Pengampu sudah ditetapkan</span>
+                            </div>
+                        </button>
+
+                        <button type="button"
+                                @click="toggleScheduledFilter('scheduled')"
+                                class="group relative flex flex-col justify-between rounded-xl border p-4 text-left transition-all duration-150"
+                                :class="{
+                                    'border-success bg-success-soft/40 shadow-xs ring-1 ring-success/40': filterScheduled === 'scheduled',
+                                    'border-border bg-surface hover:border-success/50 hover:bg-page hover:shadow-xs': filterScheduled !== 'scheduled'
+                                }">
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="text-xs font-semibold text-muted group-hover:text-ink transition">Sudah Terjadwal</span>
+                                <div class="flex size-7 items-center justify-center rounded-lg bg-page border border-border text-muted group-hover:text-success group-hover:border-success/40 transition">
+                                    <i data-lucide="clock" class="size-4"></i>
+                                </div>
+                            </div>
+                            <div class="mt-3 flex flex-col">
+                                <span class="text-2xl font-bold tracking-tight text-ink">{{ number_format($offeringStats['scheduled']) }}</span>
+                                <span class="text-[11px] text-muted">Telah dialokasikan di draf</span>
+                            </div>
+                        </button>
+
+                        <button type="button"
+                                @click="toggleScheduledFilter('unscheduled')"
+                                class="group relative flex flex-col justify-between rounded-xl border p-4 text-left transition-all duration-150"
+                                :class="{
+                                    'border-primary bg-primary-soft/30 shadow-xs ring-1 ring-primary/40': filterScheduled === 'unscheduled',
+                                    'border-border bg-surface hover:border-primary/50 hover:bg-page hover:shadow-xs': filterScheduled !== 'unscheduled'
+                                }">
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="text-xs font-semibold text-muted group-hover:text-ink transition">Belum Terjadwal</span>
+                                <div class="flex size-7 items-center justify-center rounded-lg bg-page border border-border text-muted group-hover:text-primary group-hover:border-primary/40 transition">
+                                    <i data-lucide="circle-alert" class="size-4"></i>
+                                </div>
+                            </div>
+                            <div class="mt-3 flex flex-col">
+                                <span class="text-2xl font-bold tracking-tight text-ink">{{ number_format($offeringStats['total'] - $offeringStats['scheduled']) }}</span>
+                                <span class="text-[11px] text-muted">Belum memiliki sesi</span>
+                            </div>
+                        </button>
+                    </div>
+
+                    {{-- Toolbar Filter & Pencarian Cepat --}}
+                    <x-card class="flex flex-col gap-4 p-5 shadow-xs">
+                        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3.5">
+                            <div class="flex items-center gap-2">
+                                <i data-lucide="filter" class="size-4 text-primary"></i>
+                                <span class="text-xs font-bold uppercase tracking-wider text-ink">Filter & Pencarian Penawaran</span>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span class="text-xs text-muted">
+                                    Menampilkan <span class="font-semibold text-ink" x-text="visibleCount"></span> dari <span class="font-semibold text-ink">{{ $offerings->count() }}</span> penawaran
+                                </span>
+                                <x-button size="sm" icon="plus" x-data x-on:click="$dispatch('open-modal', 'offering-new')">Tambah Penawaran</x-button>
+                            </div>
+                        </div>
+
+                        {{-- Baris Filter 1: Search & Prodi & Angkatan & Status Dosen --}}
+                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-12 items-end">
+                            <div class="sm:col-span-5">
+                                <label class="mb-1.5 block text-xs font-medium text-muted">Cari Mata Kuliah / Kode / Kelas / Dosen</label>
+                                <div class="relative">
+                                    <i data-lucide="search" class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted"></i>
+                                    <input type="search" x-model="search" placeholder="Ketik nama MK, kode, kelas, atau dosen..." aria-label="Cari penawaran"
+                                           class="w-full rounded-control border border-border bg-surface py-2 pl-9 pr-8 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs">
+                                    <button type="button" x-show="search.length > 0" @click="search = ''" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-ink">
+                                        <i data-lucide="x" class="size-3.5"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="sm:col-span-3">
+                                <label class="mb-1.5 block text-xs font-medium text-muted">Program Studi</label>
+                                <select x-model="filterProdi" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs">
+                                    <option value="">Semua Program Studi</option>
+                                    @foreach ($offeringPrograms as $prog)
+                                        <option value="{{ $prog }}">{{ $prog }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            <div class="sm:col-span-2">
+                                <label class="mb-1.5 block text-xs font-medium text-muted">Angkatan</label>
+                                <select x-model="filterCohort" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs">
+                                    <option value="">Semua Angkatan</option>
+                                    @foreach ($offeringCohorts as $cohort)
+                                        <option value="{{ $cohort }}">Angkatan {{ $cohort }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            <div class="sm:col-span-2">
+                                <label class="mb-1.5 block text-xs font-medium text-muted">Status Dosen</label>
+                                <select x-model="filterStatus" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs">
+                                    <option value="">Semua Status Dosen</option>
+                                    <option value="unassigned">⚠️ Belum Ada Dosen</option>
+                                    <option value="assigned">✅ Sudah Ada Dosen</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        {{-- Baris Filter 2: SKS & Kelas & Status Jadwal & Reset --}}
+                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-12 items-end pt-1">
+                            <div class="sm:col-span-3">
+                                <label class="mb-1.5 block text-xs font-medium text-muted">Filter Kelas Spesifik</label>
+                                <select x-model="filterClass" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs">
+                                    <option value="">Semua Kelas</option>
+                                    @foreach ($offeringClasses as $cls)
+                                        <option value="{{ $cls->id }}">{{ $cls->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            <div class="sm:col-span-2">
+                                <label class="mb-1.5 block text-xs font-medium text-muted">Bobot SKS</label>
+                                <select x-model="filterSks" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs">
+                                    <option value="">Semua SKS</option>
+                                    @foreach ($offeringSksList as $sks)
+                                        <option value="{{ $sks }}">{{ $sks }} SKS</option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            <div class="sm:col-span-3">
+                                <label class="mb-1.5 block text-xs font-medium text-muted">Status Penjadwalan</label>
+                                <select x-model="filterScheduled" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs">
+                                    <option value="">Semua Status Jadwal</option>
+                                    <option value="scheduled">Sudah Terjadwal (Ada Sesi)</option>
+                                    <option value="unscheduled">Belum Dijadwalkan</option>
+                                </select>
+                            </div>
+
+                            <div class="sm:col-span-4 flex items-center justify-end gap-2">
+                                <button type="button"
+                                        x-show="hasActiveFilters()"
+                                        @click="resetFilters()"
+                                        class="inline-flex h-[38px] items-center justify-center gap-1.5 rounded-control border border-border bg-surface px-3 text-xs font-semibold text-muted hover:text-ink hover:bg-page transition shadow-2xs"
+                                        title="Hapus semua filter aktif">
+                                    <i data-lucide="rotate-ccw" class="size-3.5"></i>
+                                    <span>Reset Filter</span>
+                                </button>
+                                <a href="{{ route('admin.teaching.index') }}"
+                                   class="inline-flex h-[38px] items-center justify-center gap-1.5 rounded-control border border-primary/30 bg-primary-soft/40 px-3 text-xs font-semibold text-primary hover:bg-primary hover:text-white transition shadow-2xs"
+                                   title="Buka halaman Pembagian Mengajar Dosen">
+                                    <i data-lucide="users" class="size-3.5"></i>
+                                    <span>Ke Pembagian SKS &rarr;</span>
+                                </a>
+                            </div>
+                        </div>
+                    </x-card>
+
+                    {{-- TABEL DATA PENAWARAN --}}
+                    <div class="overflow-hidden rounded-card border border-border bg-surface shadow-xs">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm">
+                                <thead class="border-b border-border bg-page/80 text-[11px] font-semibold uppercase tracking-wider text-muted">
+                                    <tr>
+                                        <th class="w-12 px-4 py-3.5 text-center">
+                                            <input type="checkbox"
+                                                   @change="toggleSelectAll($event.target.checked)"
+                                                   class="size-4 rounded border-border text-primary focus:ring-primary cursor-pointer"
+                                                   title="Pilih semua yang tampil">
+                                        </th>
+                                        <th class="px-4 py-3.5">Mata Kuliah</th>
+                                        <th class="px-4 py-3.5">Kelas & Rombel</th>
+                                        <th class="px-4 py-3.5 text-center">Bobot SKS</th>
+                                        <th class="px-4 py-3.5">Dosen Pengampu</th>
+                                        <th class="px-4 py-3.5 text-center">Status Jadwal</th>
+                                        <th class="px-4 py-3.5 text-right">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-border">
+                                    @forelse ($offerings as $offering)
+                                        @php
+                                            $lecturerNames = $offering->teachingAssignments->pluck('lecturer.name')->implode(' ');
+                                            $offeringSearchText = mb_strtolower($offering->classGroup->name.' '.$offering->classGroup->study_program.' '.$offering->classGroup->cohort_year.' '.$offering->course->code.' '.$offering->course->name.' '.$lecturerNames);
+                                            $isAssigned = $offering->teachingAssignments->isNotEmpty();
+                                            $isScheduled = $offering->scheduleSessions->isNotEmpty();
+                                        @endphp
+                                        <tr data-search="{{ $offeringSearchText }}"
+                                            data-prodi="{{ $offering->classGroup->study_program ?? '' }}"
+                                            data-cohort="{{ $offering->classGroup->cohort_year ?? '' }}"
+                                            data-status="{{ $isAssigned ? 'assigned' : 'unassigned' }}"
+                                            data-scheduled="{{ $isScheduled ? 'scheduled' : 'unscheduled' }}"
+                                            data-sks="{{ (int) $offering->course->sks }}"
+                                            data-class-id="{{ $offering->classGroup->id }}"
+                                            x-show="matches($el)"
+                                            class="transition hover:bg-page/70"
+                                            :class="{ 'bg-primary-soft/25': selectedIds.includes({{ $offering->id }}) }">
+                                            {{-- Checkbox --}}
+                                            <td class="px-4 py-3.5 text-center">
+                                                <input type="checkbox"
+                                                       value="{{ $offering->id }}"
+                                                       x-model.number="selectedIds"
+                                                       data-offering-id="{{ $offering->id }}"
+                                                       class="size-4 rounded border-border text-primary focus:ring-primary cursor-pointer">
+                                            </td>
+
+                                            {{-- Mata Kuliah --}}
+                                            <td class="px-4 py-3.5">
+                                                <div class="flex flex-col gap-1">
+                                                    <span class="font-bold text-ink text-sm sm:text-base tracking-tight">{{ $offering->course->name }}</span>
+                                                    <div class="flex flex-wrap items-center gap-1.5">
+                                                        <span class="font-mono text-xs text-muted">#{{ $offering->course->code }}</span>
+                                                        @if ($offering->course->curriculum)
+                                                            <span class="inline-flex items-center rounded bg-page px-1.5 py-0.2 text-[10px] font-medium text-muted border border-border">Kurikulum {{ $offering->course->curriculum }}</span>
+                                                        @endif
+                                                    </div>
+                                                </div>
+                                            </td>
+
+                                            {{-- Kelas & Rombel --}}
+                                            <td class="px-4 py-3.5">
+                                                <div class="flex flex-col gap-0.5">
+                                                    <span class="font-bold text-ink text-sm">{{ $offering->classGroup->name }}</span>
+                                                    <div class="flex flex-wrap items-center gap-1 text-xs text-muted">
+                                                        <span>{{ $offering->classGroup->study_program ?? 'Umum' }}</span>
+                                                        <span>•</span>
+                                                        <span>Angkatan {{ $offering->classGroup->cohort_year ?? '—' }}</span>
+                                                    </div>
+                                                    @if ($offering->classGroup->student_count)
+                                                        <span class="inline-flex items-center gap-1 text-[11px] font-medium text-ink/80 mt-0.5">
+                                                            <i data-lucide="users" class="size-3 text-muted"></i>
+                                                            {{ $offering->classGroup->student_count }} Mahasiswa
+                                                        </span>
+                                                    @else
+                                                        <span class="text-[11px] text-muted/60 italic mt-0.5">Kapasitas mhs belum diisi</span>
+                                                    @endif
+                                                </div>
+                                            </td>
+
+                                            {{-- Bobot SKS --}}
+                                            <td class="px-4 py-3.5 text-center">
+                                                <span class="inline-flex items-center gap-1 rounded-full bg-page px-3 py-1 text-xs font-semibold text-ink border border-border">
+                                                    {{ $offering->course->sks }} SKS
+                                                </span>
+                                            </td>
+
+                                            {{-- Dosen Pengampu --}}
+                                            <td class="px-4 py-3.5">
+                                                @if ($isAssigned)
+                                                    <div class="flex flex-col gap-1 max-w-xs">
+                                                        @foreach ($offering->teachingAssignments as $assignment)
+                                                            <div class="flex items-center gap-1.5 text-xs">
+                                                                <span class="inline-flex items-center justify-center size-4 rounded-full {{ $assignment->role->value === 'lead' ? 'bg-primary-soft text-primary font-bold' : 'bg-page border border-border text-muted font-medium' }} text-[9px]" title="{{ $assignment->role->label() }}">
+                                                                    {{ $assignment->role->value === 'lead' ? 'U' : 'M' }}
+                                                                </span>
+                                                                <span class="font-medium text-ink truncate">{{ $assignment->lecturer->name }}</span>
+                                                                <span class="text-[11px] text-muted font-mono shrink-0">({{ (float) $assignment->credited_sks }} SKS)</span>
+                                                            </div>
+                                                        @endforeach
+                                                    </div>
+                                                @else
+                                                    <div class="flex flex-col gap-1">
+                                                        <span class="inline-flex items-center gap-1 rounded-md bg-warning-soft/70 px-2 py-0.5 text-xs font-semibold text-warning-ink border border-warning/30 w-fit">
+                                                            <i data-lucide="triangle-alert" class="size-3.5 shrink-0"></i>
+                                                            <span>Belum ada dosen</span>
+                                                        </span>
+                                                        <a href="{{ route('admin.teaching.index', ['penawaran' => $offering->id]) }}" class="text-[11px] font-medium text-primary hover:underline inline-flex items-center gap-0.5">
+                                                            Atur pengampu &rarr;
+                                                        </a>
+                                                    </div>
+                                                @endif
+                                            </td>
+
+                                            {{-- Status Jadwal --}}
+                                            <td class="px-4 py-3.5 text-center">
+                                                @if ($isScheduled)
+                                                    <span class="inline-flex items-center gap-1 rounded-md bg-success-soft px-2.5 py-1 text-xs font-semibold text-success border border-success/20">
+                                                        <i data-lucide="circle-check" class="size-3"></i>
+                                                        <span>{{ $offering->scheduleSessions->count() }} sesi</span>
+                                                    </span>
+                                                @else
+                                                    <span class="text-xs text-muted/60 italic">Belum dijadwalkan</span>
+                                                @endif
+                                            </td>
+
+                                            {{-- Aksi Cepat --}}
+                                            <td class="px-4 py-3.5 text-right">
+                                                <div class="flex items-center justify-end gap-1.5">
+                                                    {{-- Tombol Bagi SKS --}}
+                                                    <a href="{{ route('admin.teaching.index', ['penawaran' => $offering->id]) }}"
+                                                       class="inline-flex items-center gap-1 rounded-lg border border-primary/30 bg-primary-soft/30 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary hover:text-white transition shadow-2xs"
+                                                       title="Bagi SKS pengampu di Pembagian Mengajar">
+                                                        <i data-lucide="users" class="size-3.5"></i>
+                                                        <span>Bagi SKS</span>
+                                                    </a>
+
+                                                    {{-- Tombol Hapus --}}
+                                                    @if ($isScheduled)
+                                                        <button type="button"
+                                                                disabled
+                                                                class="inline-flex items-center justify-center size-7 rounded-lg border border-border bg-page text-muted/40 cursor-not-allowed"
+                                                                title="Tidak dapat dihapus karena sudah memiliki sesi jadwal di draf. Hapus sesi terlebih dahulu.">
+                                                            <i data-lucide="trash-2" class="size-3.5"></i>
+                                                        </button>
+                                                    @else
+                                                        <button type="button"
+                                                                @click="confirmDelete({{ $offering->id }}, '{{ addslashes($offering->course->name.' ('.$offering->classGroup->name.')') }}', '{{ route('admin.academic.offerings.destroy', $offering) }}')"
+                                                                class="inline-flex items-center justify-center size-7 rounded-lg border border-border bg-surface text-muted hover:border-danger hover:bg-danger-soft/20 hover:text-danger transition shadow-2xs"
+                                                                title="Hapus penawaran kuliah ini">
+                                                            <i data-lucide="trash-2" class="size-3.5"></i>
+                                                        </button>
+                                                    @endif
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <tr><td colspan="7" class="py-10 text-center text-muted">Belum ada penawaran perkuliahan.</td></tr>
+                                    @endforelse
+
+                                    {{-- Empty State ketika Filter tidak menemukan hasil --}}
+                                    <tr x-show="visibleCount === 0" x-cloak>
+                                        <td colspan="7" class="py-12 text-center text-muted">
+                                            <div class="mx-auto flex size-12 items-center justify-center rounded-full bg-page border border-border text-muted mb-3">
+                                                <i data-lucide="search-x" class="size-6 text-muted/70"></i>
+                                            </div>
+                                            <p class="font-medium text-ink text-sm">Tidak ada penawaran yang sesuai dengan filter pencarian.</p>
+                                            <p class="text-xs text-muted mt-1">Coba sesuaikan kata kunci atau bersihkan kriteria filter.</p>
+                                            <div class="mt-4">
+                                                <button type="button" @click="resetFilters()" class="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-primary hover:bg-page transition shadow-2xs">
+                                                    <i data-lucide="rotate-ccw" class="size-3.5"></i>
+                                                    Reset semua filter
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {{-- FLOATING BATCH ACTION BAR --}}
+                    <div x-show="selectedIds.length > 0"
+                         x-cloak
+                         x-transition:enter="transition ease-out duration-200"
+                         x-transition:enter-start="opacity-0 translate-y-4"
+                         x-transition:enter-end="opacity-100 translate-y-0"
+                         x-transition:leave="transition ease-in duration-150"
+                         x-transition:leave-start="opacity-100 translate-y-0"
+                         x-transition:leave-end="opacity-0 translate-y-4"
+                         class="fixed bottom-6 left-1/2 z-40 flex -translate-x-1/2 flex-wrap items-center gap-3 rounded-xl border border-primary/30 bg-ink px-6 py-3.5 text-surface shadow-2xl">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="circle-check" class="size-5 text-success"></i>
+                            <span class="text-sm font-semibold"><span x-text="selectedIds.length"></span> penawaran dipilih</span>
+                        </div>
+                        <div class="h-4 w-px bg-surface/20"></div>
+
+                        <button type="button" @click="batchDeleteModalOpen = true" class="inline-flex items-center gap-1.5 rounded-lg bg-danger px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-danger/90 transition">
+                            <i data-lucide="trash-2" class="size-3.5"></i>
+                            Hapus Penawaran Terpilih
+                        </button>
+
+                        <button type="button" @click="selectedIds = []" class="text-xs text-surface/70 hover:text-white transition ml-2">
+                            Batal
+                        </button>
+                    </div>
+
+                    {{-- MODAL KONFIRMASI HAPUS SATUAN --}}
+                    <div x-show="deleteModalOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <div class="absolute inset-0 bg-ink/80 backdrop-blur-sm" @click="deleteModalOpen = false"></div>
+                        <div class="relative w-full max-w-md rounded-2xl bg-surface p-6 shadow-2xl">
+                            <div class="flex items-start justify-between border-b border-border pb-3">
+                                <h3 class="text-lg font-bold text-ink">Hapus Penawaran Kuliah?</h3>
+                                <button type="button" @click="deleteModalOpen = false" class="text-muted hover:text-ink">
+                                    <i data-lucide="x" class="size-5"></i>
+                                </button>
+                            </div>
+                            <p class="mt-3 text-xs text-muted">
+                                Apakah Anda yakin ingin menghapus penawaran <strong class="text-ink" x-text="offeringToDelete.name"></strong>?
+                                Pembagian SKS dosen pada penawaran ini juga akan ikut dihapus.
+                            </p>
+                            <form method="POST" :action="offeringToDelete.deleteUrl" class="mt-5 flex justify-end gap-2">
+                                @csrf
+                                @method('DELETE')
+                                <x-button variant="secondary" type="button" @click="deleteModalOpen = false">Batal</x-button>
+                                <x-button variant="danger" type="submit" icon="trash-2">Hapus Penawaran</x-button>
+                            </form>
+                        </div>
+                    </div>
+
+                    {{-- MODAL KONFIRMASI HAPUS BATCH --}}
+                    <div x-show="batchDeleteModalOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <div class="absolute inset-0 bg-ink/80 backdrop-blur-sm" @click="batchDeleteModalOpen = false"></div>
+                        <div class="relative w-full max-w-md rounded-2xl bg-surface p-6 shadow-2xl">
+                            <div class="flex items-start justify-between border-b border-border pb-3">
+                                <h3 class="text-lg font-bold text-ink">Hapus <span x-text="selectedIds.length"></span> Penawaran Kuliah?</h3>
+                                <button type="button" @click="batchDeleteModalOpen = false" class="text-muted hover:text-ink">
+                                    <i data-lucide="x" class="size-5"></i>
+                                </button>
+                            </div>
+                            <p class="mt-3 text-xs text-muted">
+                                Seluruh penawaran yang dipilih akan dihapus beserta pembagian SKS dosennya.
+                                Penawaran yang telah memiliki sesi jadwal di draf tidak akan dihapus.
+                            </p>
+                            <form method="POST" action="{{ route('admin.academic.offerings.batch-delete') }}" class="mt-5">
+                                @csrf
+                                <template x-for="id in selectedIds" :key="id">
+                                    <input type="hidden" name="offering_ids[]" :value="id">
+                                </template>
+                                <div class="flex justify-end gap-2">
+                                    <x-button variant="secondary" type="button" @click="batchDeleteModalOpen = false">Batal</x-button>
+                                    <x-button variant="danger" type="submit" icon="trash-2">Ya, Hapus Semua</x-button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            @endif
         @endif
     </div>
 @endsection
@@ -664,19 +1439,26 @@
         @endforeach
     @elseif ($tab === 'mata-kuliah')
         @foreach ([null, ...$courses] as $course)
-            <x-modal :name="$course ? 'course-'.$course->id : 'course-new'" :title="$course ? 'Edit mata kuliah' : 'Tambah mata kuliah'" width="max-w-[480px]">
+            <x-modal :name="$course ? 'course-'.$course->id : 'course-new'" :title="$course ? 'Edit Mata Kuliah: '.$course->name : 'Tambah Mata Kuliah'" width="max-w-[480px]">
                 <form method="POST" action="{{ $course ? route('admin.academic.courses.update', $course) : route('admin.academic.courses.store') }}" class="flex flex-col gap-4">
                     @csrf
                     @if ($course) @method('PUT') @endif
                     <div class="grid grid-cols-[1fr_100px] gap-3">
-                        <x-field label="Kode MK" name="code"><x-input name="code" :id="'code-'.($course?->id ?? 'new')" :value="$course?->code" required /></x-field>
-                        <x-field label="SKS" name="sks"><x-input type="number" name="sks" :id="'sks-'.($course?->id ?? 'new')" :value="$course?->sks" min="1" required /></x-field>
+                        <x-field label="Kode MK" name="code">
+                            <x-input name="code" :id="'code-'.($course?->id ?? 'new')" :value="$course?->code" placeholder="Contoh: TKM2301" required />
+                        </x-field>
+                        <x-field label="SKS" name="sks">
+                            <x-input type="number" name="sks" :id="'sks-'.($course?->id ?? 'new')" :value="$course?->sks ?? 3" min="1" max="8" required />
+                        </x-field>
                     </div>
-                    <x-field label="Nama mata kuliah" name="name"><x-input name="name" :id="'course-name-'.($course?->id ?? 'new')" :value="$course?->name" required /></x-field>
-                    <x-field label="Kurikulum" name="curriculum"><x-input name="curriculum" :id="'curriculum-'.($course?->id ?? 'new')" :value="$course?->curriculum" placeholder="Contoh: Kurikulum 2025" /></x-field>
-                    <div class="flex justify-end gap-3">
+                    <x-field label="Nama mata kuliah" name="name">
+                        <x-input name="name" :id="'course-name-'.($course?->id ?? 'new')" :value="$course?->name" placeholder="Contoh: Pemrograman Web" required />
+                    </x-field>
+                    <input type="hidden" name="curriculum" value="{{ $course?->curriculum }}">
+                    <p class="text-xs text-muted">Kode MK digunakan sebagai acuan unik jadwal perkuliahan dan penawaran kelas.</p>
+                    <div class="flex justify-end gap-3 pt-2 border-t border-border">
                         <x-button variant="secondary" x-on:click="$dispatch('close-modal', '{{ $course ? 'course-'.$course->id : 'course-new' }}')">Batal</x-button>
-                        <x-button type="submit">Simpan</x-button>
+                        <x-button type="submit">{{ $course ? 'Simpan Perubahan' : 'Tambah Mata Kuliah' }}</x-button>
                     </div>
                 </form>
             </x-modal>

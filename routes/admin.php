@@ -90,6 +90,7 @@ Route::put('/akademik/kelas/massal', [AcademicController::class, 'bulkUpdateClas
 Route::put('/akademik/kelas/{classGroup}', [AcademicController::class, 'updateClassGroup'])->name('academic.classes.update');
 Route::delete('/akademik/kelas/{classGroup}', [AcademicController::class, 'destroyClassGroup'])->name('academic.classes.destroy');
 Route::post('/akademik/penawaran', [AcademicController::class, 'storeOffering'])->name('academic.offerings.store');
+Route::post('/akademik/penawaran/batch-delete', [AcademicController::class, 'batchDeleteOfferings'])->name('academic.offerings.batch-delete');
 Route::delete('/akademik/penawaran/{offering}', [AcademicController::class, 'destroyOffering'])->name('academic.offerings.destroy');
 
 Route::get('/dosen', [LecturerController::class, 'index'])->name('lecturers.index');

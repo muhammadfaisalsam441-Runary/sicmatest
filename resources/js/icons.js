@@ -7,6 +7,7 @@ export {
     ArrowLeft,
     ArrowRight,
     Bell,
+    BookOpen,
     Building2,
     Calendar,
     CalendarDays,

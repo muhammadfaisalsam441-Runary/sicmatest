@@ -42,7 +42,29 @@ class AcademicController extends Controller
 
         $classGroups = $tab === 'kelas' ? ClassGroup::query()->withCount('scheduleSessions')->orderBy('cohort_year', 'desc')->orderBy('name')->get() : collect();
         $courses = $tab === 'mata-kuliah' ? Course::query()->withCount('offerings')->orderBy('code')->get() : collect();
-        $offerings = $tab === 'penawaran' && $period ? $period->courseOfferings()->with(['course', 'classGroup'])->get()->sortBy(['classGroup.name', 'course.name']) : collect();
+        $offerings = $tab === 'penawaran' && $period
+            ? $period->courseOfferings()
+                ->with(['course', 'classGroup', 'teachingAssignments.lecturer', 'scheduleSessions'])
+                ->get()
+                ->sortBy([
+                    ['classGroup.cohort_year', 'desc'],
+                    ['classGroup.name', 'asc'],
+                    ['course.name', 'asc'],
+                ])
+                ->values()
+            : collect();
+
+        $offeringStats = [
+            'total' => $offerings->count(),
+            'total_sks' => (int) $offerings->sum(fn ($o) => (int) ($o->course->sks ?? 0)),
+            'assigned' => $offerings->filter(fn ($o) => $o->teachingAssignments->isNotEmpty())->count(),
+            'unassigned' => $offerings->filter(fn ($o) => $o->teachingAssignments->isEmpty())->count(),
+            'scheduled' => $offerings->filter(fn ($o) => $o->scheduleSessions->isNotEmpty())->count(),
+        ];
+        $offeringPrograms = $offerings->pluck('classGroup.study_program')->filter()->unique()->sort()->values();
+        $offeringCohorts = $offerings->pluck('classGroup.cohort_year')->filter()->unique()->sortDesc()->values();
+        $offeringClasses = $offerings->pluck('classGroup')->unique('id')->sortBy('name')->values();
+        $offeringSksList = $offerings->pluck('course.sks')->filter()->unique()->sort()->values();
 
         $classStats = [
             'total' => $classGroups->count(),
@@ -72,6 +94,11 @@ class AcademicController extends Controller
             'classesPayload' => $classesPayload,
             'courses' => $courses,
             'offerings' => $offerings,
+            'offeringStats' => $offeringStats,
+            'offeringPrograms' => $offeringPrograms,
+            'offeringCohorts' => $offeringCohorts,
+            'offeringClasses' => $offeringClasses,
+            'offeringSksList' => $offeringSksList,
             'courseOptions' => Course::query()->orderBy('name')->get()->mapWithKeys(fn (Course $course) => [$course->id => "{$course->code} • {$course->name}"]),
             'classOptions' => ClassGroup::query()->where('is_active', true)->orderBy('name')->pluck('name', 'id'),
         ]);
@@ -320,5 +347,33 @@ class AcademicController extends Controller
         $offering->delete();
 
         return back()->with('toast', ['type' => 'success', 'title' => 'Penawaran kuliah dihapus']);
+    }
+
+    public function batchDeleteOfferings(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'offering_ids' => ['required', 'array', 'min:1'],
+            'offering_ids.*' => ['integer', 'exists:course_offerings,id'],
+        ]);
+
+        $ids = $validated['offering_ids'];
+        $withSessions = CourseOffering::query()->whereIn('id', $ids)->whereHas('scheduleSessions')->count();
+        if ($withSessions > 0) {
+            return back()->with('error', "{$withSessions} penawaran tidak dapat dihapus karena sudah memiliki sesi jadwal di draf.");
+        }
+
+        $offerings = CourseOffering::query()->whereIn('id', $ids)->get();
+        $count = $offerings->count();
+
+        foreach ($offerings as $offering) {
+            $this->audit->log('course_offering.deleted', $offering, $offering->only(['period_id', 'course_id', 'class_group_id']));
+            $offering->teachingAssignments()->delete();
+            $offering->delete();
+        }
+
+        return to_route('admin.academic.index', ['tab' => 'penawaran'])->with('toast', [
+            'type' => 'success',
+            'title' => "Berhasil menghapus {$count} penawaran kuliah",
+        ]);
     }
 }

@@ -668,3 +668,27 @@ test('admin dapat mengubah penugasan mengajar yang sudah ada dan mengganti penga
         ->assertOk()
         ->assertSee($offering->course->name);
 });
+
+test('admin mengelola penawaran kuliah dengan filter dan batch delete', function () {
+    $course1 = Course::factory()->create(['name' => 'Pemrograman Web Lanjut', 'sks' => 3]);
+    $course2 = Course::factory()->create(['name' => 'Kecerdasan Buatan', 'sks' => 3]);
+    $classGroup = ClassGroup::factory()->create(['name' => 'PTIK A 2024', 'study_program' => 'PTIK', 'cohort_year' => 2024]);
+
+    $offering1 = CourseOffering::factory()->for($this->period)->for($course1)->for($classGroup)->create();
+    $offering2 = CourseOffering::factory()->for($this->period)->for($course2)->for($classGroup)->create();
+
+    // Halaman penawaran dapat diakses dan menampilkan data
+    $this->actingAs($this->admin)
+        ->get(route('admin.academic.index', ['tab' => 'penawaran']))
+        ->assertOk()
+        ->assertSee('Pemrograman Web Lanjut')
+        ->assertSee('Kecerdasan Buatan')
+        ->assertSee('PTIK A 2024');
+
+    // Batch delete penawaran yang belum punya sesi
+    $this->post(route('admin.academic.offerings.batch-delete'), [
+        'offering_ids' => [$offering1->id, $offering2->id],
+    ])->assertRedirect(route('admin.academic.index', ['tab' => 'penawaran']));
+
+    expect(CourseOffering::query()->whereIn('id', [$offering1->id, $offering2->id])->count())->toBe(0);
+});

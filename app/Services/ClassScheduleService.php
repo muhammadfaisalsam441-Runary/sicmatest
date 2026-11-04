@@ -26,7 +26,7 @@ class ClassScheduleService
         $day = $date->toDateString();
 
         return ScheduleVersion::query()
-            ->official()
+            ->published()
             ->whereDate('effective_from', '<=', $day)
             ->where(fn (Builder $query) => $query->whereNull('effective_to')->orWhereDate('effective_to', '>=', $day))
             ->with('period.calendarExceptions')

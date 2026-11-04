@@ -33,7 +33,7 @@ class ScheduleBlockBuilder
     {
         $version->loadMissing(['period.calendarExceptions', 'sessions']);
 
-        $rows = $this->rowsFor($version);
+        $rows = $this->occurrences($version);
 
         DB::transaction(function () use ($version, $rows): void {
             RoomBlock::query()
@@ -50,9 +50,12 @@ class ScheduleBlockBuilder
     }
 
     /**
-     * @return list<array<string, mixed>>
+     * Kemunculan blok ruang per tanggal untuk versi ini (tanpa menyimpan). Dipakai juga ScheduleValidator
+     * untuk memeriksa bentrok draf dengan reservasi (B10).
+     *
+     * @return list<array{room_id: int, start_at: string, end_at: string, source_type: string, source_id: int, schedule_version_id: int, is_active: bool, created_at: string, updated_at: string}>
      */
-    private function rowsFor(ScheduleVersion $version): array
+    public function occurrences(ScheduleVersion $version): array
     {
         $period = $version->period;
 

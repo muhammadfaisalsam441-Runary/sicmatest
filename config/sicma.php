@@ -61,6 +61,8 @@ return [
             'mendalam' => 180,
         ],
         'fuzzy_enabled' => false, // BELUM DISAHKAN
+        // Kapasitas ruang kurang dari jumlah peserta: masalah wajib (true) atau peringatan (false). BELUM DITETAPKAN
+        'capacity_blocks_publish' => false,
         'python_bin' => env('SICMA_PYTHON', 'python3'),
     ],
 

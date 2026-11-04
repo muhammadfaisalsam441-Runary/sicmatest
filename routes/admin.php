@@ -1,12 +1,18 @@
 <?php
 
+use App\Http\Controllers\Admin\AcademicController;
 use App\Http\Controllers\Admin\ClosureController;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\DraftController;
+use App\Http\Controllers\Admin\ImportController;
 use App\Http\Controllers\Admin\KetiAccountController;
+use App\Http\Controllers\Admin\LecturerController;
 use App\Http\Controllers\Admin\NotificationController;
 use App\Http\Controllers\Admin\ProfileController;
 use App\Http\Controllers\Admin\ReservationController;
 use App\Http\Controllers\Admin\RoomController;
+use App\Http\Controllers\Admin\ScheduleController;
+use App\Http\Controllers\Admin\TeachingAssignmentController;
 use App\Http\Controllers\Admin\UsageLogController;
 use Illuminate\Support\Facades\Route;
 
@@ -49,3 +55,43 @@ Route::post('/notifikasi/{notification}/baca', [NotificationController::class, '
 Route::get('/profil', [ProfileController::class, 'show'])->name('profile');
 Route::put('/profil', [ProfileController::class, 'update'])->name('profile.update');
 Route::put('/profil/kata-sandi', [ProfileController::class, 'password'])->name('profile.password');
+
+Route::get('/jadwal', [ScheduleController::class, 'index'])->name('schedules.index');
+Route::get('/jadwal/templat', [ScheduleController::class, 'template'])->name('schedules.template');
+
+Route::get('/jadwal/impor', [ImportController::class, 'create'])->name('imports.create');
+Route::post('/jadwal/impor', [ImportController::class, 'store'])->middleware('throttle:10,1')->name('imports.store');
+Route::get('/jadwal/impor/{import}', [ImportController::class, 'show'])->name('imports.show');
+Route::post('/jadwal/impor/{import}/simpan', [ImportController::class, 'commit'])->name('imports.commit');
+
+Route::post('/draf', [DraftController::class, 'store'])->name('drafts.store');
+Route::get('/draf/{version}', [DraftController::class, 'show'])->name('drafts.show');
+Route::put('/draf/{version}/sesi/{session}', [DraftController::class, 'updateSession'])->scopeBindings()->name('drafts.sessions.update');
+Route::post('/draf/{version}/sesi/{session}/kunci', [DraftController::class, 'toggleLock'])->scopeBindings()->name('drafts.sessions.lock');
+Route::post('/draf/{version}/periksa', [DraftController::class, 'validateDraft'])->name('drafts.validate');
+Route::post('/draf/{version}/tetapkan', [DraftController::class, 'publish'])->can('publish-schedule')->name('drafts.publish');
+Route::get('/draf/{version}/berhasil', [DraftController::class, 'published'])->name('drafts.published');
+
+Route::get('/akademik', [AcademicController::class, 'index'])->name('academic.index');
+Route::put('/akademik/semester/{period}', [AcademicController::class, 'updatePeriod'])->name('academic.periods.update');
+Route::post('/akademik/semester/{period}/libur', [AcademicController::class, 'storeException'])->name('academic.exceptions.store');
+Route::delete('/akademik/libur/{exception}', [AcademicController::class, 'destroyException'])->name('academic.exceptions.destroy');
+Route::put('/akademik/semester/{period}/slot', [AcademicController::class, 'updateSlots'])->name('academic.slots.update');
+Route::post('/akademik/mata-kuliah', [AcademicController::class, 'storeCourse'])->name('academic.courses.store');
+Route::put('/akademik/mata-kuliah/{course}', [AcademicController::class, 'updateCourse'])->name('academic.courses.update');
+Route::delete('/akademik/mata-kuliah/{course}', [AcademicController::class, 'destroyCourse'])->name('academic.courses.destroy');
+Route::post('/akademik/kelas', [AcademicController::class, 'storeClassGroup'])->name('academic.classes.store');
+Route::put('/akademik/kelas/{classGroup}', [AcademicController::class, 'updateClassGroup'])->name('academic.classes.update');
+Route::delete('/akademik/kelas/{classGroup}', [AcademicController::class, 'destroyClassGroup'])->name('academic.classes.destroy');
+Route::post('/akademik/penawaran', [AcademicController::class, 'storeOffering'])->name('academic.offerings.store');
+Route::delete('/akademik/penawaran/{offering}', [AcademicController::class, 'destroyOffering'])->name('academic.offerings.destroy');
+
+Route::get('/dosen', [LecturerController::class, 'index'])->name('lecturers.index');
+Route::post('/dosen', [LecturerController::class, 'store'])->name('lecturers.store');
+Route::put('/dosen/{lecturer}', [LecturerController::class, 'update'])->name('lecturers.update');
+Route::post('/dosen/impor', [LecturerController::class, 'import'])->name('lecturers.import');
+
+Route::get('/pembagian-mengajar', [TeachingAssignmentController::class, 'index'])->name('teaching.index');
+Route::post('/pembagian-mengajar', [TeachingAssignmentController::class, 'store'])->name('teaching.store');
+Route::post('/pembagian-mengajar/{assignment}/kunci', [TeachingAssignmentController::class, 'toggleLock'])->name('teaching.lock');
+Route::delete('/pembagian-mengajar/{assignment}', [TeachingAssignmentController::class, 'destroy'])->name('teaching.destroy');

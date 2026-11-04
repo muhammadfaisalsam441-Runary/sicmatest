@@ -30,6 +30,7 @@ export {
     LayoutGrid,
     Loader,
     Lock,
+    LockOpen,
     LogOut,
     Mail,
     MapPin,

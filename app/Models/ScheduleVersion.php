@@ -104,4 +104,14 @@ class ScheduleVersion extends Model
     {
         return $query->where('status', ScheduleVersionStatus::Official);
     }
+
+    /**
+     * Versi yang pernah ditetapkan (resmi atau digantikan). Versi digantikan tetap berlaku sampai effective_to,
+     * dan blok ruangnya sesudah tanggal itu sudah dinonaktifkan saat penetapan versi baru.
+     */
+    #[Scope]
+    protected function published(Builder $query): Builder
+    {
+        return $query->whereIn('status', [ScheduleVersionStatus::Official, ScheduleVersionStatus::Superseded]);
+    }
 }

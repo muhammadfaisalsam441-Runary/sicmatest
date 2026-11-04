@@ -152,7 +152,7 @@ class AvailabilityService
             ->overlapping($from, $until)
             ->where(fn (Builder $query) => $query
                 ->where('source_type', '!=', RoomBlockSource::Schedule)
-                ->orWhereIn('schedule_version_id', ScheduleVersion::query()->official()->select('id')))
+                ->orWhereIn('schedule_version_id', ScheduleVersion::query()->published()->select('id')))
             ->orderBy('start_at')
             ->when($lock, fn (Builder $query) => $query->sharedLock())
             ->get()
@@ -301,7 +301,7 @@ class AvailabilityService
         }
 
         return $period->scheduleVersions()
-            ->official()
+            ->published()
             ->whereDate('effective_from', '<=', $day)
             ->where(fn (Builder $query) => $query->whereNull('effective_to')->orWhereDate('effective_to', '>=', $day))
             ->exists();

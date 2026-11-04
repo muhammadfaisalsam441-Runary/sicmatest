@@ -94,6 +94,14 @@ class ReservationService
                     ['reservation_id' => $reservation->id],
                 );
 
+                $this->notifications->notify(
+                    $this->notifications->admins(),
+                    'reservation.booked',
+                    "Reservasi baru: {$lockedRoom->name}",
+                    "{$classGroup->name} memesan {$lockedRoom->name} pada ".Wita::date($start).', '.Wita::range($start, $end)." untuk {$purpose}.",
+                    ['reservation_id' => $reservation->id],
+                );
+
                 return $reservation;
             }, attempts: 3);
         } catch (UniqueConstraintViolationException) {
@@ -186,6 +194,14 @@ class ReservationService
                 ['reservation_id' => $reservation->id],
             );
 
+            $this->notifications->notify(
+                $this->notifications->admins(),
+                'reservation.finished',
+                'Penggunaan '.$reservation->room->name.' selesai',
+                $reservation->creator->name.' ('.$reservation->classGroup->name.') menyelesaikan penggunaan '.$reservation->room->name.' pukul '.Wita::clock($now).'.',
+                ['reservation_id' => $reservation->id],
+            );
+
             return $reservation;
         });
     }
@@ -229,6 +245,14 @@ class ReservationService
                     'reservation.cancelled',
                     'Reservasi dibatalkan admin',
                     $reservation->room->name.' '.Wita::date($reservation->start_at).' '.Wita::range($reservation->start_at, $reservation->end_at).' dibatalkan. Alasan: '.$reason,
+                    ['reservation_id' => $reservation->id],
+                );
+            } else {
+                $this->notifications->notify(
+                    $this->notifications->admins(),
+                    'reservation.cancelled',
+                    'Reservasi dibatalkan: '.$reservation->room->name,
+                    $reservation->classGroup->name.' membatalkan reservasi '.Wita::date($reservation->start_at).', '.Wita::range($reservation->start_at, $reservation->end_at).'.',
                     ['reservation_id' => $reservation->id],
                 );
             }

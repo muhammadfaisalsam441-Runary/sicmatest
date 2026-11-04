@@ -33,6 +33,19 @@
             <x-stat-card label="Digunakan sekarang" :value="$summary['busy']" tone="danger" hint="Sedang digunakan pada data simulasi" />
         </div>
 
+        @if ($notStarted->isNotEmpty() || $overrunning->isNotEmpty())
+            <x-card class="flex flex-col gap-3 border-danger/40">
+                <h2 class="text-lg font-semibold text-danger">Perlu perhatian</h2>
+                @foreach ($notStarted as $reservation)
+                    <p class="text-sm"><span class="font-semibold">{{ $reservation->room->name }}</span> • {{ $reservation->classGroup->name }} belum menekan Mulai gunakan ({{ Wita::range($reservation->start_at, $reservation->end_at) }}). Status tidak diubah otomatis.</p>
+                @endforeach
+                @foreach ($overrunning as $reservation)
+                    <p class="text-sm"><span class="font-semibold">{{ $reservation->room->name }}</span> • {{ $reservation->classGroup->name }} masih menggunakan ruang melewati batas {{ Wita::clock($reservation->end_at) }}.</p>
+                @endforeach
+                <a href="{{ route('admin.reservations.index', ['status' => 'akan-datang']) }}" class="text-sm font-semibold text-primary hover:underline">Buka Riwayat Reservasi</a>
+            </x-card>
+        @endif
+
         <x-card class="flex flex-col gap-5">
             <div class="flex items-center justify-between">
                 <h2 class="text-xl font-semibold">Penyusunan jadwal {{ $period?->name ?? 'semester aktif' }}</h2>

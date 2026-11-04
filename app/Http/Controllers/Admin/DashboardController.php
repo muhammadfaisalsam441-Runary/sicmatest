@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Reservation;
 use App\Services\AdminDashboardService;
 use App\Services\AvailabilityService;
+use App\Services\OverdueReservationService;
 use Illuminate\View\View;
 
 /**
@@ -13,7 +14,7 @@ use Illuminate\View\View;
  */
 class DashboardController extends Controller
 {
-    public function __invoke(AvailabilityService $availability, AdminDashboardService $dashboard): View
+    public function __invoke(AvailabilityService $availability, AdminDashboardService $dashboard, OverdueReservationService $overdue): View
     {
         $now = now();
 
@@ -22,6 +23,8 @@ class DashboardController extends Controller
             'summary' => $availability->summary($now),
             'progress' => $dashboard->scheduleProgress(),
             'roomStatuses' => $dashboard->roomStatuses($now),
+            'notStarted' => $overdue->notStarted(),
+            'overrunning' => $overdue->overrunning(),
             'latestReservations' => Reservation::query()
                 ->with(['room', 'classGroup'])
                 ->latest()

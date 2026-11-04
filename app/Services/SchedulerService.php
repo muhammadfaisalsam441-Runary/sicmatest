@@ -410,6 +410,7 @@ class SchedulerService
     {
         $job->forceFill(['status' => OptimizationJobStatus::Failed, 'finished_at' => now(), 'result' => ['message' => $message]])->save();
         $this->audit->log('optimization.failed', $job, null, ['message' => $message]);
+        $this->notifications->notify($job->creator, 'optimization.failed', 'Penyusunan jadwal gagal dijalankan', $message, ['optimization_job_id' => $job->id]);
 
         return $job;
     }

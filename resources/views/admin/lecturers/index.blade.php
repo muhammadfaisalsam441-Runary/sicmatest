@@ -291,10 +291,21 @@
                 </table>
             </div>
 
-            {{-- Pagination Footer Menggunakan Template Kustom Baru --}}
-            @if ($lecturers->hasPages())
+            {{-- Pagination & Data Summary Footer --}}
+            @if ($lecturers->total() > 0)
                 <div class="border-t border-border bg-page/50 px-4 py-3">
-                    {{ $lecturers->links() }}
+                    @if ($lecturers->hasPages())
+                        {{ $lecturers->links() }}
+                    @else
+                        <div class="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted py-1">
+                            <div>
+                                Menampilkan <span class="font-semibold text-ink">1</span> sampai <span class="font-semibold text-ink">{{ $lecturers->total() }}</span> dari <span class="font-semibold text-ink">{{ number_format($lecturers->total()) }}</span> data dosen
+                            </div>
+                            <span class="inline-flex items-center justify-center min-w-[32px] h-7 px-2.5 rounded-control border border-border bg-surface text-ink text-xs font-semibold">
+                                Halaman 1 dari 1
+                            </span>
+                        </div>
+                    @endif
                 </div>
             @endif
         </div>

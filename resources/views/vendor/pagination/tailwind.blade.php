@@ -5,11 +5,11 @@
             @if ($paginator->firstItem())
                 Menampilkan <span class="font-semibold text-ink">{{ $paginator->firstItem() }}</span>
                 sampai <span class="font-semibold text-ink">{{ $paginator->lastItem() }}</span>
-                dari <span class="font-semibold text-ink">{{ number_format($paginator->total()) }}</span> penawaran
+                dari <span class="font-semibold text-ink">{{ number_format($paginator->total()) }}</span> data
                 <span class="text-muted/60">•</span>
                 Halaman <span class="font-semibold text-primary">{{ $paginator->currentPage() }}</span> dari <span class="font-semibold text-ink">{{ $paginator->lastPage() }}</span>
             @else
-                Total <span class="font-semibold text-ink">{{ number_format($paginator->total()) }}</span> penawaran
+                Total <span class="font-semibold text-ink">{{ number_format($paginator->total()) }}</span> data
             @endif
         </div>
 

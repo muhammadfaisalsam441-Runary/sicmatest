@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { canBackgroundRefresh, captureFields, restoreFields, hasFormChanges, isEditingField, navigationState, registerStatusPolling } from '../../resources/js/navigation.js';
+import { canBackgroundRefresh, captureFields, restoreFields, hasFormChanges, isEditingField, navigationState, formActionUrl, registerStatusPolling } from '../../resources/js/navigation.js';
 
 function input(name, value = '', extra = {}) {
     return { tagName: 'INPUT', type: 'text', name, value, defaultValue: value, ...extra };
@@ -12,6 +12,19 @@ function select(name, options, multiple = false) {
         options: options.map(([value, selected = false, defaultSelected = selected]) => ({ value, selected, defaultSelected })),
     };
 }
+
+test('field action pada formulir massal tidak menggantikan URL pengiriman', () => {
+    const page = 'https://sicma.test/admin/dosen';
+    const form = {
+        action: input('action', 'set_target_sks', { type: 'hidden' }),
+        getAttribute: (name) => name === 'action' ? '/admin/dosen/batch' : null,
+        ownerDocument: { URL: page, baseURI: page },
+    };
+
+    assert.equal(formActionUrl(form).href, 'https://sicma.test/admin/dosen/batch');
+    assert.equal(formActionUrl(form, { getAttribute: () => '/admin/dosen/preview' }).href, 'https://sicma.test/admin/dosen/preview');
+    assert.equal(formActionUrl(form, { getAttribute: () => '' }).href, page);
+});
 
 test('isian edit dipulihkan tanpa menimpa token, password, dan field milik server', () => {
     const original = { elements: [

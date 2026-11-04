@@ -69,6 +69,11 @@ export function navigationState(currentUrl, targetUrl, options, previous, stored
     return { state, point: options.scroll || state?.scroll || [0, 0] };
 }
 
+export function formActionUrl(form, submitter) {
+    const action = submitter?.getAttribute('formaction') ?? form.getAttribute('action');
+    return new URL(action || form.ownerDocument.URL, form.ownerDocument.baseURI);
+}
+
 export function installPortalNavigation(Alpine, renderIcons) {
     if (!document.body.dataset.portal) return null;
 
@@ -80,8 +85,9 @@ export function installPortalNavigation(Alpine, renderIcons) {
     history.scrollRestoration = 'manual';
 
     function formKey(form) {
-        const peers = Array.from(document.forms).filter((other) => other.action === form.action && other.method === form.method);
-        return [form.action, form.querySelector('[name="_method"]')?.value || form.method,
+        const action = formActionUrl(form).href;
+        const peers = Array.from(document.forms).filter((other) => formActionUrl(other).href === action && other.method === form.method);
+        return [action, form.querySelector('[name="_method"]')?.value || form.method,
             form.closest('[data-modal-name]')?.dataset.modalName || form.id || peers.indexOf(form)].join('|');
     }
 
@@ -403,7 +409,7 @@ export function installPortalNavigation(Alpine, renderIcons) {
             || (form.target && form.target !== '_self') || form.method === 'dialog') return;
         const submitter = event.submitter;
         const method = (submitter?.getAttribute('formmethod') || form.method || 'GET').toUpperCase();
-        const url = new URL(submitter?.getAttribute('formaction') || form.action, location.href);
+        const url = formActionUrl(form, submitter);
         if (url.origin !== location.origin || !['GET', 'POST'].includes(method)) return;
         event.preventDefault();
         if (request !== null && !request.silent) return;

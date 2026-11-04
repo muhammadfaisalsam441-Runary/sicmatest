@@ -31,6 +31,7 @@ Route::get('/', DashboardController::class)->name('dashboard');
 
 Route::get('/ruang', [RoomController::class, 'index'])->name('rooms.index');
 Route::post('/ruang', [RoomController::class, 'store'])->name('rooms.store');
+Route::post('/ruang/batch', [RoomController::class, 'batchUpdate'])->name('rooms.batch');
 Route::put('/ruang/{room}', [RoomController::class, 'update'])->name('rooms.update');
 Route::delete('/ruang/{room}', [RoomController::class, 'destroy'])->name('rooms.destroy');
 

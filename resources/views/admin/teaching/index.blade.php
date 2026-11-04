@@ -10,7 +10,7 @@
 @endsection
 
 @section('content')
-    <div class="flex flex-col gap-6" x-data="teachingManager()">
+    <div class="flex flex-col gap-6" x-data="teachingManager(@js($offerings->pluck('id')->all()), @js($lecturerOptionsByOffering))">
         <x-page-header title="Pembagian mengajar dan beban SKS" subtitle="Bagi mata kuliah ke dosen yang layak. Tampilan matriks memudahkan pengelolaan massal ratusan kelas layaknya spreadsheet." />
 
         <x-card>
@@ -296,10 +296,21 @@
                 </table>
             </div>
 
-            {{-- Pagination Footer --}}
-            @if ($offerings->hasPages())
+            {{-- Pagination & Data Summary Footer --}}
+            @if ($offerings->total() > 0)
                 <div class="border-t border-border bg-page/50 px-4 py-3">
-                    {{ $offerings->links() }}
+                    @if ($offerings->hasPages())
+                        {{ $offerings->links() }}
+                    @else
+                        <div class="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted py-1">
+                            <div>
+                                Menampilkan <span class="font-semibold text-ink">1</span> sampai <span class="font-semibold text-ink">{{ $offerings->total() }}</span> dari <span class="font-semibold text-ink">{{ number_format($offerings->total()) }}</span> kelas penawaran
+                            </div>
+                            <span class="inline-flex items-center justify-center min-w-[32px] h-7 px-2.5 rounded-control border border-border bg-surface text-ink text-xs font-semibold">
+                                Halaman 1 dari 1
+                            </span>
+                        </div>
+                    @endif
                 </div>
             @endif
         </div>
@@ -353,15 +364,13 @@
 
                     <div>
                         <label class="mb-1 block text-xs font-medium text-muted">Pilih Dosen Pengajar <span class="text-danger">*</span></label>
-                        <select name="lecturer_id" required class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
-                            <option value="">-- Pilih Dosen Terverifikasi --</option>
-                            @foreach ($lecturerOptionsEnriched as $lec)
-                                <option value="{{ $lec['id'] }}">
-                                    {{ $lec['name'] }} — [{{ $lec['sks_info'] }} • {{ $lec['status'] }}]
-                                </option>
-                            @endforeach
+                        <select name="lecturer_id" x-model="quickLecturerId" required :disabled="quickLecturers.length === 0" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
+                            <option value="">-- Pilih Dosen Mata Kuliah Ini --</option>
+                            <template x-for="lecturer in quickLecturers" :key="lecturer.id">
+                                <option :value="lecturer.id" x-text="`${lecturer.name} — ${lecturer.sks_info} • ${lecturer.verified ? lecturer.status : 'Perlu verifikasi'}`"></option>
+                            </template>
                         </select>
-                        <p class="mt-1 text-[11px] text-muted">Informasi beban SKS dosen diperbarui secara real-time.</p>
+                        <p class="mt-1 text-[11px] text-muted" x-show="quickLecturers.length === 0">Belum ada dosen aktif yang tercatat mengajar mata kuliah ini pada semester tersebut.</p>
                     </div>
 
                     <div class="grid grid-cols-2 gap-3">
@@ -390,7 +399,7 @@
 
                     <div class="mt-2 flex items-center justify-end gap-2 border-t border-border pt-4">
                         <x-button variant="secondary" type="button" @click="quickModalOpen = false">Batal</x-button>
-                        <x-button variant="primary" type="submit" icon="check">Simpan Penugasan</x-button>
+                        <x-button variant="primary" type="submit" icon="check" x-bind:disabled="quickLecturers.length === 0">Simpan Penugasan</x-button>
                     </div>
                 </form>
             </div>
@@ -528,52 +537,4 @@
         </div>
     </div>
 
-    <script>
-        function teachingManager() {
-            const pageOfferingIds = @js($offerings->pluck('id')->all());
-
-            return {
-                selectedIds: [],
-                quickModalOpen: false,
-                batchModalOpen: false,
-                rekapModalOpen: false,
-                lecturerSearch: '',
-                activeOffering: {
-                    id: null,
-                    course: '',
-                    classGroup: '',
-                    role: 'lead'
-                },
-
-                isAllSelected() {
-                    return pageOfferingIds.length > 0 && pageOfferingIds.every(id => this.selectedIds.includes(id));
-                },
-
-                toggleSelectAll(checked) {
-                    if (checked) {
-                        pageOfferingIds.forEach(id => {
-                            if (!this.selectedIds.includes(id)) {
-                                this.selectedIds.push(id);
-                            }
-                        });
-                    } else {
-                        this.selectedIds = this.selectedIds.filter(id => !pageOfferingIds.includes(id));
-                    }
-                },
-
-                openQuickAssign(id, courseName, className, role) {
-                    this.activeOffering = {
-                        id: id,
-                        course: courseName,
-                        classGroup: className,
-                        role: role || 'lead'
-                    };
-                    this.quickModalOpen = true;
-                    this.$nextTick(() => {
-                        if (window.renderIcons) window.renderIcons();
-                    });
-                }
-            };
-        }
-    </script>
 @endsection

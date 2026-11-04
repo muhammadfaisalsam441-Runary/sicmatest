@@ -3,6 +3,7 @@
 use App\Enums\KetiApplicationStatus;
 use App\Enums\ReservationStatus;
 use App\Enums\RoomBlockSource;
+use App\Enums\RoomType;
 use App\Models\AppNotification;
 use App\Models\AuditLog;
 use App\Models\ClassGroup;
@@ -119,6 +120,38 @@ test('ruang yang tidak dipakai dihapus secara soft delete', function () {
 
     expect($room->fresh()->trashed())->toBeTrue()
         ->and(AuditLog::query()->where('action', 'room.deleted')->exists())->toBeTrue();
+});
+
+test('admin dapat melakukan aksi massal ubah gedung, jenis ruang, dan tambah fasilitas', function () {
+    $room1 = Room::factory()->create(['name' => 'R1', 'building_id' => null, 'type' => RoomType::Classroom]);
+    $room2 = Room::factory()->create(['name' => 'R2', 'building_id' => null, 'type' => RoomType::Classroom]);
+
+    $this->actingAs($this->admin)->post(route('admin.rooms.batch'), [
+        'action' => 'set_building',
+        'room_ids' => [$room1->id, $room2->id],
+        'building' => 'Pinisi',
+    ])->assertRedirect();
+
+    expect($room1->fresh()->building->name)->toBe('Pinisi')
+        ->and($room2->fresh()->building->name)->toBe('Pinisi');
+
+    $this->post(route('admin.rooms.batch'), [
+        'action' => 'set_type',
+        'room_ids' => [$room1->id, $room2->id],
+        'type' => 'lab',
+    ])->assertRedirect();
+
+    expect($room1->fresh()->type)->toBe(RoomType::Lab)
+        ->and($room2->fresh()->type)->toBe(RoomType::Lab);
+
+    $this->post(route('admin.rooms.batch'), [
+        'action' => 'add_facilities',
+        'room_ids' => [$room1->id, $room2->id],
+        'facilities' => 'Proyektor, AC',
+    ])->assertRedirect();
+
+    expect($room1->fresh()->facilities->pluck('name')->all())->toContain('Proyektor', 'AC')
+        ->and($room2->fresh()->facilities->pluck('name')->all())->toContain('Proyektor', 'AC');
 });
 
 test('penutupan ruang yang berdampak meminta konfirmasi dan tidak membatalkan reservasi', function () {

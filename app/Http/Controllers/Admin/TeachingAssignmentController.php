@@ -80,14 +80,13 @@ class TeachingAssignmentController extends Controller
         $allLoads = $period ? $loads->summary($period) : collect();
 
         $lecturers = Lecturer::query()
-            ->where('profile_status', LecturerProfileStatus::Verified)
             ->where('is_active', true)
             ->orderBy('name')
             ->get();
 
         $loadsByLecturerId = $allLoads->keyBy(fn ($item) => $item['lecturer']->id);
 
-        $lecturerOptionsEnriched = $lecturers->map(function ($lecturer) use ($loadsByLecturerId) {
+        $lecturerOptionsById = $lecturers->mapWithKeys(function (Lecturer $lecturer) use ($loadsByLecturerId): array {
             $load = $loadsByLecturerId->get($lecturer->id);
             $assigned = $load['assigned'] ?? 0.0;
             $max = $load['max'] ?? null;
@@ -97,7 +96,7 @@ class TeachingAssignmentController extends Controller
 
             $sksInfo = $max !== null ? "{$assigned}/{$max} SKS" : "{$assigned} SKS";
 
-            return [
+            return [$lecturer->id => [
                 'id' => $lecturer->id,
                 'name' => $lecturer->name,
                 'sks_info' => $sksInfo,
@@ -106,7 +105,24 @@ class TeachingAssignmentController extends Controller
                 'max' => $max,
                 'status' => $status,
                 'tone' => $tone,
-            ];
+                'verified' => $lecturer->profile_status === LecturerProfileStatus::Verified,
+            ]];
+        });
+        $lecturerOptionsEnriched = $lecturerOptionsById->where('verified', true)->values();
+
+        $instructorsByCourseAndPeriod = TeachingAssignment::query()
+            ->join('course_offerings', 'course_offerings.id', '=', 'teaching_assignments.course_offering_id')
+            ->whereIn('course_offerings.course_id', $offerings->pluck('course_id')->unique())
+            ->whereIn('course_offerings.period_id', $offerings->pluck('period_id')->unique())
+            ->select('course_offerings.course_id', 'course_offerings.period_id', 'teaching_assignments.lecturer_id')
+            ->distinct()
+            ->get()
+            ->groupBy(fn (TeachingAssignment $assignment): string => $assignment->period_id.':'.$assignment->course_id);
+
+        $lecturerOptionsByOffering = $offerings->getCollection()->mapWithKeys(function (CourseOffering $offering) use ($instructorsByCourseAndPeriod, $lecturerOptionsById): array {
+            $instructorIds = $instructorsByCourseAndPeriod->get($offering->period_id.':'.$offering->course_id, collect())->pluck('lecturer_id');
+
+            return [$offering->id => $lecturerOptionsById->only($instructorIds->all())->values()->all()];
         });
 
         $studyPrograms = ClassGroup::query()->whereNotNull('study_program')->distinct()->orderBy('study_program')->pluck('study_program');
@@ -130,8 +146,8 @@ class TeachingAssignmentController extends Controller
             'prodi' => $prodi,
             'perPage' => $perPage,
             'studyPrograms' => $studyPrograms,
-            'lecturerOptions' => $lecturers->pluck('name', 'id'),
             'lecturerOptionsEnriched' => $lecturerOptionsEnriched,
+            'lecturerOptionsByOffering' => $lecturerOptionsByOffering,
         ]);
     }
 

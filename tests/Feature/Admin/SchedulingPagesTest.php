@@ -242,6 +242,27 @@ test('admin dapat melakukan aksi massal verifikasi, set homebase, dan target sks
         ->and((float) $dosen2->loadTargets()->where('period_id', $this->period->id)->value('max_sks'))->toBe(16.0);
 });
 
+test('dropdown penugasan menampilkan pengajar aktif dari mata kuliah dan semester yang sama', function () {
+    $offering = CourseOffering::factory()->for($this->period)->create();
+    $parallel = CourseOffering::factory()->for($this->period)->for($offering->course)->create();
+    $otherCourse = CourseOffering::factory()->for($this->period)->create();
+    $past = Period::factory()->create(['is_active' => false]);
+    $pastOffering = CourseOffering::factory()->for($past)->for($offering->course)->create();
+    $sourceLecturer = Lecturer::factory()->unverified()->create();
+    $inactive = Lecturer::factory()->create(['is_active' => false]);
+
+    TeachingAssignment::factory()->for($parallel, 'courseOffering')->for($sourceLecturer)->create();
+    TeachingAssignment::factory()->for($parallel, 'courseOffering')->for($inactive)->create();
+    TeachingAssignment::factory()->for($otherCourse, 'courseOffering')->create();
+    TeachingAssignment::factory()->for($pastOffering, 'courseOffering')->create();
+
+    $response = $this->actingAs($this->admin)->get(route('admin.teaching.index'))->assertOk();
+    $options = collect($response->viewData('lecturerOptionsByOffering')->get($offering->id));
+
+    expect($options->pluck('id')->all())->toBe([$sourceLecturer->id])
+        ->and($options->sole()['verified'])->toBeFalse();
+});
+
 test('rekap beban tidak memberi SKS penuh ke setiap anggota tim', function () {
     $offering = CourseOffering::factory()->for($this->period)->create();
     $offering->course->update(['sks' => 3]);

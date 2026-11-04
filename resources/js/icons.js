@@ -8,6 +8,7 @@ export {
     Bell,
     Building2,
     Calendar,
+    CalendarX,
     CalendarDays,
     ChartNoAxesColumn,
     Check,

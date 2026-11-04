@@ -84,6 +84,9 @@
                 </div>
 
                 <main class="flex-1 px-10 py-6">
+                    @if (session('error'))
+                        <x-alert variant="danger" class="mb-6">{{ session('error') }}</x-alert>
+                    @endif
                     @yield('content')
                 </main>
             </div>

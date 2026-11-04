@@ -18,7 +18,7 @@ enum RoomType: string
     public function label(): string
     {
         return match ($this) {
-            self::Classroom => 'Ruang kelas',
+            self::Classroom => 'Ruang kuliah',
             self::Lab => 'Laboratorium',
             self::Workshop => 'Bengkel',
             self::Other => 'Lainnya',

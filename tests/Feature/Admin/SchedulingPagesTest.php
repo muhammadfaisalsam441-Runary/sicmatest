@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\LecturerHomebase;
 use App\Enums\LecturerProfileStatus;
 use App\Enums\ScheduleVersionStatus;
 use App\Enums\SessionMode;
@@ -208,6 +209,37 @@ test('impor dosen dari CSV memperbarui nama yang ada dan menandai yang tanpa NID
 
     expect(Lecturer::query()->where('nidn', '0912345678')->value('profile_status'))->toBe(LecturerProfileStatus::Verified)
         ->and(Lecturer::query()->where('name', 'Ibu Baru')->value('profile_status'))->toBe(LecturerProfileStatus::Unverified);
+});
+
+test('admin dapat melakukan aksi massal verifikasi, set homebase, dan target sks dosen', function () {
+    $dosen1 = Lecturer::factory()->unverified()->create(['homebase' => null]);
+    $dosen2 = Lecturer::factory()->unverified()->create(['homebase' => null]);
+
+    $this->actingAs($this->admin)->post(route('admin.lecturers.batch'), [
+        'action' => 'verify',
+        'lecturer_ids' => [$dosen1->id, $dosen2->id],
+    ])->assertRedirect();
+
+    expect($dosen1->fresh()->profile_status)->toBe(LecturerProfileStatus::Verified)
+        ->and($dosen2->fresh()->profile_status)->toBe(LecturerProfileStatus::Verified);
+
+    $this->post(route('admin.lecturers.batch'), [
+        'action' => 'homebase_jtik',
+        'lecturer_ids' => [$dosen1->id, $dosen2->id],
+    ])->assertRedirect();
+
+    expect($dosen1->fresh()->homebase)->toBe(LecturerHomebase::Jtik)
+        ->and($dosen2->fresh()->homebase)->toBe(LecturerHomebase::Jtik);
+
+    $this->post(route('admin.lecturers.batch'), [
+        'action' => 'set_target_sks',
+        'lecturer_ids' => [$dosen1->id, $dosen2->id],
+        'target_sks' => 12,
+        'max_sks' => 16,
+    ])->assertRedirect();
+
+    expect((float) $dosen1->loadTargets()->where('period_id', $this->period->id)->value('target_sks'))->toBe(12.0)
+        ->and((float) $dosen2->loadTargets()->where('period_id', $this->period->id)->value('max_sks'))->toBe(16.0);
 });
 
 test('rekap beban tidak memberi SKS penuh ke setiap anggota tim', function () {

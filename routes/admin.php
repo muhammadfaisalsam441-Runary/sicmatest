@@ -89,6 +89,7 @@ Route::delete('/akademik/penawaran/{offering}', [AcademicController::class, 'des
 
 Route::get('/dosen', [LecturerController::class, 'index'])->name('lecturers.index');
 Route::post('/dosen', [LecturerController::class, 'store'])->name('lecturers.store');
+Route::post('/dosen/batch', [LecturerController::class, 'batchUpdate'])->name('lecturers.batch');
 Route::put('/dosen/{lecturer}', [LecturerController::class, 'update'])->name('lecturers.update');
 Route::post('/dosen/impor', [LecturerController::class, 'import'])->name('lecturers.import');
 

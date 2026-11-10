@@ -4,6 +4,7 @@ namespace App\Services\Room;
 
 use App\Enums\ReservationStatus;
 use App\Enums\RoomType;
+use App\Enums\ScheduleVersionStatus;
 use App\Exceptions\DomainException;
 use App\Models\Room\Building;
 use App\Models\Room\Facility;
@@ -11,6 +12,7 @@ use App\Models\Room\Room;
 use App\Models\Scheduling\ScheduleSession;
 use App\Services\Account\AuditLogger;
 use App\Support\AvailabilityCache;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -61,6 +63,51 @@ class RoomService
     }
 
     /**
+     * Aksi massal Kelola Ruang. Dijalankan dalam satu transaksi dan setiap ruang yang berubah dicatat di audit log (B17).
+     *
+     * @param  list<int>  $roomIds
+     * @param  array{building?: string|null, type?: string|null, facilities?: string|null, capacity?: int|null}  $data
+     * @return int Jumlah ruang yang diproses
+     */
+    public function batchUpdate(array $roomIds, string $action, array $data): int
+    {
+        return DB::transaction(function () use ($roomIds, $action, $data): int {
+            $rooms = Room::query()->whereIn('id', $roomIds)->with('facilities')->lockForUpdate()->get();
+            $facilityIds = [];
+
+            if ($action === 'add_facilities') {
+                $facilityIds = collect(explode(',', (string) ($data['facilities'] ?? '')))
+                    ->map(fn (string $name): string => Str::of($name)->squish()->ucfirst()->toString())
+                    ->filter()
+                    ->unique()
+                    ->map(fn (string $name): int => Facility::query()->firstOrCreate(['name' => $name])->id)
+                    ->all();
+            }
+
+            $buildingId = $action === 'set_building' ? $this->buildingId(trim((string) ($data['building'] ?? '')) ?: null) : null;
+
+            foreach ($rooms as $room) {
+                $before = $room->only(['building_id', 'type', 'capacity']) + ['facilities' => $room->facilities->pluck('name')->sort()->values()->all()];
+
+                match ($action) {
+                    'set_building' => $room->forceFill(['building_id' => $buildingId])->save(),
+                    'set_type' => $room->forceFill(['type' => RoomType::from((string) $data['type'])])->save(),
+                    'set_capacity' => $room->forceFill(['capacity' => (int) $data['capacity']])->save(),
+                    'add_facilities' => $room->facilities()->syncWithoutDetaching($facilityIds),
+                };
+
+                $room->load('facilities');
+                $after = $room->only(['building_id', 'type', 'capacity']) + ['facilities' => $room->facilities->pluck('name')->sort()->values()->all()];
+                $this->audit->log('room.batch_'.$action, $room, $before, $after);
+            }
+
+            AvailabilityCache::bust();
+
+            return $rooms->count();
+        });
+    }
+
+    /**
      * Hapus ruang (soft delete). Ditolak bila masih dipakai reservasi aktif atau jadwal resmi,
      * agar reservasi dan jadwal tidak hilang diam-diam (B10).
      *
@@ -77,13 +124,26 @@ class RoomService
             throw new DomainException('ROOM_IN_USE', "{$room->name} masih punya {$activeReservations} reservasi aktif. Batalkan reservasinya dulu dengan alasan.");
         }
 
-        $officialSessions = ScheduleSession::query()
+        // Jadwal resmi, jadwal lama yang masih berlaku sampai effective_to, dan draf yang belum ditetapkan.
+        $sessions = ScheduleSession::query()
             ->whereBelongsTo($room)
-            ->whereHas('version', fn ($query) => $query->official())
-            ->count();
+            ->whereHas('version', fn (Builder $query) => $query->where(fn (Builder $query) => $query
+                ->where('status', ScheduleVersionStatus::Official)
+                ->orWhere(fn (Builder $query) => $query->where('status', ScheduleVersionStatus::Superseded)
+                    ->where(fn (Builder $query) => $query->whereNull('effective_to')->orWhereDate('effective_to', '>=', now()->toDateString())))
+                ->orWhereIn('status', [ScheduleVersionStatus::Draft, ScheduleVersionStatus::Ready])))
+            ->with('version:id,version_no,status')
+            ->get(['id', 'schedule_version_id']);
 
-        if ($officialSessions > 0) {
-            throw new DomainException('ROOM_IN_USE', "{$room->name} dipakai {$officialSessions} sesi jadwal resmi. Pindahkan sesinya lewat draf jadwal lalu tetapkan sebelum menghapus ruang.");
+        if ($sessions->isNotEmpty()) {
+            $versions = $sessions->pluck('version')->unique('id')->sortBy('version_no')
+                ->map(fn ($version): string => match ($version->status) {
+                    ScheduleVersionStatus::Official => "jadwal resmi v{$version->version_no}",
+                    ScheduleVersionStatus::Superseded => "jadwal v{$version->version_no} (masih berlaku)",
+                    default => "draf v{$version->version_no}",
+                })->implode(', ');
+
+            throw new DomainException('ROOM_IN_USE', "{$room->name} masih dipakai {$sessions->count()} sesi di {$versions}. Pindahkan sesinya lebih dulu sebelum menghapus ruang.");
         }
 
         DB::transaction(function () use ($room, $reason): void {

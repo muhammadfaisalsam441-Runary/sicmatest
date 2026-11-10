@@ -4,19 +4,16 @@ namespace App\Http\Controllers\Admin;
 
 use App\Enums\RoomType;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\BatchRoomRequest;
 use App\Http\Requests\Admin\RoomRequest;
 use App\Models\Academic\Period;
 use App\Models\Room\Building;
-use App\Models\Room\Facility;
 use App\Models\Room\Room;
 use App\Models\Room\RoomClosure;
 use App\Services\Room\RoomService;
-use App\Support\AvailabilityCache;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
-use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 /**
@@ -96,53 +93,13 @@ class RoomController extends Controller
         ]);
     }
 
-    public function batchUpdate(Request $request): RedirectResponse
+    public function batchUpdate(BatchRoomRequest $request, RoomService $rooms): RedirectResponse
     {
-        $validated = $request->validate([
-            'action' => ['required', 'string', 'in:set_building,set_type,add_facilities,set_capacity'],
-            'room_ids' => ['required', 'array', 'min:1'],
-            'room_ids.*' => ['integer', 'exists:rooms,id'],
-            'building' => ['nullable', 'string', 'max:60'],
-            'type' => ['nullable', Rule::enum(RoomType::class)],
-            'facilities' => ['nullable', 'string', 'max:255'],
-            'capacity' => ['exclude_unless:action,set_capacity', 'required', 'integer', 'min:1', 'max:1000'],
-        ], [
-            'capacity.required' => 'Masukkan kapasitas ruang.',
-            'capacity.integer' => 'Isi dengan angka bulat, misalnya 40.',
-            'capacity.min' => 'Kapasitas minimal 1 orang.',
-            'capacity.max' => 'Kapasitas maksimal 1.000 orang.',
-        ]);
-
-        $ids = $validated['room_ids'];
-        $count = count($ids);
-
-        match ($validated['action']) {
-            'set_capacity' => Room::query()->whereIn('id', $ids)->update(['capacity' => $validated['capacity']]),
-            'set_building' => (function () use ($ids, $validated): void {
-                $buildingName = trim((string) ($validated['building'] ?? ''));
-                $buildingId = $buildingName !== '' ? Building::firstOrCreate(['name' => $buildingName, 'code' => Str::upper(Str::slug($buildingName))])->id : null;
-                Room::query()->whereIn('id', $ids)->update(['building_id' => $buildingId]);
-            })(),
-            'set_type' => (function () use ($ids, $validated): void {
-                if (! empty($validated['type'])) {
-                    Room::query()->whereIn('id', $ids)->update(['type' => $validated['type']]);
-                }
-            })(),
-            'add_facilities' => (function () use ($ids, $validated): void {
-                $facilityNames = collect(explode(',', (string) ($validated['facilities'] ?? '')))
-                    ->map(fn (string $n): string => Str::of($n)->trim()->ucfirst()->toString())
-                    ->filter()
-                    ->unique();
-                if ($facilityNames->isNotEmpty()) {
-                    $facilityIds = $facilityNames->map(fn (string $n): int => Facility::firstOrCreate(['name' => $n])->id)->all();
-                    foreach (Room::query()->whereIn('id', $ids)->get() as $room) {
-                        $room->facilities()->syncWithoutDetaching($facilityIds);
-                    }
-                }
-            })(),
-        };
-
-        AvailabilityCache::bust();
+        $count = $rooms->batchUpdate(
+            array_map('intval', $request->validated('room_ids')),
+            $request->validated('action'),
+            $request->safe()->only(['building', 'type', 'facilities', 'capacity']),
+        );
 
         return back()->with('toast', [
             'type' => 'success',

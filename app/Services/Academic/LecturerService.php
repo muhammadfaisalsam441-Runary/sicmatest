@@ -5,6 +5,7 @@ namespace App\Services\Academic;
 use App\Enums\ImportStatus;
 use App\Enums\LecturerHomebase;
 use App\Enums\LecturerProfileStatus;
+use App\Exceptions\DomainException;
 use App\Models\Academic\CourseOffering;
 use App\Models\Academic\Period;
 use App\Models\Lecturer\Lecturer;
@@ -96,6 +97,47 @@ class LecturerService
             $this->audit->log($before === null ? 'lecturer.created' : 'lecturer.updated', $lecturer, $before, $lecturer->only(self::AUDITED));
 
             return $lecturer;
+        });
+    }
+
+    /**
+     * Aksi massal Data Dosen dalam satu transaksi; setiap dosen yang berubah dicatat di audit log (B17).
+     *
+     * @param  list<int>  $lecturerIds
+     * @param  array{target_sks?: float|int|string|null, max_sks?: float|int|string|null}  $data
+     * @return int Jumlah dosen yang diproses
+     */
+    public function batchUpdate(array $lecturerIds, string $action, array $data): int
+    {
+        return DB::transaction(function () use ($lecturerIds, $action, $data): int {
+            $lecturers = Lecturer::query()->whereIn('id', $lecturerIds)->lockForUpdate()->get();
+            $period = $action === 'set_target_sks' ? Period::query()->active()->first() : null;
+
+            if ($action === 'set_target_sks' && $period === null) {
+                throw new DomainException('DATA_INCOMPLETE', 'Belum ada semester aktif untuk menyimpan target SKS.');
+            }
+
+            foreach ($lecturers as $lecturer) {
+                if ($action === 'set_target_sks') {
+                    $target = $lecturer->loadTargets()->firstOrNew(['period_id' => $period->id]);
+                    $before = $target->exists ? $target->only(['target_sks', 'max_sks']) : null;
+                    $target->fill(['target_sks' => $data['target_sks'] ?? null, 'max_sks' => $data['max_sks'] ?? null])->save();
+                    $this->audit->log('lecturer.batch_set_target_sks', $lecturer, $before, $target->only(['target_sks', 'max_sks']) + ['period_id' => $period->id]);
+
+                    continue;
+                }
+
+                $before = $lecturer->only(['profile_status', 'homebase']);
+                $lecturer->forceFill(match ($action) {
+                    'verify' => ['profile_status' => LecturerProfileStatus::Verified],
+                    'unverify' => ['profile_status' => LecturerProfileStatus::Unverified],
+                    'homebase_jtik' => ['homebase' => LecturerHomebase::Jtik],
+                    'homebase_external' => ['homebase' => LecturerHomebase::External],
+                })->save();
+                $this->audit->log('lecturer.batch_'.$action, $lecturer, $before, $lecturer->only(['profile_status', 'homebase']));
+            }
+
+            return $lecturers->count();
         });
     }
 

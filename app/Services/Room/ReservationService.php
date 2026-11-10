@@ -403,14 +403,25 @@ class ReservationService
             return;
         }
 
-        if ($conflicts->contains('source_type', RoomBlockSource::Closure)) {
-            throw new DomainException('ROOM_CLOSED', 'Ruangan sedang ditutup pada jam tersebut.');
-        }
-
-        throw new DomainException('ROOM_CONFLICT', 'Ruangan sudah lebih dulu dipesan kelas lain untuk jam tersebut.', [
+        $details = [
             'room_id' => $room->id,
             'conflict_until' => CarbonImmutable::instance($conflicts->max('end_at'))->toIso8601String(),
-        ]);
+        ];
+
+        $closure = $conflicts->firstWhere('source_type', RoomBlockSource::Closure);
+        if ($closure !== null) {
+            throw new DomainException('ROOM_CLOSED', 'Ruangan sedang ditutup sampai '.Wita::stamp($closure->end_at).'.', $details);
+        }
+
+        // Pesan menyebut sumber bentrok: kuliah terjadwal atau reservasi kelas lain.
+        $schedule = $conflicts->where('source_type', RoomBlockSource::Schedule)->sortBy('start_at')->first();
+        if ($schedule !== null) {
+            throw new DomainException('ROOM_CONFLICT', 'Ada kuliah terjadwal di ruangan ini pukul '.Wita::range($schedule->start_at, $schedule->end_at).'. Pilih jam atau ruangan lain.', $details + ['source' => 'schedule']);
+        }
+
+        $reservation = $conflicts->sortBy('start_at')->first();
+
+        throw new DomainException('ROOM_CONFLICT', 'Ruangan sudah lebih dulu dipesan kelas lain untuk jam tersebut ('.Wita::range($reservation->start_at, $reservation->end_at).').', $details + ['source' => 'reservation']);
     }
 
     private function assertTransition(Reservation $reservation, ReservationStatus $from, ReservationStatus $to): void

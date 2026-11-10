@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Enums\LecturerHomebase;
 use App\Enums\LecturerProfileStatus;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\BatchLecturerRequest;
 use App\Http\Requests\Admin\ImportLecturersRequest;
 use App\Http\Requests\Admin\LecturerRequest;
 use App\Models\Academic\Course;
@@ -12,7 +13,6 @@ use App\Models\Academic\CourseOffering;
 use App\Models\Academic\Period;
 use App\Models\Lecturer\Lecturer;
 use App\Models\Lecturer\LecturerExpertise;
-use App\Models\Lecturer\LecturerLoadTarget;
 use App\Models\Lecturer\TeachingAssignment;
 use App\Services\Academic\LecturerService;
 use Illuminate\Database\Eloquent\Builder;
@@ -108,40 +108,13 @@ class LecturerController extends Controller
         ]);
     }
 
-    public function batchUpdate(Request $request): RedirectResponse
+    public function batchUpdate(BatchLecturerRequest $request, LecturerService $lecturers): RedirectResponse
     {
-        $validated = $request->validate([
-            'action' => ['required', 'string', 'in:verify,unverify,homebase_jtik,homebase_external,set_target_sks'],
-            'lecturer_ids' => ['required', 'array', 'min:1'],
-            'lecturer_ids.*' => ['integer', 'exists:lecturers,id'],
-            'target_sks' => ['nullable', 'integer', 'min:0', 'max:60'],
-            'max_sks' => ['nullable', 'integer', 'min:0', 'max:60'],
-        ]);
-
-        $ids = $validated['lecturer_ids'];
-        $action = $validated['action'];
-        $count = count($ids);
-
-        match ($action) {
-            'verify' => Lecturer::query()->whereIn('id', $ids)->update(['profile_status' => LecturerProfileStatus::Verified]),
-            'unverify' => Lecturer::query()->whereIn('id', $ids)->update(['profile_status' => LecturerProfileStatus::Unverified]),
-            'homebase_jtik' => Lecturer::query()->whereIn('id', $ids)->update(['homebase' => LecturerHomebase::Jtik]),
-            'homebase_external' => Lecturer::query()->whereIn('id', $ids)->update(['homebase' => LecturerHomebase::External]),
-            'set_target_sks' => (function () use ($ids, $validated): void {
-                $period = Period::query()->active()->first();
-                if ($period !== null) {
-                    foreach ($ids as $id) {
-                        LecturerLoadTarget::query()->updateOrCreate(
-                            ['lecturer_id' => $id, 'period_id' => $period->id],
-                            [
-                                'target_sks' => $validated['target_sks'] ?? null,
-                                'max_sks' => $validated['max_sks'] ?? null,
-                            ]
-                        );
-                    }
-                }
-            })(),
-        };
+        $count = $lecturers->batchUpdate(
+            array_map('intval', $request->validated('lecturer_ids')),
+            $request->validated('action'),
+            $request->safe()->only(['target_sks', 'max_sks']),
+        );
 
         return back()->with('toast', [
             'type' => 'success',

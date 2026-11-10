@@ -4,19 +4,20 @@ use App\Enums\LecturerHomebase;
 use App\Enums\LecturerProfileStatus;
 use App\Enums\ScheduleVersionStatus;
 use App\Enums\SessionMode;
-use App\Models\AuditLog;
-use App\Models\ClassGroup;
-use App\Models\Course;
-use App\Models\CourseOffering;
-use App\Models\Import;
-use App\Models\Lecturer;
-use App\Models\Period;
-use App\Models\Room;
-use App\Models\ScheduleSession;
-use App\Models\ScheduleVersion;
-use App\Models\TeachingAssignment;
-use App\Models\User;
-use App\Services\TeachingLoadService;
+use App\Models\Academic\ClassGroup;
+use App\Models\Academic\Course;
+use App\Models\Academic\CourseOffering;
+use App\Models\Academic\Period;
+use App\Models\Lecturer\Lecturer;
+use App\Models\Lecturer\TeachingAssignment;
+use App\Models\Room\Room;
+use App\Models\Scheduling\Import;
+use App\Models\Scheduling\ScheduleSession;
+use App\Models\Scheduling\ScheduleVersion;
+use App\Models\User\AuditLog;
+use App\Models\User\User;
+use App\Services\Academic\TeachingLoadService;
+use App\Services\Scheduling\ScheduleValidator;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\UploadedFile;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
@@ -55,6 +56,110 @@ test('draf bisa ditinjau per kelas, dosen, dan ruang', function (string $view) {
             'kelas' => 'Tekom C', 'dosen' => 'Rina Kartika', 'ruang' => 'AE 107'
         }]);
 })->with(['kelas', 'dosen', 'ruang']);
+
+test('pemeriksaan dan penetapan terpisah dari editor dan GET tidak memeriksa otomatis', function () {
+    $draft = ScheduleVersion::factory()->for($this->period)->create();
+    ScheduleSession::factory()->for($draft, 'version')->create(['title' => 'Pemrograman Web']);
+    $before = AuditLog::query()->count();
+
+    $this->actingAs($this->admin)->get(route('admin.drafts.inspections'))
+        ->assertOk()->assertSee('Buka Pemeriksaan');
+    $this->get(route('admin.drafts.inspect', $draft))->assertOk()
+        ->assertSee('Belum diperiksa')->assertDontSee('Lanjut ke Penetapan');
+    $this->get(route('admin.drafts.show', $draft))->assertOk()
+        ->assertSee('Buka Pemeriksaan')->assertDontSee('publish-draft');
+    $this->get(route('admin.schedules.index', ['tab' => 'penetapan', 'draf' => $draft->id]))
+        ->assertOk()->assertSee('Belum diperiksa')->assertDontSee('name="effective_from"', false);
+
+    expect(AuditLog::query()->count())->toBe($before);
+});
+
+test('pemeriksaan mencatat revisi dan perubahan kunci menandai hasil lama kedaluwarsa', function () {
+    $draft = ScheduleVersion::factory()->for($this->period)->create()->refresh();
+    $session = ScheduleSession::factory()->for($draft, 'version')->create(['room_id' => Room::factory()->create()->id]);
+    $session->participants()->attach(ClassGroup::factory()->create(['student_count' => 20])->id);
+    $session->lecturers()->attach(Lecturer::factory()->create()->id, ['role' => 'lead']);
+
+    $this->actingAs($this->admin)->post(route('admin.drafts.validate', $draft))
+        ->assertRedirect(route('admin.drafts.inspect', $draft));
+    $this->get(route('admin.drafts.inspect', $draft))->assertOk()->assertSee('Lanjut ke Penetapan');
+    $this->get(route('admin.schedules.index', ['tab' => 'penetapan', 'draf' => $draft->id]))
+        ->assertOk()->assertSee('Akun ini tidak memiliki izin menetapkan jadwal.')->assertDontSee('name="effective_from"', false);
+    $this->actingAs(User::factory()->superAdmin()->create());
+    $this->get(route('admin.schedules.index', ['tab' => 'penetapan', 'draf' => $draft->id]))
+        ->assertOk()->assertSee('Tinjau Penetapan')->assertSee('name="effective_from"', false);
+
+    $this->post(route('admin.drafts.sessions.lock', [$draft, $session]));
+    $this->get(route('admin.drafts.inspect', $draft))->assertOk()->assertSee('Perlu diperiksa ulang')->assertDontSee('Lanjut ke Penetapan');
+    expect(AuditLog::query()->where('action', 'schedule.checked')->count())->toBe(1);
+});
+
+test('masalah wajib menghalangi lanjut dan daftar temuan dapat difilter', function () {
+    $draft = ScheduleVersion::factory()->for($this->period)->create();
+    ScheduleSession::factory()->unscheduled()->for($draft, 'version')->create(['title' => 'Belum Ditempatkan']);
+    $this->actingAs($this->admin)->post(route('admin.drafts.validate', $draft));
+    $draft->issues()->create(['code' => 'PROFILE_TEST', 'severity' => 'warning', 'session_ids' => [], 'message' => 'Profil perlu dilengkapi']);
+
+    $this->get(route('admin.drafts.inspect', [$draft, 'tingkat' => 'error', 'jenis' => 'SESSION_WITHOUT_TIME']))
+        ->assertOk()->assertSee('Perlu diperbaiki')->assertSee('belum punya hari dan jam')
+        ->assertDontSee('Profil perlu dilengkapi')->assertDontSee('Lanjut ke Penetapan');
+});
+
+test('peringatan tanpa masalah wajib tetap tersedia pada pemeriksaan dan penetapan', function () {
+    $draft = ScheduleVersion::factory()->for($this->period)->create();
+    $session = ScheduleSession::factory()->for($draft, 'version')->create(['room_id' => Room::factory()->create()->id]);
+    $session->participants()->attach(ClassGroup::factory()->create(['student_count' => 20])->id);
+    $session->lecturers()->attach(Lecturer::factory()->unverified()->create()->id, ['role' => 'lead']);
+    app(ScheduleValidator::class)->validate($draft);
+
+    $this->actingAs($this->admin)->get(route('admin.drafts.inspect', $draft))
+        ->assertOk()->assertSee('Siap dengan peringatan')->assertSee('Lanjut ke Penetapan');
+    $this->actingAs(User::factory()->superAdmin()->create());
+    $this->get(route('admin.schedules.index', ['tab' => 'penetapan', 'draf' => $draft->id]))
+        ->assertOk()->assertSee('Peringatan perlu ditinjau')->assertSee('Tinjau Penetapan');
+});
+
+test('jadwal resmi membedakan versi yang berlaku hari ini dan versi mendatang', function () {
+    $old = ScheduleVersion::factory()->for($this->period)->create(['status' => ScheduleVersionStatus::Superseded, 'version_no' => 1, 'effective_from' => '2026-09-01', 'effective_to' => '2026-11-08']);
+    $next = ScheduleVersion::factory()->official()->for($this->period)->create(['version_no' => 2, 'effective_from' => '2026-11-09']);
+    ScheduleSession::factory()->for($old, 'version')->create(['title' => 'Sesi Berlaku Sekarang']);
+    ScheduleSession::factory()->for($next, 'version')->create(['title' => 'Sesi Mulai Mendatang']);
+
+    $this->actingAs($this->admin)->get(route('admin.schedules.index'))->assertOk()
+        ->assertViewHas('active', fn ($version) => $version->id === $old->id)
+        ->assertViewHas('official', fn ($version) => $version->id === $old->id)
+        ->assertSee('Sudah ditetapkan; belum berlaku hari ini.')->assertSee('Sesi Berlaku Sekarang')->assertDontSee('Sesi Mulai Mendatang');
+    $this->get(route('admin.schedules.index', ['versi' => $next->id]))->assertOk()->assertSee('Sesi Mulai Mendatang');
+});
+
+test('jadwal resmi dan ekspor Excel mengikuti filter ruang serta versi yang dipilih', function () {
+    $official = ScheduleVersion::factory()->official()->for($this->period)->create();
+    $room = Room::factory()->create();
+    ScheduleSession::factory()->for($official, 'version')->create(['room_id' => $room->id, 'title' => 'Sesi Terpilih']);
+    ScheduleSession::factory()->for($official, 'version')->create(['room_id' => Room::factory()->create()->id, 'title' => 'Sesi Lain']);
+
+    $this->actingAs($this->admin)->get(route('admin.schedules.index', ['ruang' => $room->id]))
+        ->assertOk()->assertSee('Sesi Terpilih')->assertDontSee('Sesi Lain');
+    $download = $this->get(route('admin.drafts.excel', [$official, 'ruang' => $room->id]))->assertOk();
+    $file = tmpfile();
+    try {
+        fwrite($file, $download->streamedContent());
+        $sheet = IOFactory::createReader('Xlsx')->load(stream_get_meta_data($file)['uri'])->getActiveSheet();
+        expect($sheet->getCell('D5')->getValue())->toBe('Sesi Terpilih')->and($sheet->getHighestDataRow())->toBe(5);
+    } finally {
+        fclose($file);
+    }
+});
+
+test('Keti dan tamu tidak dapat mengakses pemeriksaan atau penetapan jadwal', function () {
+    $draft = ScheduleVersion::factory()->for($this->period)->create();
+    $this->actingAs(User::factory()->approvedKeti()->create())
+        ->get(route('admin.drafts.inspections'))->assertForbidden();
+    $this->get(route('admin.drafts.inspect', $draft))->assertForbidden();
+    $this->get(route('admin.schedules.index', ['tab' => 'penetapan', 'draf' => $draft->id]))->assertForbidden();
+    auth()->logout();
+    $this->get(route('admin.drafts.inspections'))->assertRedirect(route('login'));
+});
 
 test('admin mengunduh Excel untuk versi dan pengelompokan jadwal yang dibuka', function () {
     $draft = ScheduleVersion::factory()->for($this->period)->create(['version_no' => 6]);
@@ -476,7 +581,7 @@ test('pembagian 14 pertemuan menyimpan fase dan mengakui SKS penuh untuk setiap 
     $offering = CourseOffering::factory()->for($this->period)->create();
     $offering->course->update(['sks' => $sks]);
     $lead = TeachingAssignment::factory()->for($offering, 'courseOffering')->create(['credited_sks' => 1.5]);
-    $partner = TeachingAssignment::factory()->for($offering, 'courseOffering')->create(['role' => 'partner']);
+    $partner = TeachingAssignment::factory()->for($offering, 'courseOffering')->create(['role' => 'partner', 'credited_sks' => 1.5]);
     $preview = route('admin.teaching.phases.preview');
 
     $plan = $this->actingAs($this->admin)->get($preview)->assertOk()
@@ -493,29 +598,36 @@ test('pembagian 14 pertemuan menyimpan fase dan mengakui SKS penuh untuk setiap 
         ->and($partner->fresh()->phase->value)->toBe('after_uts')
         ->and($offering->course->fresh()->sks)->toBe($sks)
         ->and($lead->fresh()->credited_sks)->toBe('1.50')
-        ->and($partner->fresh()->credited_sks)->toBeNull();
+        ->and($partner->fresh()->credited_sks)->toBe('1.50');
 
-    $response = $this->get(route('admin.teaching.index'))->assertOk()->assertSee('SKS Semester');
+    $response = $this->get(route('admin.teaching.index'))->assertOk()
+        ->assertSee(['SKS Semester', 'Bagi Beban Otomatis', "{$sks} SKS • UTS", "{$sks} SKS • UAS"])
+        ->assertDontSee('1.5 SKS');
     $loads = $response->viewData('loads');
     expect($loads->pluck('meeting_sks')->all())->toBe([$expectedLoad, $expectedLoad])
         ->and($loads->pluck('assigned')->all())->toBe([(float) $sks, (float) $sks])
         ->and($loads->pluck('pending')->all())->toBe([0, 0])
         ->and($loads->pluck('pending_phases')->all())->toBe([0, 0]);
 
-    expect($this->get($preview)->assertOk()->viewData('plan')['already_set'])->toBe(1);
+    $rechecked = $this->get($preview)->assertOk()
+        ->assertSee(['Hitung Ulang', 'Sudah sesuai', "{$sks} SKS × 7 = {$expectedLoad} SKS"])
+        ->assertDontSee('Simpan Pembagian Pertemuan')
+        ->viewData('plan');
+    expect($rechecked['already_set'])->toBe(1)
+        ->and($rechecked['rows'])->toBeEmpty();
 })->with([[2, 14], [3, 21], [4, 28]]);
 
-test('pembagian pertemuan melewati tim yang belum lengkap dan menolak usulan yang berubah setelah ditinjau', function () {
+test('pembagian pertemuan melewati tim tanpa pengampu dan menolak usulan yang berubah setelah ditinjau', function () {
     $offering = CourseOffering::factory()->for($this->period)->create();
     $lead = TeachingAssignment::factory()->for($offering, 'courseOffering')->create();
     $partner = TeachingAssignment::factory()->for($offering, 'courseOffering')->create(['role' => 'partner']);
     $incomplete = CourseOffering::factory()->for($this->period)->create();
-    TeachingAssignment::factory()->for($incomplete, 'courseOffering')->create();
+    TeachingAssignment::factory()->for($incomplete, 'courseOffering')->create(['role' => 'partner']);
     $preview = route('admin.teaching.phases.preview');
 
     $plan = $this->actingAs($this->admin)->get($preview)->assertOk()->viewData('plan');
     expect($plan['rows'])->toHaveCount(1)
-        ->and(collect($plan['skipped'])->pluck('reason')->all())->toBe(['Tetapkan tepat satu pengampu dan satu mitra yang berbeda.']);
+        ->and(collect($plan['skipped'])->pluck('reason')->all())->toBe(['Tetapkan satu pengampu dan maksimal dua mitra dengan dosen yang berbeda.']);
 
     $lead->update(['is_locked' => true]);
     $this->from($preview)->post(route('admin.teaching.phases.apply'), ['fingerprint' => $plan['fingerprint']])
@@ -525,6 +637,38 @@ test('pembagian pertemuan melewati tim yang belum lengkap dan menolak usulan yan
         ->and($partner->fresh()->phase->value)->toBe('full');
     expect(collect($this->get($preview)->assertOk()->viewData('plan')['skipped'])->pluck('reason'))
         ->toContain('Fase yang perlu diubah berada pada penugasan terkunci.');
+});
+
+test('pembagian ulang menangani pengampu tunggal dan tim dengan dua mitra', function () {
+    $soloOffering = CourseOffering::factory()->for($this->period)->create();
+    $soloOffering->course->update(['sks' => 3]);
+    $solo = TeachingAssignment::factory()->for($soloOffering, 'courseOffering')->create(['phase' => 'before_uts']);
+    $teamOffering = CourseOffering::factory()->for($this->period)->create();
+    $teamOffering->course->update(['sks' => 2]);
+    $lead = TeachingAssignment::factory()->for($teamOffering, 'courseOffering')->create();
+    $partners = TeachingAssignment::factory()->count(2)->for($teamOffering, 'courseOffering')->create(['role' => 'partner']);
+    $preview = route('admin.teaching.phases.preview');
+
+    $plan = $this->actingAs($this->admin)->get($preview)->assertOk()
+        ->assertSee(['3 SKS × 14 = 42 SKS', '2 SKS × 7 = 14 SKS'])
+        ->viewData('plan');
+    expect($plan['rows'])->toHaveCount(2)->and($plan['skipped'])->toBeEmpty();
+
+    $this->from($preview)->post(route('admin.teaching.phases.apply'), ['fingerprint' => $plan['fingerprint']])
+        ->assertRedirect(route('admin.teaching.index'))->assertSessionHasNoErrors();
+
+    expect($solo->fresh()->phase->value)->toBe('full')
+        ->and($lead->fresh()->phase->value)->toBe('before_uts')
+        ->and($partners->fresh()->pluck('phase.value')->all())->toBe(['after_uts', 'after_uts']);
+
+    $loads = app(TeachingLoadService::class)->summary($this->period)->keyBy('lecturer.id');
+    expect($loads[$solo->lecturer_id]['assigned'])->toBe(3.0)
+        ->and($loads[$solo->lecturer_id]['meeting_sks'])->toBe(42)
+        ->and($loads[$lead->lecturer_id]['meeting_sks'])->toBe(14);
+    foreach ($partners as $partner) {
+        expect($loads[$partner->lecturer_id]['assigned'])->toBe(2.0)
+            ->and($loads[$partner->lecturer_id]['meeting_sks'])->toBe(14);
+    }
 });
 
 test('penugasan tunggal dan massal mengambil SKS dari mata kuliah pada setiap kelas', function () {
@@ -667,6 +811,10 @@ test('admin dapat mengubah penugasan mengajar yang sudah ada dan mengganti penga
     $this->get(route('admin.teaching.index', ['filter' => 'tim_mitra']))
         ->assertOk()
         ->assertSee($offering->course->name);
+
+    // Filter berdasarkan semester
+    $this->get(route('admin.teaching.index', ['semester' => '1']))
+        ->assertOk();
 });
 
 test('admin mengelola penawaran kuliah dengan filter dan batch delete', function () {

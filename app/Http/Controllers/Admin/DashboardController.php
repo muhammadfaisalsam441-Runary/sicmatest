@@ -3,10 +3,10 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Reservation;
-use App\Services\AdminDashboardService;
-use App\Services\AvailabilityService;
-use App\Services\OverdueReservationService;
+use App\Models\Reservation\Reservation;
+use App\Services\Account\AdminDashboardService;
+use App\Services\Room\AvailabilityService;
+use App\Services\Room\OverdueReservationService;
 use Illuminate\View\View;
 
 /**

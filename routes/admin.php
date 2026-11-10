@@ -67,6 +67,8 @@ Route::get('/jadwal/impor/{import}', [ImportController::class, 'show'])->name('i
 Route::post('/jadwal/impor/{import}/simpan', [ImportController::class, 'commit'])->name('imports.commit');
 
 Route::post('/draf', [DraftController::class, 'store'])->name('drafts.store');
+Route::get('/pemeriksaan-jadwal', [DraftController::class, 'inspections'])->name('drafts.inspections');
+Route::get('/draf/{version}/pemeriksaan', [DraftController::class, 'show'])->name('drafts.inspect');
 Route::get('/draf/{version}', [DraftController::class, 'show'])->name('drafts.show');
 Route::get('/draf/{version}/unduh/excel', [DraftController::class, 'excel'])->name('drafts.excel');
 Route::get('/draf/{version}/unduh/pdf', [DraftController::class, 'pdf'])->name('drafts.pdf');
@@ -100,6 +102,8 @@ Route::put('/dosen/{lecturer}', [LecturerController::class, 'update'])->name('le
 Route::post('/dosen/impor', [LecturerController::class, 'import'])->name('lecturers.import');
 
 Route::get('/pembagian-mengajar', [TeachingAssignmentController::class, 'index'])->name('teaching.index');
+Route::get('/pembagian-mengajar/beban-otomatis', [TeachingAssignmentController::class, 'previewAllocation'])->name('teaching.allocation.preview');
+Route::post('/pembagian-mengajar/beban-otomatis', [TeachingAssignmentController::class, 'applyAllocation'])->name('teaching.allocation.apply');
 Route::get('/pembagian-mengajar/sks-otomatis', [TeachingAssignmentController::class, 'previewPhases'])->name('teaching.phases.preview');
 Route::post('/pembagian-mengajar/sks-otomatis', [TeachingAssignmentController::class, 'applyPhases'])->name('teaching.phases.apply');
 Route::post('/pembagian-mengajar', [TeachingAssignmentController::class, 'store'])->name('teaching.store');
@@ -115,3 +119,4 @@ Route::get('/susun-jadwal/riwayat', [SchedulerController::class, 'history'])->na
 Route::get('/susun-jadwal/proses/{job}', [SchedulerController::class, 'show'])->name('scheduler.show');
 Route::get('/susun-jadwal/proses/{job}/status', [SchedulerController::class, 'status'])->name('scheduler.status');
 Route::post('/susun-jadwal/proses/{job}/batal', [SchedulerController::class, 'cancel'])->name('scheduler.cancel');
+Route::post('/susun-jadwal/proses/{job}/ulang', [SchedulerController::class, 'retry'])->middleware('throttle:10,1')->name('scheduler.retry');

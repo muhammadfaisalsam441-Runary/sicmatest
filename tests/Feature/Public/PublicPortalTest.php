@@ -1,11 +1,11 @@
 <?php
 
-use App\Models\Building;
-use App\Models\ClassGroup;
-use App\Models\Room;
-use App\Models\User;
-use App\Services\AvailabilityService;
-use App\Services\ReservationService;
+use App\Models\Academic\ClassGroup;
+use App\Models\Room\Building;
+use App\Models\Room\Room;
+use App\Models\User\User;
+use App\Services\Room\AvailabilityService;
+use App\Services\Room\ReservationService;
 use Carbon\CarbonImmutable;
 
 beforeEach(function () {

@@ -8,16 +8,16 @@ use App\Enums\ScheduleVersionStatus;
 use App\Enums\SessionMode;
 use App\Enums\TeachingRole;
 use App\Enums\UserRole;
-use App\Models\ClassGroup;
-use App\Models\Course;
-use App\Models\CourseOffering;
-use App\Models\Lecturer;
-use App\Models\Period;
-use App\Models\Room;
-use App\Models\ScheduleSession;
-use App\Models\ScheduleVersion;
-use App\Models\User;
-use App\Services\ScheduleBlockBuilder;
+use App\Models\Academic\ClassGroup;
+use App\Models\Academic\Course;
+use App\Models\Academic\CourseOffering;
+use App\Models\Academic\Period;
+use App\Models\Lecturer\Lecturer;
+use App\Models\Room\Room;
+use App\Models\Scheduling\ScheduleSession;
+use App\Models\Scheduling\ScheduleVersion;
+use App\Models\User\User;
+use App\Services\Scheduling\ScheduleBlockBuilder;
 use Illuminate\Database\Seeder;
 
 /**

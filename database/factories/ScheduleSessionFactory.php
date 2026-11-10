@@ -4,9 +4,9 @@ namespace Database\Factories;
 
 use App\Enums\SessionMode;
 use App\Enums\SessionPhase;
-use App\Models\Room;
-use App\Models\ScheduleSession;
-use App\Models\ScheduleVersion;
+use App\Models\Room\Room;
+use App\Models\Scheduling\ScheduleSession;
+use App\Models\Scheduling\ScheduleVersion;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**

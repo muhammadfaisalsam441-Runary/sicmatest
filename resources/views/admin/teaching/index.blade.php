@@ -21,57 +21,30 @@
             @if ($period)
                 <x-slot:actions>
                     <x-button variant="secondary" icon="chart-column-increasing" @click="rekapModalOpen = true">Rekap Beban SKS Dosen</x-button>
-                    <x-button icon="zap" :href="route('admin.teaching.phases.preview')">Bagi Pertemuan Otomatis</x-button>
+                    <x-button variant="secondary" icon="calendar" :href="route('admin.teaching.phases.preview')">Atur Fase Pertemuan</x-button>
+                    <x-button icon="zap" :href="route('admin.teaching.allocation.preview')">Bagi Beban Otomatis</x-button>
                 </x-slot:actions>
             @endif
         </x-page-header>
 
-        <x-card>
-            <x-stepper :steps="['Data', 'Tim mengajar', 'Draf jadwal', 'Periksa', 'Tetapkan']" :current="2" />
-        </x-card>
-
-        @if ($withoutLead > 0)
-            <x-alert variant="danger">
-                <strong>{{ $withoutLead }} dari {{ $totalCount }} kelas</strong> belum memiliki dosen pengampu. Klik tombol <em>"+ Tugaskan Pengampu"</em> langsung pada baris mata kuliah atau gunakan centang kotak untuk penugasan massal.
-            </x-alert>
-        @else
-            <x-alert variant="success">
-                Semua {{ $totalCount }} penawaran kelas telah memiliki dosen pengampu utama! Klik pada nama dosen atau tombol <strong>Atur Tim</strong> untuk mengubah pengampu/mitra, mengatur fase pertemuan (UTS/UAS), atau mengunci penugasan.
+        @if (session('allocation_draft'))
+            <x-alert variant="info">
+                Draf jadwal baru sudah memuat tim pengajar hasil pembagian.
+                <a class="font-semibold underline" href="{{ route('admin.drafts.show', session('allocation_draft')) }}">Tinjau draf dan periksa penempatannya</a>.
             </x-alert>
         @endif
 
-        {{-- Ringkasan Metrik Cepat --}}
-        <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <x-card class="flex flex-col gap-1 p-4">
-                <span class="text-xs font-medium text-muted">Total Penawaran Kelas</span>
-                <span class="text-2xl font-bold text-ink">{{ number_format($totalCount) }}</span>
-                <span class="text-xs text-muted">{{ $period?->name ?? 'Semester aktif' }}</span>
-            </x-card>
-            <x-card @class([
-                'flex flex-col gap-1 p-4',
-                'border-danger/30 bg-danger-soft/10' => $withoutLead > 0,
-            ])>
-                <span class="text-xs font-medium {{ $withoutLead > 0 ? 'text-danger' : 'text-muted' }}">Belum Ada Pengampu</span>
-                <span class="text-2xl font-bold {{ $withoutLead > 0 ? 'text-danger' : 'text-ink' }}">{{ number_format($withoutLead) }}</span>
-                <span class="text-xs {{ $withoutLead > 0 ? 'text-danger/80' : 'text-muted' }}">{{ $withoutLead > 0 ? 'Perlu segera ditetapkan' : 'Semua kelas punya pengampu' }}</span>
-            </x-card>
-            <x-card class="flex flex-col gap-1 p-4 border-success/30 bg-success-soft/10">
-                <span class="text-xs font-medium text-success">Tim Pengajar (Pengampu & Mitra)</span>
-                <div class="flex items-baseline gap-2">
-                    <span class="text-2xl font-bold text-success">{{ number_format($teamCount) }}</span>
-                    <span class="text-xs text-muted">tim ({{ number_format($singleCount) }} tunggal)</span>
-                </div>
-                <span class="text-xs text-success/80">{{ number_format($withLead) }} kelas terisi pengampu</span>
-            </x-card>
-            <x-card class="flex flex-col gap-1 p-4">
-                <div class="flex items-center justify-between">
-                    <span class="text-xs font-medium text-muted">Dosen Terverifikasi</span>
-                    <button type="button" @click="rekapModalOpen = true" class="text-xs font-semibold text-primary hover:underline">Lihat Rekap</button>
-                </div>
-                <span class="text-2xl font-bold text-ink">{{ number_format($lecturerOptionsEnriched->count()) }}</span>
-                <span class="text-xs text-muted">Siap ditugaskan</span>
-            </x-card>
-        </div>
+        <x-card>
+            <x-schedule-steps :current="2" />
+        </x-card>
+
+        <x-tabs :items="[
+            ['label' => 'Penugasan Dosen & SKS', 'href' => route('admin.teaching.index'), 'active' => true],
+            ['label' => 'Bagi Beban Otomatis', 'href' => route('admin.teaching.allocation.preview'), 'active' => false],
+            ['label' => 'Atur Fase Pertemuan (UTS/UAS)', 'href' => route('admin.teaching.phases.preview'), 'active' => false],
+        ]" />
+
+
 
         {{-- Toolbar Filter & Pencarian Cepat --}}
         <x-card class="flex flex-col gap-4">
@@ -121,20 +94,20 @@
                 </div>
             </div>
 
-            {{-- Form Pencarian & Filter Prodi --}}
-            <form method="GET" action="{{ route('admin.teaching.index') }}" class="grid grid-cols-1 items-end gap-3 sm:grid-cols-12">
+            {{-- Form Pencarian & Filter --}}
+            <form method="GET" action="{{ route('admin.teaching.index') }}" class="grid grid-cols-1 items-end gap-3 sm:grid-cols-2 lg:grid-cols-12">
                 <input type="hidden" name="filter" value="{{ $filter }}">
 
-                <div class="sm:col-span-5">
-                    <label class="mb-1 block text-xs font-medium text-muted">Cari Mata Kuliah / Kelas / Nama Dosen</label>
+                <div class="sm:col-span-2 lg:col-span-3">
+                    <label class="mb-1 block text-xs font-medium text-muted">Cari Mata Kuliah / Kelas / Dosen</label>
                     <div class="relative">
                         <i data-lucide="search" class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted"></i>
-                        <input type="text" name="q" value="{{ $keyword }}" placeholder="Ketik mata kuliah, kode MK, nama kelas, atau nama dosen..."
+                        <input type="text" name="q" value="{{ $keyword }}" placeholder="Ketik nama MK, kode, kelas, dosen..."
                                class="w-full rounded-control border border-border bg-surface pl-9 pr-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary">
                     </div>
                 </div>
 
-                <div class="sm:col-span-3">
+                <div class="sm:col-span-1 lg:col-span-3">
                     <label class="mb-1 block text-xs font-medium text-muted">Program Studi</label>
                     <select name="prodi" @change="$el.form.requestSubmit()" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
                         <option value="">Semua Program Studi</option>
@@ -144,7 +117,17 @@
                     </select>
                 </div>
 
-                <div class="sm:col-span-2">
+                <div class="sm:col-span-1 lg:col-span-2">
+                    <label class="mb-1 block text-xs font-medium text-muted">Semester</label>
+                    <select name="semester" @change="$el.form.requestSubmit()" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
+                        <option value="">Semua Semester</option>
+                        @foreach ($semesterOptions as $sOpt)
+                            <option value="{{ $sOpt['value'] }}" @selected($semester === (string) $sOpt['value'])>{{ $sOpt['label'] }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="sm:col-span-1 lg:col-span-2">
                     <label class="mb-1 block text-xs font-medium text-muted">Per Halaman</label>
                     <select name="per_page" @change="$el.form.requestSubmit()" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
                         @foreach ([25, 50, 100] as $n)
@@ -153,12 +136,12 @@
                     </select>
                 </div>
 
-                <div class="flex gap-2 sm:col-span-2">
+                <div class="flex gap-2 sm:col-span-1 lg:col-span-2">
                     <button type="submit" class="inline-flex h-[38px] flex-1 items-center justify-center gap-1.5 rounded-control bg-primary px-3 text-xs font-semibold text-white hover:bg-primary/90 transition" title="Terapkan Filter">
                         <i data-lucide="search" class="size-3.5"></i>
                         <span>Cari</span>
                     </button>
-                    @if ($keyword !== '' || $prodi !== '' || $filter !== 'semua')
+                    @if ($keyword !== '' || $prodi !== '' || $semester !== '' || $filter !== 'semua')
                         <a href="{{ route('admin.teaching.index') }}" class="inline-flex h-[38px] items-center justify-center gap-1 rounded-control border border-border bg-surface px-2.5 text-xs font-medium text-muted hover:text-ink hover:bg-page transition" title="Reset Filter">
                             <i data-lucide="rotate-ccw" class="size-3.5"></i>
                             <span>Reset</span>
@@ -169,24 +152,26 @@
         </x-card>
 
         {{-- TABEL GRID DATA-HEAVY (SPREADSHEET-LIKE) --}}
-        <div class="overflow-hidden rounded-card border border-border bg-surface shadow-sm">
+        <div class="overflow-hidden rounded-card border border-border bg-surface shadow-xs">
             <div class="overflow-x-auto">
-                <table class="w-full text-left text-sm">
-                    <thead class="border-b border-border bg-page text-xs font-medium text-muted">
+                <table class="w-full border-collapse text-left text-sm">
+                    <thead class="border-b border-border bg-page text-xs font-semibold text-muted">
                         <tr>
-                            <th class="w-10 px-4 py-3 text-center">
+                            <th class="w-10 px-3 py-3 text-center">
                                 <input type="checkbox"
                                        @change="toggleSelectAll($event.target.checked)"
                                        :checked="isAllSelected()"
                                        class="size-4 rounded border-border text-primary focus:ring-primary cursor-pointer"
                                        title="Pilih semua di halaman ini">
                             </th>
-                            <th class="px-4 py-3 font-semibold">Mata Kuliah & Kode</th>
-                            <th class="px-4 py-3 font-semibold">Kelas / Prodi</th>
-                            <th class="px-3 py-3 text-center font-semibold">SKS</th>
-                            <th class="px-4 py-3 font-semibold">Dosen Pengampu (Lead)</th>
-                            <th class="px-4 py-3 font-semibold">Dosen Mitra (Partner)</th>
-                            <th class="px-4 py-3 text-right font-semibold">Aksi</th>
+                            <th class="px-4 py-3">Kelas & Prodi</th>
+                            <th class="w-24 px-3 py-3 text-center">Angkatan</th>
+                            <th class="px-4 py-3">Mata Kuliah & Kode</th>
+                            <th class="w-20 px-3 py-3 text-center">SKS</th>
+                            <th class="px-4 py-3">Dosen Pengampu (SKS)</th>
+                            <th class="px-4 py-3">Dosen Mitra (SKS)</th>
+                            <th class="w-24 px-3 py-3 text-center">Skema</th>
+                            <th class="w-28 px-4 py-3 text-right">Aksi</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-border">
@@ -202,7 +187,6 @@
                                     'role_label' => $a->role === TeachingRole::Lead ? 'Pengampu' : 'Mitra',
                                     'phase' => $a->phase->value,
                                     'phase_label' => $a->phaseLabel(),
-                                    'credited_sks' => $a->credited_sks !== null ? (int) $a->credited_sks : null,
                                     'is_locked' => (bool) $a->is_locked,
                                 ])->values()->all();
                                 $offeringPayload = [
@@ -212,215 +196,173 @@
                                     'sks' => $offering->course->sks,
                                     'team' => $teamPayload,
                                 ];
+                                $leadPayload = $leadAssignment ? [
+                                    'id' => $leadAssignment->id,
+                                    'lecturer_id' => $leadAssignment->lecturer_id,
+                                    'role' => $leadAssignment->role->value,
+                                    'phase' => $leadAssignment->phase->value,
+                                ] : null;
+                                $leadSks = $offering->course->sks;
                                 $isSelectedFromQuery = request()->integer('penawaran') === $offering->id;
                             @endphp
-                            <tr @class(['transition hover:bg-primary-soft/20', 'bg-primary-soft/20 ring-1 ring-inset ring-primary/30' => $isSelectedFromQuery])
+                            <tr @class(['border-b border-border transition hover:bg-primary-soft/20', 'bg-primary-soft/20 ring-1 ring-inset ring-primary/30' => $isSelectedFromQuery])
                                 :class="{ 'bg-primary-soft/30': selectedIds.map(Number).includes({{ $offering->id }}) }">
                                 {{-- Checkbox --}}
-                                <td class="px-4 py-3 text-center">
+                                <td class="w-10 px-3 py-3 text-center">
                                     <input type="checkbox"
                                            :value="{{ $offering->id }}"
                                            x-model.number="selectedIds"
                                            class="size-4 rounded border-border text-primary focus:ring-primary cursor-pointer">
                                 </td>
 
-                                {{-- Mata Kuliah --}}
-                                <td class="px-4 py-3">
+                                {{-- Kelas & Prodi --}}
+                                <td class="px-4 py-3 whitespace-nowrap">
                                     <div class="flex flex-col">
-                                        <div class="flex items-center gap-2">
-                                            <span class="font-semibold text-ink">{{ $offering->course->name }}</span>
-                                            @if ($isSelectedFromQuery)
-                                                <span class="rounded bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-white">Dipilih</span>
-                                            @endif
-                                        </div>
-                                        <span class="text-xs text-muted">{{ $offering->course->code ?? '—' }} • Kurikulum {{ $offering->course->curriculum ?? '—' }}</span>
-                                    </div>
-                                </td>
-
-                                {{-- Kelas / Prodi --}}
-                                <td class="px-4 py-3">
-                                    <div class="flex flex-col">
-                                        <span class="font-medium text-ink">{{ $offering->classGroup->name }}</span>
+                                        <span class="font-bold text-ink text-sm">{{ $offering->classGroup->name }}</span>
                                         <span class="text-xs text-muted">{{ $offering->classGroup->study_program ?? 'JTIK' }} ({{ $offering->classGroup->student_count ?? 0 }} mhs)</span>
                                     </div>
                                 </td>
 
+                                {{-- Angkatan --}}
+                                <td class="w-24 px-3 py-3 text-center whitespace-nowrap">
+                                    @if ($offering->classGroup->cohort_year)
+                                        <span class="inline-flex items-center justify-center rounded-md border border-border bg-page px-2 py-0.5 text-xs font-semibold text-ink">
+                                            {{ $offering->classGroup->cohort_year }}
+                                        </span>
+                                    @else
+                                        <span class="text-xs text-muted italic">—</span>
+                                    @endif
+                                </td>
+
+                                {{-- Mata Kuliah & Kode --}}
+                                <td class="px-4 py-3">
+                                    <div class="flex flex-col">
+                                        <div class="flex items-center gap-2">
+                                            <span class="font-bold text-ink text-sm">{{ $offering->course->name }}</span>
+                                            @if ($isSelectedFromQuery)
+                                                <span class="rounded bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-white">Dipilih</span>
+                                            @endif
+                                        </div>
+                                        <span class="font-mono text-xs text-muted">{{ $offering->course->code ?? '—' }}</span>
+                                    </div>
+                                </td>
+
                                 {{-- SKS --}}
-                                <td class="px-3 py-3 text-center">
-                                    <span class="inline-flex items-center rounded-md bg-page px-2 py-0.5 text-xs font-semibold text-ink ring-1 ring-border">
+                                <td class="w-20 px-3 py-3 text-center whitespace-nowrap">
+                                    <span class="inline-flex items-center justify-center rounded-full bg-primary-soft px-2.5 py-0.5 text-xs font-bold text-primary">
                                         {{ $offering->course->sks }} SKS
                                     </span>
                                 </td>
 
-                                {{-- Dosen Pengampu (Lead) --}}
+                                {{-- Dosen Pengampu (SKS) --}}
                                 <td class="px-4 py-3">
                                     @if ($leadAssignment)
-                                        @php
-                                            $leadPayload = [
-                                                'id' => $leadAssignment->id,
-                                                'lecturer_id' => $leadAssignment->lecturer_id,
-                                                'role' => $leadAssignment->role->value,
-                                                'phase' => $leadAssignment->phase->value,
-                                                'credited_sks' => $leadAssignment->credited_sks !== null ? (int) $leadAssignment->credited_sks : '',
-                                            ];
-                                        @endphp
-                                        <div class="inline-flex flex-wrap items-center gap-1.5 rounded-lg border border-border bg-page px-2.5 py-1 text-xs">
+                                        <div class="flex items-center gap-1.5 flex-wrap">
                                             @if ($leadAssignment->is_locked)
-                                                <span class="font-semibold text-ink">{{ $leadAssignment->lecturer->name }}</span>
+                                                <span class="font-semibold text-ink text-sm">{{ $leadAssignment->lecturer->name }}</span>
+                                                <span title="Penugasan dikunci" class="text-primary inline-flex items-center">
+                                                    <i data-lucide="lock" class="size-3.5"></i>
+                                                </span>
                                             @else
                                                 <button type="button"
                                                         @click="openEditAssignment(@js($offeringPayload), @js($leadPayload))"
-                                                        class="font-semibold text-ink hover:text-primary hover:underline text-left"
-                                                        title="Klik untuk mengganti dosen pengampu atau mengubah fase pertemuan">
+                                                        class="font-semibold text-ink text-sm hover:text-primary hover:underline text-left cursor-pointer"
+                                                        title="Klik untuk mengubah dosen pengampu atau fase pertemuan">
                                                     {{ $leadAssignment->lecturer->name }}
                                                 </button>
                                             @endif
-
-                                            <span class="rounded bg-surface px-1.5 py-0.5 text-[10px] font-medium text-muted border border-border/60">
-                                                {{ $leadAssignment->phaseLabel() }}
+                                            <span class="inline-flex items-center rounded bg-page px-1.5 py-0.5 text-[11px] font-medium text-muted border border-border whitespace-nowrap">
+                                                {{ $leadSks }} SKS{{ $leadAssignment->phase !== SessionPhase::Full ? ' • ' . ($leadAssignment->phase === SessionPhase::BeforeUts ? 'UTS' : 'UAS') : '' }}
                                             </span>
-
-                                            @if ($leadAssignment->credited_sks !== null)
-                                                <span class="rounded bg-primary-soft px-1.5 py-0.5 text-[10px] font-semibold text-primary">
-                                                    {{ (int) $leadAssignment->credited_sks }} SKS
-                                                </span>
-                                            @endif
-
-                                            @unless ($leadAssignment->is_locked)
-                                                <button type="button"
-                                                        @click="openEditAssignment(@js($offeringPayload), @js($leadPayload))"
-                                                        class="text-muted hover:text-primary ml-0.5"
-                                                        title="Ubah pengampu / fase">
-                                                    <i data-lucide="pencil" class="size-3.5"></i>
-                                                </button>
-                                            @endunless
-
-                                            {{-- Lock Toggle --}}
-                                            <form method="POST" action="{{ route('admin.teaching.lock', $leadAssignment) }}" class="inline">
-                                                @csrf
-                                                <button type="submit" class="text-primary hover:text-primary/70" title="{{ $leadAssignment->is_locked ? 'Terkunci (klik untuk buka kunci)' : 'Klik untuk mengunci penugasan' }}">
-                                                    <i data-lucide="{{ $leadAssignment->is_locked ? 'lock' : 'lock-open' }}" class="size-3.5"></i>
-                                                </button>
-                                            </form>
-
-                                            {{-- Delete Button --}}
-                                            @unless ($leadAssignment->is_locked)
-                                                <form method="POST" action="{{ route('admin.teaching.destroy', $leadAssignment) }}" class="inline" onsubmit="return confirm('Hapus pengampu dari penawaran ini?')">
-                                                    @csrf
-                                                    @method('DELETE')
-                                                    <button type="submit" class="text-danger hover:text-danger/70" title="Hapus pengampu">
-                                                        <i data-lucide="x" class="size-3.5"></i>
-                                                    </button>
-                                                </form>
-                                            @endunless
                                         </div>
                                     @else
-                                        <button type="button"
-                                                @click="openQuickAssign({{ $offering->id }}, @js($offering->course->name), @js($offering->classGroup->name), 'lead', {{ $offering->course->sks }}, @js($teamPayload))"
-                                                class="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-danger/60 bg-danger-soft/30 px-2.5 py-1 text-xs font-semibold text-danger hover:bg-danger-soft transition">
-                                            <i data-lucide="user-plus" class="size-3.5"></i>
-                                            <span>Tugaskan Pengampu</span>
-                                        </button>
+                                        <span class="inline-flex items-center gap-1 text-xs font-semibold text-danger">
+                                            <i data-lucide="circle-alert" class="size-3.5 shrink-0"></i>
+                                            <span>Belum Ada</span>
+                                        </span>
                                     @endif
                                 </td>
 
-                                {{-- Dosen Mitra (Partner) --}}
+                                {{-- Dosen Mitra (SKS) --}}
                                 <td class="px-4 py-3">
-                                    <div class="flex flex-wrap items-center gap-1.5">
-                                        @foreach ($partnerAssignments as $partnerAssignment)
-                                            @php
-                                                $partnerPayload = [
-                                                    'id' => $partnerAssignment->id,
-                                                    'lecturer_id' => $partnerAssignment->lecturer_id,
-                                                    'role' => $partnerAssignment->role->value,
-                                                    'phase' => $partnerAssignment->phase->value,
-                                                    'credited_sks' => $partnerAssignment->credited_sks !== null ? (int) $partnerAssignment->credited_sks : '',
-                                                ];
-                                            @endphp
-                                            <div class="inline-flex flex-wrap items-center gap-1.5 rounded-lg border border-border bg-page px-2 py-0.5 text-xs">
-                                                @if ($partnerAssignment->is_locked)
-                                                    <span class="text-ink font-medium">{{ $partnerAssignment->lecturer->name }}</span>
-                                                @else
-                                                    <button type="button"
-                                                            @click="openEditAssignment(@js($offeringPayload), @js($partnerPayload))"
-                                                            class="text-ink font-medium hover:text-primary hover:underline text-left"
-                                                            title="Klik untuk mengubah dosen mitra atau fase pertemuan">
-                                                        {{ $partnerAssignment->lecturer->name }}
-                                                    </button>
-                                                @endif
-
-                                                <span class="rounded bg-surface px-1.5 py-0.5 text-[10px] font-medium text-muted border border-border/60">
-                                                    {{ $partnerAssignment->phaseLabel() }}
-                                                </span>
-
-                                                @if ($partnerAssignment->credited_sks !== null)
-                                                    <span class="rounded bg-primary-soft px-1.5 py-0.5 text-[10px] font-semibold text-primary">
-                                                        {{ (int) $partnerAssignment->credited_sks }} SKS
-                                                    </span>
-                                                @endif
-
-                                                @unless ($partnerAssignment->is_locked)
-                                                    <button type="button"
-                                                            @click="openEditAssignment(@js($offeringPayload), @js($partnerPayload))"
-                                                            class="text-muted hover:text-primary"
-                                                            title="Ubah mitra / fase">
-                                                        <i data-lucide="pencil" class="size-3"></i>
-                                                    </button>
-                                                @endunless
-
-                                                <form method="POST" action="{{ route('admin.teaching.lock', $partnerAssignment) }}" class="inline">
-                                                    @csrf
-                                                    <button type="submit" class="text-primary hover:text-primary/70" title="{{ $partnerAssignment->is_locked ? 'Terkunci (klik untuk buka kunci)' : 'Klik untuk mengunci' }}">
-                                                        <i data-lucide="{{ $partnerAssignment->is_locked ? 'lock' : 'lock-open' }}" class="size-3"></i>
-                                                    </button>
-                                                </form>
-
-                                                @unless ($partnerAssignment->is_locked)
-                                                    <form method="POST" action="{{ route('admin.teaching.destroy', $partnerAssignment) }}" class="inline" onsubmit="return confirm('Hapus mitra dari kelas ini?')">
-                                                        @csrf
-                                                        @method('DELETE')
-                                                        <button type="submit" class="text-danger hover:text-danger/70" title="Hapus mitra">
-                                                            <i data-lucide="x" class="size-3"></i>
+                                    @if ($partnerAssignments->isNotEmpty())
+                                        <div class="flex flex-col gap-1.5">
+                                            @foreach ($partnerAssignments as $partnerAssignment)
+                                                @php
+                                                    $partnerPayload = [
+                                                        'id' => $partnerAssignment->id,
+                                                        'lecturer_id' => $partnerAssignment->lecturer_id,
+                                                        'role' => $partnerAssignment->role->value,
+                                                        'phase' => $partnerAssignment->phase->value,
+                                                    ];
+                                                    $partnerSks = $offering->course->sks;
+                                                @endphp
+                                                <div class="flex items-center gap-1.5 flex-wrap">
+                                                    @if ($partnerAssignment->is_locked)
+                                                        <span class="font-medium text-ink text-xs">{{ $partnerAssignment->lecturer->name }}</span>
+                                                        <span title="Penugasan dikunci" class="text-primary inline-flex items-center">
+                                                            <i data-lucide="lock" class="size-3"></i>
+                                                        </span>
+                                                    @else
+                                                        <button type="button"
+                                                                @click="openEditAssignment(@js($offeringPayload), @js($partnerPayload))"
+                                                                class="font-medium text-ink text-xs hover:text-primary hover:underline text-left cursor-pointer"
+                                                                title="Klik untuk mengubah dosen mitra atau fase pertemuan">
+                                                            {{ $partnerAssignment->lecturer->name }}
                                                         </button>
-                                                    </form>
-                                                @endunless
-                                            </div>
-                                        @endforeach
+                                                    @endif
+                                                    <span class="inline-flex items-center rounded bg-page px-1.5 py-0.5 text-[10px] font-medium text-muted border border-border whitespace-nowrap">
+                                                        {{ $partnerSks }} SKS{{ $partnerAssignment->phase !== SessionPhase::Full ? ' • ' . ($partnerAssignment->phase === SessionPhase::BeforeUts ? 'UTS' : 'UAS') : '' }}
+                                                    </span>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    @else
+                                        <span class="text-xs text-muted italic">— Dosen Tunggal —</span>
+                                    @endif
+                                </td>
 
-                                        <button type="button"
-                                                @click="openQuickAssign({{ $offering->id }}, @js($offering->course->name), @js($offering->classGroup->name), 'partner', {{ $offering->course->sks }}, @js($teamPayload))"
-                                                class="inline-flex items-center gap-1 rounded-md border border-dashed border-border px-2 py-0.5 text-xs font-medium text-muted hover:text-primary hover:border-primary/40 hover:bg-primary-soft/20 transition"
-                                                title="Tambah dosen mitra">
-                                            <i data-lucide="plus" class="size-3"></i>
-                                            <span>Mitra</span>
-                                        </button>
-                                    </div>
+                                {{-- Skema --}}
+                                <td class="w-24 px-3 py-3 text-center whitespace-nowrap">
+                                    @if (! $leadAssignment && $partnerAssignments->isEmpty())
+                                        <span class="inline-flex items-center rounded-full bg-danger-soft px-2.5 py-0.5 text-[11px] font-semibold text-danger border border-danger/20">
+                                            Kosong
+                                        </span>
+                                    @elseif ($partnerAssignments->isNotEmpty())
+                                        <span class="inline-flex items-center rounded-full bg-purple-50 px-2.5 py-0.5 text-[11px] font-semibold text-purple-700 border border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800">
+                                            Team ({{ $partnerAssignments->count() + 1 }})
+                                        </span>
+                                    @else
+                                        <span class="inline-flex items-center rounded-full bg-page px-2.5 py-0.5 text-[11px] font-medium text-muted border border-border">
+                                            Tunggal
+                                        </span>
+                                    @endif
                                 </td>
 
                                 {{-- Aksi Cepat --}}
-                                <td class="px-4 py-3 text-right whitespace-nowrap">
-                                    @if ($leadAssignment && ! $leadAssignment->is_locked)
+                                <td class="w-28 px-4 py-3 text-right whitespace-nowrap">
+                                    @if ($leadAssignment)
                                         <button type="button"
                                                 @click="openEditAssignment(@js($offeringPayload), @js($leadPayload))"
-                                                class="inline-flex items-center gap-1.5 rounded-control border border-border bg-surface px-2.5 py-1 text-xs font-semibold text-ink hover:bg-primary-soft hover:text-primary hover:border-primary/30 transition"
-                                                title="Kelola atau ubah tim pengajar kelas ini">
+                                                class="inline-flex items-center gap-1.5 rounded-control border border-border bg-surface px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary-soft hover:border-primary/40 transition cursor-pointer"
+                                                title="Kelola tim pengajar kelas ini">
                                             <i data-lucide="pencil" class="size-3.5"></i>
                                             <span>Atur Tim</span>
                                         </button>
                                     @else
                                         <button type="button"
-                                                @click="openQuickAssign({{ $offering->id }}, @js($offering->course->name), @js($offering->classGroup->name), '{{ $leadAssignment ? 'partner' : 'lead' }}', {{ $offering->course->sks }}, @js($teamPayload))"
-                                                class="inline-flex items-center gap-1.5 rounded-control border border-border bg-surface px-2.5 py-1 text-xs font-semibold text-ink hover:bg-primary-soft hover:text-primary hover:border-primary/30 transition"
-                                                title="Kelola tim pengajar kelas ini">
-                                            <i data-lucide="pencil" class="size-3.5"></i>
-                                            <span>Atur Tim</span>
+                                                @click="openQuickAssign({{ $offering->id }}, @js($offering->course->name), @js($offering->classGroup->name), 'lead', {{ $offering->course->sks }}, @js($teamPayload))"
+                                                class="inline-flex items-center gap-1.5 rounded-control border border-danger/40 bg-danger-soft/40 px-2.5 py-1 text-xs font-semibold text-danger hover:bg-danger-soft transition cursor-pointer"
+                                                title="Tugaskan pengampu kelas ini">
+                                            <i data-lucide="user-plus" class="size-3.5"></i>
+                                            <span>Tugaskan</span>
                                         </button>
                                     @endif
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="py-12 text-center text-muted">
+                                <td colspan="9" class="py-12 text-center text-muted">
                                     <i data-lucide="search-x" class="mx-auto size-8 text-muted/60 mb-2"></i>
                                     <p class="font-medium text-ink">Tidak ditemukan penawaran mata kuliah yang sesuai filter.</p>
                                     <p class="text-xs text-muted mt-1">Coba sesuaikan kata kunci atau bersihkan filter pencarian.</p>
@@ -522,22 +464,43 @@
                                         </div>
                                         <span class="mt-0.5 text-[11px] text-muted">
                                             Periode: <strong class="text-ink" x-text="member.phase_label"></strong>
-                                            <template x-if="member.credited_sks !== null">
-                                                <span> • Diakui <strong class="text-primary" x-text="`${member.credited_sks} SKS`"></strong></span>
-                                            </template>
                                         </span>
                                     </div>
                                     <div class="flex items-center gap-1.5">
-                                        <template x-if="member.is_locked">
-                                            <span class="rounded bg-page px-2 py-1 text-[10px] font-semibold text-muted">Terkunci</span>
-                                        </template>
+                                        {{-- Toggle Lock --}}
+                                        <form method="POST" :action="`/admin/pembagian-mengajar/${member.id}/kunci`" class="inline">
+                                            @csrf
+                                            <button type="submit"
+                                                    class="rounded-md border border-border bg-surface px-2 py-1 text-[11px] font-medium transition hover:border-primary hover:text-primary"
+                                                    :class="member.is_locked ? 'text-primary' : 'text-muted'"
+                                                    :title="member.is_locked ? 'Klik untuk buka kunci' : 'Klik untuk kunci penugasan'">
+                                                <span x-text="member.is_locked ? '🔒 Terkunci' : '🔓 Kunci'"></span>
+                                            </button>
+                                        </form>
+
+                                        {{-- Edit Button --}}
                                         <template x-if="!member.is_locked">
                                             <button type="button"
                                                     @click="openEditAssignment(activeOffering, member)"
-                                                    class="rounded-md px-2.5 py-1 text-xs font-semibold transition"
-                                                    :class="editingAssignmentId === member.id ? 'bg-primary text-white' : 'border border-border bg-page text-ink hover:border-primary hover:text-primary'">
-                                                <span x-text="editingAssignmentId === member.id ? 'Sedang Diedit' : 'Pilih Edit'"></span>
+                                                    class="inline-flex items-center gap-1 rounded-control px-2.5 py-1 text-xs font-semibold transition cursor-pointer"
+                                                    :class="editingAssignmentId === member.id ? 'bg-primary text-white' : 'border border-border bg-surface text-primary hover:border-primary/40 hover:bg-primary-soft'">
+                                                <i data-lucide="pencil" class="size-3.5"></i>
+                                                <span x-text="editingAssignmentId === member.id ? 'Sedang Diedit' : 'Edit'"></span>
                                             </button>
+                                        </template>
+
+                                        {{-- Delete Button --}}
+                                        <template x-if="!member.is_locked">
+                                            <form method="POST" :action="`/admin/pembagian-mengajar/${member.id}`" class="inline" onsubmit="return confirm('Hapus pengajar ini dari tim?')">
+                                                @csrf
+                                                <input type="hidden" name="_method" value="DELETE">
+                                                <button type="submit"
+                                                        class="inline-flex items-center gap-1 rounded-control border border-danger/30 bg-danger-soft/30 px-2.5 py-1 text-xs font-semibold text-danger hover:bg-danger hover:text-white transition cursor-pointer"
+                                                        title="Hapus pengajar dari tim">
+                                                    <i data-lucide="trash-2" class="size-3.5"></i>
+                                                    <span>Hapus</span>
+                                                </button>
+                                            </form>
                                         </template>
                                     </div>
                                 </div>
@@ -615,12 +578,6 @@
                         </div>
                     </div>
 
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-muted">SKS Diakui untuk Target Dosen (Opsional — Bilangan Bulat)</label>
-                        <input type="number" step="1" min="0" max="12" name="credited_sks" x-model="quickCreditedSks" placeholder="Kosongkan jika mengikuti perhitungan otomatis"
-                               class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
-                    </div>
-
                     <div class="mt-2 flex items-center justify-end gap-2 border-t border-border pt-4">
                         <x-button variant="secondary" type="button" @click="quickModalOpen = false">Batal</x-button>
                         <x-button variant="primary" type="submit" icon="check">
@@ -682,12 +639,6 @@
                         </div>
                     </div>
 
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-muted">SKS Diakui untuk Target Dosen (Opsional)</label>
-                        <input type="number" step="1" min="0" max="12" name="credited_sks" placeholder="Kosongkan jika otomatis"
-                               class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
-                    </div>
-
                     <div class="rounded-lg bg-page p-3 text-xs text-muted">
                         <i data-lucide="info" class="size-4 inline text-primary mr-1"></i>
                         Jika memilih peran <strong>Pengampu (Utama)</strong>, pengampu lama yang tidak dikunci pada kelas terpilih akan diperbarui. Penugasan yang sudah dikunci tidak akan diubah.
@@ -709,7 +660,7 @@
                     <div>
                         <span class="text-xs font-semibold text-primary">Semester Aktif</span>
                         <h3 class="text-xl font-bold text-ink">Rekap Beban SKS Dosen</h3>
-                        <p class="text-xs text-muted">Beban pertemuan dihitung dari SKS mata kuliah × 7 untuk setiap fase. Target dan maksimum memakai SKS diakui.</p>
+                        <p class="text-xs text-muted">Target dan maksimum memakai SKS Semester, dihitung satu kali per mata kuliah di setiap kelas. SKS × Pertemuan mengikuti jumlah pertemuan setiap pengajar.</p>
                     </div>
                     <button type="button" @click="rekapModalOpen = false" class="text-muted hover:text-ink">
                         <i data-lucide="x" class="size-5"></i>
@@ -731,7 +682,7 @@
                                 <th class="py-2.5 px-3 text-center font-semibold">SKS × Pertemuan</th>
                                 <th class="py-2.5 px-3 text-center font-semibold">Target</th>
                                 <th class="py-2.5 px-3 text-center font-semibold">Maks.</th>
-                                <th class="py-2.5 px-3 text-center font-semibold">SKS Diakui</th>
+                                <th class="py-2.5 px-3 text-center font-semibold">SKS Semester</th>
                                 <th class="py-2.5 px-3 text-center font-semibold">Sisa</th>
                                 <th class="py-2.5 px-4 font-semibold">Status Beban</th>
                             </tr>
@@ -769,7 +720,7 @@
                 </div>
 
                 <div class="mt-4 flex items-center justify-between border-t border-border pt-3 text-xs text-muted">
-                    <span>Dua pengajar tidak otomatis masing-masing menerima SKS penuh.</span>
+                    <span>SKS Semester menjumlahkan bobot mata kuliah pada setiap kelas yang diajar masing-masing dosen.</span>
                     <x-button variant="secondary" type="button" @click="rekapModalOpen = false">Tutup</x-button>
                 </div>
             </div>

@@ -2,7 +2,7 @@
 
 namespace App\Http\Requests\Admin;
 
-use App\Services\SchedulerService;
+use App\Services\Scheduling\SchedulerService;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -31,7 +31,7 @@ class StartSchedulingRequest extends FormRequest
             'scope' => ['required', Rule::in(array_keys(SchedulerService::SCOPES))],
             'class_ids' => ['nullable', 'required_if:scope,kelas', 'array'],
             'class_ids.*' => ['integer', Rule::exists('class_groups', 'id')],
-            'time_limit' => ['required', 'integer', Rule::in(array_values(config('sicma.scheduler.time_limits')))],
+            'time_limit' => ['sometimes', 'integer', Rule::in(array_values(config('sicma.scheduler.time_limits')))],
         ];
     }
 

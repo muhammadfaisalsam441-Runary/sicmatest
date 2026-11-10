@@ -2,8 +2,8 @@
 
 namespace App\Console\Commands;
 
-use App\Models\User;
-use App\Services\JtikSpreadsheetImportService;
+use App\Models\User\User;
+use App\Services\Scheduling\JtikSpreadsheetImportService;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
@@ -13,7 +13,7 @@ use InvalidArgumentException;
 use Throwable;
 
 #[Signature('sicma:import-jtik
-    {--directory= : Folder kedua spreadsheet sumber}
+    {--directory= : Folder kedua spreadsheet sumber (default: storage/app/reference-files)}
     {--admin= : Email admin yang dicatat sebagai pelaksana impor}
     {--preview : Periksa sumber tanpa menulis ke database}
     {--ganjil-start=2026-08-18}
@@ -29,7 +29,7 @@ class ImportJtikSpreadsheets extends Command
     public function handle(JtikSpreadsheetImportService $service): int
     {
         try {
-            $directory = rtrim($this->option('directory') ?: base_path(), '/\\');
+            $directory = rtrim($this->option('directory') ?: storage_path('app/reference-files'), '/\\');
             $sources = [];
             foreach (['Ganjil_2026_2027', 'Genap_2025_2026'] as $suffix) {
                 $sources[] = $service->inspect($directory.DIRECTORY_SEPARATOR.'Jadwal_dan_Dosen_JTIK_UNM_'.$suffix.'.xlsx');

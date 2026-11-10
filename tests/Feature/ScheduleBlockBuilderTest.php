@@ -2,13 +2,13 @@
 
 use App\Enums\RoomBlockSource;
 use App\Enums\SessionPhase;
-use App\Models\CalendarException;
-use App\Models\ClassGroup;
-use App\Models\Period;
-use App\Models\Room;
-use App\Models\ScheduleSession;
-use App\Models\ScheduleVersion;
-use App\Services\ScheduleBlockBuilder;
+use App\Models\Academic\CalendarException;
+use App\Models\Academic\ClassGroup;
+use App\Models\Academic\Period;
+use App\Models\Room\Room;
+use App\Models\Scheduling\ScheduleSession;
+use App\Models\Scheduling\ScheduleVersion;
+use App\Services\Scheduling\ScheduleBlockBuilder;
 
 function septemberPeriod(array $attributes = []): Period
 {

@@ -2,10 +2,10 @@
 
 namespace Database\Factories;
 
-use App\Models\ClassGroup;
-use App\Models\Course;
-use App\Models\CourseOffering;
-use App\Models\Period;
+use App\Models\Academic\ClassGroup;
+use App\Models\Academic\Course;
+use App\Models\Academic\CourseOffering;
+use App\Models\Academic\Period;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**

@@ -1,12 +1,12 @@
 <?php
 
 use App\Enums\ReservationStatus;
-use App\Models\AppNotification;
-use App\Models\Reservation;
-use App\Models\Room;
-use App\Models\RoomBlock;
-use App\Models\User;
-use App\Services\ReservationService;
+use App\Models\Reservation\Reservation;
+use App\Models\Room\Room;
+use App\Models\Room\RoomBlock;
+use App\Models\User\AppNotification;
+use App\Models\User\User;
+use App\Services\Room\ReservationService;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Scheduling\Schedule;
 

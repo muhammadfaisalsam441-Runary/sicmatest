@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Keti;
 
 use App\Http\Controllers\Controller;
-use App\Models\Room;
-use App\Services\AvailabilityService;
+use App\Models\Room\Room;
+use App\Services\Room\AvailabilityService;
 use App\Support\RoomCardPresenter;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;

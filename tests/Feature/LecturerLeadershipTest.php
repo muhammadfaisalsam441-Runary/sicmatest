@@ -1,7 +1,7 @@
 <?php
 
-use App\Models\LeadershipTerm;
-use App\Models\Lecturer;
+use App\Models\Lecturer\LeadershipTerm;
+use App\Models\Lecturer\Lecturer;
 use Carbon\CarbonImmutable;
 
 test('dosen dianggap pimpinan hanya selama masa jabatan', function (string $date, bool $expected) {

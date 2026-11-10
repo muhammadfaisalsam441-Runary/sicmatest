@@ -8,7 +8,7 @@
 @section('breadcrumb', 'Susun Jadwal|'.($isDraft ? 'Draf v'.$version->version_no : 'Resmi v'.$version->version_no))
 
 @section('breadcrumb-actions')
-    <x-button variant="secondary" :href="route('admin.schedules.index')">Kelola Jadwal</x-button>
+    <x-button variant="secondary" :href="route('admin.schedules.index')">Jadwal Resmi</x-button>
 @endsection
 
 @section('content')
@@ -26,50 +26,36 @@
             :title="($isDraft ? 'Draf jadwal ' : 'Jadwal ').$version->period->name">
             <x-slot:actions>
                 <x-status-badge variant="primary">{{ $isDraft ? 'Draf' : $version->status->label() }} v{{ $version->version_no }}</x-status-badge>
+                <x-button variant="secondary" icon="download" :href="route('admin.drafts.excel', [$version, 'tinjau' => $view])" download>Unduh Excel</x-button>
+                <x-button variant="secondary" icon="download" :href="route('admin.drafts.pdf', [$version, 'tinjau' => $view])" download>Unduh PDF</x-button>
                 @if ($isDraft)
-                    <form method="POST" action="{{ route('admin.drafts.validate', $version) }}">
-                        @csrf
-                        <x-button type="submit" variant="soft" icon="refresh-cw">Periksa ulang</x-button>
-                    </form>
-                    @if ($canPublish)
-                        <x-button :variant="$blocking->isEmpty() ? 'primary' : 'secondary'" x-data x-on:click="$dispatch('open-modal', 'publish-draft')">Tetapkan jadwal</x-button>
-                    @endif
+                    <x-button :href="route('admin.drafts.inspect', $version)">Buka Pemeriksaan</x-button>
                 @endif
             </x-slot:actions>
         </x-page-header>
 
         <x-card>
-            <x-stepper :steps="['Data', 'Tim mengajar', 'Draf jadwal', 'Periksa', 'Tetapkan']" :current="$isDraft ? ($blocking->isEmpty() ? 4 : 3) : 6" />
+            <x-schedule-steps :current="$isDraft ? 3 : 5" :version="$version" />
         </x-card>
+
+        @include('admin.partials.scheduling-tabs', [
+            'version' => $version,
+            'isDraft' => $isDraft,
+            'reviewStatus' => $reviewStatus,
+        ])
 
         <x-card class="flex flex-wrap gap-x-8 gap-y-2 text-sm" padding="px-6 py-4">
             <span><span class="font-semibold">{{ $version->source->label() }}</span> {{ Wita::stamp($version->created_at) }}</span>
-            <span><span class="font-semibold">Status draf:</span> {{ $blocking->isEmpty() ? 'siap ditetapkan' : 'perlu pemeriksaan' }}</span>
+            <span><span class="font-semibold">{{ $isDraft ? 'Pemeriksaan:' : 'Status versi:' }}</span> {{ $isDraft ? $reviewStatus['label'] : $version->status->label() }}</span>
             <span><span class="font-semibold">Sesi</span> {{ $counts['total'] }} total • {{ $counts['timed'] }} punya waktu • {{ $counts['unscheduled'] }} tanpa waktu • {{ $counts['online'] }} online</span>
             <span><span class="font-semibold">Dikunci</span> {{ $counts['locked'] }} sesi</span>
             <span><span class="font-semibold">Berlaku mulai</span> {{ Wita::date($version->effective_from) }}</span>
         </x-card>
 
         @if ($isDraft)
-            <x-card class="flex flex-col gap-3">
-                <div class="flex items-center justify-between">
-                    <h2 class="text-lg font-semibold">{{ $blocking->isEmpty() ? 'Tidak ada masalah wajib' : 'Selesaikan '.$blocking->count().' masalah wajib dulu.' }}</h2>
-                    <span class="text-xs text-muted">Dosen diperiksa sesuai periode sebelum atau setelah UTS.</span>
-                </div>
-                @foreach ($blocking as $issue)
-                    <div class="flex items-start justify-between gap-4 rounded-control bg-danger-soft px-4 py-3 text-sm">
-                        <span><x-status-badge variant="danger">Masalah wajib</x-status-badge> <span class="ml-2 text-ink">{{ $issue->message }}</span></span>
-                        @if (! empty($issue->session_ids))
-                            <a href="{{ route('admin.drafts.show', [$version, 'tinjau' => $view, 'sesi' => $issue->session_ids[0]]) }}" class="shrink-0 font-semibold text-primary hover:underline">Lihat sesi</a>
-                        @endif
-                    </div>
-                @endforeach
-                @foreach ($warnings as $issue)
-                    <div class="flex items-start justify-between gap-4 rounded-control bg-page px-4 py-3 text-sm ring-1 ring-border">
-                        <span><x-status-badge variant="warning">Peringatan</x-status-badge> <span class="ml-2 text-muted">{{ $issue->message }}</span></span>
-                    </div>
-                @endforeach
-            </x-card>
+            <x-info-box title="Pemeriksaan tersedia pada halaman tersendiri">
+                <p>Temuan wajib, peringatan, dan kesiapan penetapan dapat dipantau melalui <a class="font-semibold text-primary hover:underline" href="{{ route('admin.drafts.inspect', $version) }}">Pemeriksaan Jadwal</a>.</p>
+            </x-info-box>
         @endif
 
         <x-tabs :items="collect(['kelas' => 'Tinjau per kelas', 'dosen' => 'Tinjau per dosen', 'ruang' => 'Tinjau per ruang'])
@@ -111,13 +97,13 @@
                                     @if ($isDraft)
                                         <form method="POST" action="{{ route('admin.drafts.sessions.lock', [$version, $session]) }}" class="inline">
                                             @csrf
-                                            <button type="submit" class="inline-flex size-9 items-center justify-center rounded-control border border-border text-primary hover:bg-primary-soft/60" aria-label="{{ $session->is_locked ? 'Buka kunci' : 'Kunci' }} sesi">
-                                                <i data-lucide="{{ $session->is_locked ? 'lock' : 'lock-open' }}" class="size-4"></i>
+                                            <button type="submit" class="inline-flex size-8 items-center justify-center rounded-control border border-border bg-surface text-primary hover:bg-primary-soft hover:border-primary/40 transition cursor-pointer" aria-label="{{ $session->is_locked ? 'Buka kunci' : 'Kunci' }} sesi" title="{{ $session->is_locked ? 'Buka kunci' : 'Kunci' }} sesi">
+                                                <i data-lucide="{{ $session->is_locked ? 'lock' : 'lock-open' }}" class="size-3.5"></i>
                                             </button>
                                         </form>
                                         @unless ($session->is_locked)
-                                            <a href="{{ route('admin.drafts.show', [$version, 'tinjau' => $view, 'sesi' => $session->id]) }}" class="inline-flex size-9 items-center justify-center rounded-control border border-border text-primary hover:bg-primary-soft/60" aria-label="Ubah penempatan {{ $session->title }}">
-                                                <i data-lucide="pencil" class="size-4"></i>
+                                            <a href="{{ route('admin.drafts.show', [$version, 'tinjau' => $view, 'sesi' => $session->id]) }}" class="inline-flex size-8 items-center justify-center rounded-control border border-border bg-surface text-primary hover:bg-primary-soft hover:border-primary/40 transition cursor-pointer" aria-label="Ubah penempatan {{ $session->title }}" title="Ubah penempatan {{ $session->title }}">
+                                                <i data-lucide="pencil" class="size-3.5"></i>
                                             </a>
                                         @endunless
                                     @endif
@@ -147,7 +133,7 @@
                 </x-field>
                 <div class="grid grid-cols-3 gap-3" x-show="mode !== 'unscheduled'">
                     <x-field label="Hari" name="day_of_week">
-                        <x-select name="day_of_week" :options="[1 => 'Senin', 2 => 'Selasa', 3 => 'Rabu', 4 => 'Kamis', 5 => 'Jumat', 6 => 'Sabtu']" :value="$editing->day_of_week" placeholder="Pilih hari" />
+                        <x-select name="day_of_week" :options="collect(config('sicma.scheduler.days'))->mapWithKeys(fn ($day) => [$day => Wita::dayName($day)])" :value="$editing->day_of_week" placeholder="Pilih hari" />
                     </x-field>
                     <x-field label="Jam mulai" name="start_time">
                         <x-input type="time" name="start_time" :min="config('sicma.operating_hours.start')" :max="config('sicma.operating_hours.end')" :value="$editing->start_minute !== null ? sprintf('%02d:%02d', intdiv($editing->start_minute, 60), $editing->start_minute % 60) : null" />
@@ -175,39 +161,4 @@
         </x-modal>
     @endif
 
-    @if ($isDraft && auth()->user()->can('publish-schedule'))
-        <x-modal name="publish-draft" :title="'Tetapkan draf v'.$version->version_no.' sebagai jadwal resmi?'" :show="$errors->has('effective_from')" width="max-w-[520px]">
-            <div class="flex flex-col gap-4">
-                <p class="text-sm text-muted">Setelah ditetapkan, dosen dan ketua tingkat mengikuti jadwal ini. Perubahan berikutnya dibuat sebagai revisi baru.</p>
-                <ul class="flex flex-col gap-2 text-sm">
-                    @foreach ([
-                        [$issues->whereIn('code', ['ROOM_CONFLICT', 'LECTURER_CONFLICT', 'CLASS_CONFLICT'])->isEmpty(), 'Tidak ada bentrok ruang, dosen, atau kelas'],
-                        [$issues->where('code', 'LEADERSHIP_THURSDAY')->isEmpty(), 'Pimpinan tidak dijadwalkan hari Kamis'],
-                        [$issues->whereIn('code', ['SESSION_WITHOUT_TIME', 'SESSION_WITHOUT_ROOM'])->isEmpty(), 'Seluruh sesi punya waktu dan ruang'],
-                        [$issues->where('code', 'RESERVATION_CONFLICT')->isEmpty(), 'Tidak ada reservasi yang terdampak (diperiksa ulang saat disimpan)'],
-                        [true, 'Jadwal online tidak mengunci ruang fisik'],
-                    ] as [$ok, $label])
-                        <li class="flex items-center gap-2 {{ $ok ? 'text-success' : 'text-danger' }}">
-                            <i data-lucide="{{ $ok ? 'circle-check' : 'circle-alert' }}" class="size-4"></i>{{ $label }}
-                        </li>
-                    @endforeach
-                </ul>
-                <form method="POST" action="{{ route('admin.drafts.publish', $version) }}" class="flex flex-col gap-4">
-                    @csrf
-                    <input type="hidden" name="lock_version" value="{{ $version->lock_version }}">
-                    <x-field label="Berlaku mulai" name="effective_from">
-                        <x-input type="date" name="effective_from" :value="max(now()->toDateString(), $version->effective_from->toDateString())" :min="now()->toDateString()" required />
-                    </x-field>
-                    <x-field label="Catatan revisi (opsional)" name="note">
-                        <x-input name="note" placeholder="Contoh: perbaikan bentrok AE 107 Senin" />
-                    </x-field>
-                    <p class="text-xs text-muted">Sistem memeriksa ulang data terbaru. Jika ada perubahan serentak atau masalah wajib, penetapan dihentikan untuk ditinjau ulang.</p>
-                    <div class="flex justify-end gap-3">
-                        <x-button variant="secondary" x-on:click="$dispatch('close-modal', 'publish-draft')">Batal</x-button>
-                        <x-button type="submit">Tetapkan sebagai resmi</x-button>
-                    </div>
-                </form>
-            </div>
-        </x-modal>
-    @endif
 @endpush

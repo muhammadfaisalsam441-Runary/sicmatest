@@ -4,9 +4,9 @@ namespace App\Http\Controllers\Admin;
 
 use App\Enums\ReservationStatus;
 use App\Http\Controllers\Controller;
-use App\Models\ClassGroup;
-use App\Models\Reservation;
-use App\Models\Room;
+use App\Models\Academic\ClassGroup;
+use App\Models\Reservation\Reservation;
+use App\Models\Room\Room;
 use App\Support\Wita;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;

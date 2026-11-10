@@ -131,7 +131,7 @@
                             <x-field label="Alasan menonaktifkan (wajib)" name="reason">
                                 <x-input name="reason" :id="'reason-deactivate-'.$applicant->id" placeholder="Contoh: masa jabatan Keti berakhir" required />
                             </x-field>
-                            <x-button type="submit" variant="danger-outline">Nonaktifkan akun</x-button>
+                            <x-button type="submit" variant="danger-outline" icon="user-x">Nonaktifkan akun</x-button>
                         </form>
                     @endif
                     <x-button variant="secondary" x-on:click="$dispatch('close-modal', 'application-{{ $application->id }}')">Tutup</x-button>
@@ -154,7 +154,7 @@
                     <div class="flex flex-wrap justify-end gap-3">
                         <x-button variant="secondary" x-on:click="$dispatch('close-modal', 'decline-{{ $application->id }}')">Batal</x-button>
                         <x-button type="submit" variant="soft" formaction="{{ route('admin.keti-accounts.revise', $application) }}">Minta perbaikan</x-button>
-                        <x-button type="submit" variant="danger">Kirim penolakan</x-button>
+                        <x-button type="submit" variant="danger" icon="x-circle">Kirim penolakan</x-button>
                     </div>
                 </form>
             </x-modal>

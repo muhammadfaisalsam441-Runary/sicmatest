@@ -4,9 +4,9 @@ namespace App\Http\Controllers\Keti;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Keti\RoomSearchRequest;
-use App\Models\Building;
-use App\Services\Availability\SearchCriteria;
-use App\Services\AvailabilityService;
+use App\Models\Room\Building;
+use App\Services\Room\AvailabilityService;
+use App\Services\Room\SearchCriteria;
 use App\Support\RoomCardPresenter;
 use App\Support\Wita;
 use Illuminate\View\View;

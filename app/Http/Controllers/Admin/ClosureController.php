@@ -4,9 +4,9 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\ClosureRequest;
-use App\Models\Room;
-use App\Models\RoomClosure;
-use App\Services\ClosureService;
+use App\Models\Room\Room;
+use App\Models\Room\RoomClosure;
+use App\Services\Room\RoomClosureService;
 use App\Support\Wita;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
@@ -17,7 +17,7 @@ use Illuminate\Http\Request;
  */
 class ClosureController extends Controller
 {
-    public function store(ClosureRequest $request, ClosureService $closures): RedirectResponse
+    public function store(ClosureRequest $request, RoomClosureService $closures): RedirectResponse
     {
         $room = Room::query()->findOrFail($request->integer('room_id'));
         $start = CarbonImmutable::parse($request->validated('start_at'));
@@ -44,7 +44,7 @@ class ClosureController extends Controller
         ]);
     }
 
-    public function destroy(Request $request, RoomClosure $closure, ClosureService $closures): RedirectResponse
+    public function destroy(Request $request, RoomClosure $closure, RoomClosureService $closures): RedirectResponse
     {
         $closures->remove($closure, $request->user());
 

@@ -1,7 +1,7 @@
 <?php
 
-use App\Models\Room;
-use App\Models\RoomBlock;
+use App\Models\Room\Room;
+use App\Models\Room\RoomBlock;
 use Carbon\CarbonImmutable;
 
 function blockFrom(Room $room, string $start, string $end): RoomBlock

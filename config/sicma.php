@@ -24,9 +24,15 @@ return [
     ],
 
     'reservation' => [
-        'default_minutes' => 60, // desain: "Durasi 1 jam"
+        'default_minutes' => 100,
         'min_minutes' => 30, // BELUM DITETAPKAN
-        'max_minutes' => 180, // BELUM DITETAPKAN
+        'max_minutes' => 200, // 4 SKS = 200 menit
+        'duration_options' => [
+            100 => '2 SKS (100 menit)',
+            150 => '3 SKS (150 menit)',
+            200 => '4 SKS (200 menit)',
+        ],
+        'academic_purposes' => ['Kuliah Pengganti', 'Praktikum Tambahan'],
         'max_days_ahead' => 7, // BELUM DITETAPKAN
         'max_active_per_class' => 3, // BELUM DITETAPKAN
         'checkin_open_minutes_before' => 15, // BELUM DITETAPKAN
@@ -66,7 +72,7 @@ return [
         'run_mode' => env('SICMA_SCHEDULER_MODE', 'queue'),
         'grace_seconds' => 30,
         'queue_wait_seconds' => 600,
-        'days' => [1, 2, 3, 4, 5], // Senin–Jumat. BELUM DITETAPKAN
+        'days' => [1, 2, 3, 4, 5], // Perkuliahan hanya Senin–Jumat.
     ],
 
     'polling_seconds' => 30,

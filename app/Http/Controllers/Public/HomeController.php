@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Public;
 
 use App\Http\Controllers\Controller;
-use App\Services\Availability\SearchCriteria;
-use App\Services\AvailabilityService;
+use App\Services\Room\AvailabilityService;
+use App\Services\Room\SearchCriteria;
 use App\Support\AvailabilityCache;
 use App\Support\RoomCardPresenter;
 use Carbon\CarbonImmutable;

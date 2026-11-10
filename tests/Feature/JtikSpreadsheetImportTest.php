@@ -5,18 +5,18 @@ namespace Tests\Feature;
 use App\Enums\ImportStatus;
 use App\Enums\ScheduleVersionStatus;
 use App\Exceptions\DomainException;
-use App\Models\ClassGroup;
-use App\Models\Course;
-use App\Models\Import;
-use App\Models\ImportRow;
-use App\Models\Lecturer;
-use App\Models\Period;
-use App\Models\Room;
-use App\Models\ScheduleSession;
-use App\Models\ScheduleVersion;
-use App\Models\User;
-use App\Services\JtikSpreadsheetImportService;
-use App\Services\SchedulePublisher;
+use App\Models\Academic\ClassGroup;
+use App\Models\Academic\Course;
+use App\Models\Academic\Period;
+use App\Models\Lecturer\Lecturer;
+use App\Models\Room\Room;
+use App\Models\Scheduling\Import;
+use App\Models\Scheduling\ImportRow;
+use App\Models\Scheduling\ScheduleSession;
+use App\Models\Scheduling\ScheduleVersion;
+use App\Models\User\User;
+use App\Services\Scheduling\JtikSpreadsheetImportService;
+use App\Services\Scheduling\SchedulePublisher;
 use Carbon\CarbonImmutable;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
@@ -172,7 +172,7 @@ class JtikSpreadsheetImportTest extends TestCase
 
     public function test_available_source_workbooks_reconcile_with_imported_data(): void
     {
-        $directory = getenv('SICMA_SOURCE_DIRECTORY') ?: base_path();
+        $directory = getenv('SICMA_SOURCE_DIRECTORY') ?: storage_path('app/reference-files');
         $ganjil = $directory.'/Jadwal_dan_Dosen_JTIK_UNM_Ganjil_2026_2027.xlsx';
         $genap = $directory.'/Jadwal_dan_Dosen_JTIK_UNM_Genap_2025_2026.xlsx';
         if (! is_file($ganjil) || ! is_file($genap)) {

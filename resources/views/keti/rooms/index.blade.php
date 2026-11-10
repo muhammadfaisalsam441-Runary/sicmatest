@@ -6,7 +6,7 @@
     <div class="flex flex-col gap-6">
         <div class="flex items-start justify-between">
             <x-page-header title="Ruangan JTIK" subtitle="{{ $totalRooms }} ruangan terdaftar" />
-            <x-sim-data-label :at="$checkedAt" />
+            <span class="text-xs text-muted">{{ \App\Support\Wita::stamp($checkedAt) }}</span>
         </div>
 
         <form method="GET" action="{{ route('keti.rooms.index') }}" class="flex items-center gap-3 rounded-card border border-border bg-surface p-3">
@@ -23,7 +23,13 @@
             <x-button variant="secondary" :href="route('keti.rooms.index')">Reset</x-button>
         </form>
 
-        <h2 class="text-lg font-semibold">Daftar ruangan</h2>
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="flex flex-col gap-1">
+                <h2 class="text-lg font-semibold">Daftar ruangan</h2>
+                <p class="text-sm text-muted">Status menunjukkan kondisi saat ini. Kamu tetap bisa booking untuk tanggal dan jam operasional berikutnya.</p>
+            </div>
+            <x-button :href="route('keti.rooms.calendar')" icon="calendar-days">Booking ruangan</x-button>
+        </div>
 
         @if ($rooms === [])
             <x-empty-state title="Ruangan tidak ditemukan" message="Ubah kata kunci atau filter untuk melihat ruangan lain.">

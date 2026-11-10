@@ -3,9 +3,9 @@
 namespace Database\Factories;
 
 use App\Enums\KetiApplicationStatus;
-use App\Models\ClassGroup;
-use App\Models\KetiApplication;
-use App\Models\User;
+use App\Models\Academic\ClassGroup;
+use App\Models\User\KetiApplication;
+use App\Models\User\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**

@@ -4,12 +4,12 @@ namespace App\Http\Controllers\Keti;
 
 use App\Enums\ReservationStatus;
 use App\Http\Controllers\Controller;
-use App\Models\Building;
-use App\Models\Reservation;
-use App\Models\Room;
-use App\Services\AgendaDescriber;
-use App\Services\Availability\SearchCriteria;
-use App\Services\AvailabilityService;
+use App\Models\Reservation\Reservation;
+use App\Models\Room\Building;
+use App\Models\Room\Room;
+use App\Services\Room\AvailabilityService;
+use App\Services\Room\RoomAgendaDescriber;
+use App\Services\Room\SearchCriteria;
 use App\Support\RoomCardPresenter;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
@@ -59,13 +59,14 @@ class RoomController extends Controller
     /**
      * Detail ruang + panel "Gunakan untuk kelasmu".
      */
-    public function show(Request $request, Room $room, AvailabilityService $availability, AgendaDescriber $agenda): View
+    public function show(Request $request, Room $room, AvailabilityService $availability, RoomAgendaDescriber $agenda): View
     {
         abort_unless($room->is_active, 404);
 
         $request->validate([
             'mulai' => ['nullable', 'date'],
             'durasi' => ['nullable', 'integer', 'min:'.config('sicma.reservation.min_minutes'), 'max:'.config('sicma.reservation.max_minutes')],
+            'orang' => ['nullable', 'integer', 'min:1', 'max:500'],
         ]);
 
         $now = CarbonImmutable::now()->startOfMinute();
@@ -76,6 +77,14 @@ class RoomController extends Controller
 
         $current = $availability->forRoom($room, $now);
         $requested = $availability->forRoom($room, $start, $start->addMinutes($duration));
+        $suggestedStart = null;
+        if (! $request->filled('mulai') && ! $requested->isAvailable()) {
+            $suggestedStart = $availability->nextBookingStart($room, $duration);
+            if ($suggestedStart !== null) {
+                $start = $suggestedStart;
+                $requested = $availability->forRoom($room, $start, $start->addMinutes($duration));
+            }
+        }
         $user = $request->user();
 
         return view('keti.rooms.show', [
@@ -85,7 +94,11 @@ class RoomController extends Controller
             'start' => $start,
             'end' => $start->addMinutes($duration),
             'duration' => $duration,
+            'participants' => $request->integer('orang') ?: null,
             'isNow' => $start->equalTo($now),
+            'academicBookingAllowed' => in_array($start->dayOfWeekIso, config('sicma.scheduler.days'), true),
+            'suggestedStart' => $suggestedStart,
+            'lastBookingDate' => $now->addDays((int) config('sicma.reservation.max_days_ahead'))->endOfDay(),
             'currentAgenda' => $current->currentBlock ? $agenda->describe($current->currentBlock) : null,
             'nextAgenda' => $current->nextBlock ? $agenda->describe($current->nextBlock) : null,
             'classGroup' => $user->activeClassGroup(),

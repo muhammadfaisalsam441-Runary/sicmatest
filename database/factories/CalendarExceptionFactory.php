@@ -3,8 +3,8 @@
 namespace Database\Factories;
 
 use App\Enums\CalendarExceptionType;
-use App\Models\CalendarException;
-use App\Models\Period;
+use App\Models\Academic\CalendarException;
+use App\Models\Academic\Period;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**

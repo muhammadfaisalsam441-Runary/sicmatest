@@ -4,9 +4,9 @@ namespace Database\Factories;
 
 use App\Enums\SessionPhase;
 use App\Enums\TeachingRole;
-use App\Models\CourseOffering;
-use App\Models\Lecturer;
-use App\Models\TeachingAssignment;
+use App\Models\Academic\CourseOffering;
+use App\Models\Lecturer\Lecturer;
+use App\Models\Lecturer\TeachingAssignment;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**

@@ -33,7 +33,6 @@ class TeachingAssignmentRequest extends FormRequest
             'lecturer_id' => ['required', Rule::exists('lecturers', 'id')->whereNull('deleted_at'), Rule::unique('teaching_assignments')->where(fn ($query) => $query->where('course_offering_id', $this->input('course_offering_id'))->where('phase', $this->input('phase', 'full')))],
             'role' => ['required', Rule::enum(TeachingRole::class)],
             'phase' => ['required', Rule::enum(SessionPhase::class)],
-            'credited_sks' => ['nullable', 'numeric', 'min:0', 'max:12'],
         ];
     }
 
@@ -46,7 +45,6 @@ class TeachingAssignmentRequest extends FormRequest
             'lecturer_id' => 'dosen',
             'role' => 'peran',
             'phase' => 'periode',
-            'credited_sks' => 'SKS diakui',
         ];
     }
 

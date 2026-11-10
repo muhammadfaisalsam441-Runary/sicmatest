@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Keti;
 
 use App\Enums\ReservationStatus;
 use App\Http\Controllers\Controller;
-use App\Models\Reservation;
-use App\Services\ClassScheduleService;
+use App\Models\Reservation\Reservation;
+use App\Services\Academic\ClassScheduleService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -23,7 +23,7 @@ class MyClassController extends Controller
         return view('keti.my-class', [
             'classGroup' => $classGroup,
             'date' => $date,
-            'days' => collect(range(0, 4))->map(fn (int $offset): CarbonImmutable => $weekStart->addDays($offset)),
+            'days' => collect(config('sicma.scheduler.days'))->map(fn (int $day): CarbonImmutable => $weekStart->addDays($day - 1)),
             'sessions' => $schedules->sessionsFor($classGroup, $date),
             'reservations' => Reservation::query()
                 ->whereBelongsTo($classGroup)

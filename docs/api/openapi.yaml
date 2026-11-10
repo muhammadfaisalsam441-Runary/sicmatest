@@ -1,0 +1,798 @@
+openapi: 3.1.0
+info:
+  title: SICMA API (Sistem Informasi Cek Ruangan & Manajemen Akademik)
+  description: |
+    Dokumentasi resmi API SICMA JTIK (Jurusan Teknik Informatika dan Komputer) Universitas Negeri Makassar.
+    API ini menyediakan layanan untuk:
+    - Autentikasi dan pendaftaran Ketua Tingkat (Keti) serta Admin
+    - Pencarian ruangan kosong dan kalender visual ketersediaan ruangan real-time
+    - Manajemen siklus reservasi ruangan (booking, check-in mulai, perpanjang, lapor kendala, selesai)
+    - Pengelolaan master data akademik (kelas, mata kuliah, penawaran perkuliahan, data dosen, dan jadwal)
+  version: 1.0.0
+  contact:
+    name: Tim Pengembang SICMA JTIK
+    email: admin@sicma.test
+
+servers:
+  - url: http://127.0.0.1:8000
+    description: Server Lokal (Development)
+  - url: https://sicma.test
+    description: Laravel Herd Domain
+
+tags:
+  - name: Autentikasi
+    description: Endpoint login, pendaftaran Keti, verifikasi email, dan sesi
+  - name: Portal Keti - Ketersediaan Ruang
+    description: Pencarian ruangan kosong, kalender matriks jadwal, dan katalog ruang
+  - name: Portal Keti - Reservasi Ruang
+    description: Pemesanan ruang, check-in, selesai pakai, perpanjang waktu, dan pelaporan kendala
+  - name: Portal Keti - Profil & Personalisasi
+    description: Ruangan favorit, jadwal My Class, notifikasi, dan profil Keti
+  - name: Portal Admin - Kelola Ruang
+    description: Manajemen CRUD ruang, kapasitas, fasilitas, dan penutupan darurat ruang
+  - name: Portal Admin - Reservasi & Log
+    description: Pengawasan reservasi, pembatalan admin, dan riwayat log penggunaan ruang
+  - name: Portal Admin - Verifikasi Akun Keti
+    description: Persetujuan, perbaikan, dan penolakan pendaftaran akun Keti
+  - name: Portal Admin - Akademik & Dosen
+    description: Pengelolaan master kelas, mata kuliah, penawaran, dan beban SKS dosen
+
+paths:
+  /masuk:
+    post:
+      tags:
+        - Autentikasi
+      summary: Masuk / Login ke Sistem
+      description: Melakukan autentikasi menggunakan email dan password untuk Admin atau Keti.
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: admin@sicma.test
+                password:
+                  type: string
+                  format: password
+                  example: password
+                remember:
+                  type: boolean
+                  example: true
+      responses:
+        '200':
+          description: Berhasil masuk (sesi aktif)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+                  redirect:
+                    type: string
+                    example: /admin
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /daftar:
+    post:
+      tags:
+        - Autentikasi
+      summary: Pendaftaran Akun Ketua Tingkat (Keti)
+      description: Mendaftarkan akun Keti baru dengan menyertakan NIM dan memilih kelas yang diwakili.
+      operationId: registerKeti
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - nim
+                - email
+                - class_group_id
+                - password
+                - password_confirmation
+              properties:
+                name:
+                  type: string
+                  example: Muhammad Fajar
+                nim:
+                  type: string
+                  example: "220209501001"
+                email:
+                  type: string
+                  format: email
+                  example: keti.tekomc@sicma.test
+                class_group_id:
+                  type: integer
+                  example: 3
+                password:
+                  type: string
+                  format: password
+                  example: password123
+                password_confirmation:
+                  type: string
+                  format: password
+                  example: password123
+      responses:
+        '201':
+          description: Pendaftaran berhasil, email verifikasi dikirimkan
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Akun berhasil didaftarkan. Silakan periksa email untuk verifikasi.
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /keluar:
+    post:
+      tags:
+        - Autentikasi
+      summary: Keluar / Logout
+      description: Mengakhiri sesi pengguna saat ini.
+      operationId: logout
+      responses:
+        '200':
+          description: Sesi berhasil dihapus
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+
+  /keti/cari-ruangan:
+    get:
+      tags:
+        - Portal Keti - Ketersediaan Ruang
+      summary: Cari Ruangan Kosong Real-time
+      description: Mencari ruangan yang berstatus "Tersedia" berdasarkan tanggal, jam mulai, durasi, kapasitas, dan gedung.
+      operationId: searchAvailableRooms
+      parameters:
+        - name: hari
+          in: query
+          description: Pilihan hari ('hari-ini', 'besok', atau 'pilih')
+          schema:
+            type: string
+            enum: [hari-ini, besok, pilih]
+            default: hari-ini
+        - name: tanggal
+          in: query
+          description: Tanggal pencarian format YYYY-MM-DD (wajib jika hari=pilih)
+          schema:
+            type: string
+            format: date
+            example: '2026-11-08'
+        - name: jam
+          in: query
+          description: Jam mulai perkuliahan format HH:MM
+          schema:
+            type: string
+            example: '09:15'
+        - name: durasi
+          in: query
+          description: Durasi perkuliahan dalam menit (30 s/d 180 menit)
+          schema:
+            type: integer
+            default: 60
+            example: 100
+        - name: q
+          in: query
+          description: Kata kunci nama atau kode ruang
+          schema:
+            type: string
+            example: AE 101
+        - name: gedung
+          in: query
+          description: ID gedung atau 'lainnya'
+          schema:
+            type: string
+            example: '1'
+        - name: orang
+          in: query
+          description: Minimal kapasitas kursi yang dibutuhkan
+          schema:
+            type: integer
+            example: 35
+        - name: urutan
+          in: query
+          description: Pengurutan hasil ('terlama', 'nama', 'kapasitas')
+          schema:
+            type: string
+            enum: [terlama, nama, kapasitas]
+            default: terlama
+      responses:
+        '200':
+          description: Daftar ruangan yang tersedia sesuai kriteria
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RoomCard'
+
+  /keti/kalender-ruangan:
+    get:
+      tags:
+        - Portal Keti - Ketersediaan Ruang
+      summary: Matriks Visual Kalender Ruangan
+      description: Mengambil seluruh jadwal blok dan slot kosong untuk semua ruangan pada suatu tanggal tertentu.
+      operationId: getRoomCalendar
+      parameters:
+        - name: tanggal
+          in: query
+          description: Tanggal kalender format YYYY-MM-DD
+          schema:
+            type: string
+            format: date
+            example: '2026-11-09'
+        - name: gedung
+          in: query
+          description: Filter ID gedung atau 'all'
+          schema:
+            type: string
+            default: all
+        - name: tipe
+          in: query
+          description: Filter jenis ruang ('all', 'kelas', 'lab')
+          schema:
+            type: string
+            enum: [all, kelas, lab]
+            default: all
+      responses:
+        '200':
+          description: Data matriks jadwal ruangan
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  date:
+                    type: string
+                    example: '2026-11-09'
+                  operating_hours:
+                    type: object
+                    properties:
+                      start:
+                        type: string
+                        example: '07:30'
+                      end:
+                        type: string
+                        example: '17:30'
+                  rooms:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RoomScheduleMatrix'
+
+  /keti/ruangan/{room}:
+    get:
+      tags:
+        - Portal Keti - Ketersediaan Ruang
+      summary: Detail Spesifik Ruangan & Agenda
+      description: Mendapatkan informasi lengkap satu ruangan, daftar fasilitas, status real-time saat ini, dan agenda kegiatan hari ini.
+      operationId: getRoomDetail
+      parameters:
+        - name: room
+          in: path
+          required: true
+          description: ID ruangan
+          schema:
+            type: integer
+            example: 8
+      responses:
+        '200':
+          description: Detail ruangan ditemukan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoomDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /keti/reservasi:
+    post:
+      tags:
+        - Portal Keti - Reservasi Ruang
+      summary: Ajukan Reservasi Ruangan
+      description: |
+        Membuat pemesanan ruangan baru atas nama kelas Keti. 
+        Kelas diambil otomatis dari akun Keti di server untuk mencegah spoofing kelas.
+        Jika terjadi bentrok jadwal atau pemesanan ganda, server merespons kode 409 Conflict.
+      operationId: storeReservation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - room_id
+                - start_at
+                - duration
+                - purpose
+                - idempotency_key
+              properties:
+                room_id:
+                  type: integer
+                  description: ID ruangan yang dipesan
+                  example: 8
+                start_at:
+                  type: string
+                  format: date-time
+                  description: Waktu mulai perkuliahan format ISO8601 (WITA)
+                  example: '2026-11-09T09:15:00+08:00'
+                duration:
+                  type: integer
+                  description: Durasi penggunaan dalam menit (30 s/d 180)
+                  example: 100
+                purpose:
+                  type: string
+                  maxLength: 120
+                  description: Mata kuliah atau keperluan pemakaian
+                  example: Kuliah Pengganti Pemrograman Web (Tekom C)
+                participants:
+                  type: integer
+                  description: Perkiraan jumlah mahasiswa hadir (opsional)
+                  example: 30
+                idempotency_key:
+                  type: string
+                  format: uuid
+                  description: UUID unik dari klien untuk mencegah dobel submit
+                  example: 9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d
+      responses:
+        '201':
+          description: Pemesanan berhasil dibuat
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+                  reservation_id:
+                    type: integer
+                    example: 105
+                  redirect_url:
+                    type: string
+                    example: http://127.0.0.1:8000/keti/reservasi/105
+        '409':
+          description: Bentrok ruangan atau jadwal sudah terisi
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                    example: ROOM_UNAVAILABLE
+                  message:
+                    type: string
+                    example: Ruangan AE 101 sedang digunakan oleh jadwal perkuliahan lain pada jam tersebut.
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /keti/reservasi/{reservation}/status:
+    get:
+      tags:
+        - Portal Keti - Reservasi Ruang
+      summary: Polling Status Reservasi
+      description: Endpoint ringan untuk polling berkala (setiap 30 detik) saat berada di halaman penggunaan ruangan.
+      operationId: getReservationStatus
+      parameters:
+        - name: reservation
+          in: path
+          required: true
+          description: ID reservasi
+          schema:
+            type: integer
+            example: 105
+      responses:
+        '200':
+          description: Status terkini reservasi
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [booked, in_use, finished, cancelled, expired]
+                    example: in_use
+                  end_at:
+                    type: string
+                    format: date-time
+                    example: '2026-11-09T10:55:00+08:00'
+                  lock_version:
+                    type: integer
+                    example: 2
+
+  /keti/reservasi/{reservation}/mulai:
+    post:
+      tags:
+        - Portal Keti - Reservasi Ruang
+      summary: Mulai Gunakan Ruangan (Check-in)
+      description: Keti menekan tombol "Mulai Gunakan Ruangan" saat sesi kelas dimulai di lokasi.
+      operationId: startReservation
+      parameters:
+        - name: reservation
+          in: path
+          required: true
+          schema:
+            type: integer
+            example: 105
+      responses:
+        '200':
+          description: Penggunaan ruang berhasil dimulai, waktu aktual tercatat
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+                  status:
+                    type: string
+                    example: in_use
+
+  /keti/reservasi/{reservation}/selesai:
+    post:
+      tags:
+        - Portal Keti - Reservasi Ruang
+      summary: Selesai Menggunakan Ruangan
+      description: Keti menekan tombol "Selesai Menggunakan" ketika perkuliahan berakhir agar ruang kembali berstatus Tersedia untuk orang lain.
+      operationId: finishReservation
+      parameters:
+        - name: reservation
+          in: path
+          required: true
+          schema:
+            type: integer
+            example: 105
+      responses:
+        '200':
+          description: Penggunaan ruangan selesai dan tercatat di Log Pemakaian
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+                  status:
+                    type: string
+                    example: finished
+
+  /keti/reservasi/{reservation}/perpanjang:
+    post:
+      tags:
+        - Portal Keti - Reservasi Ruang
+      summary: Perpanjang Waktu Penggunaan (+30 menit)
+      description: Menambah durasi penggunaan ruangan sebanyak 30 menit jika tidak ada jadwal berikutnya yang bentrok.
+      operationId: extendReservation
+      parameters:
+        - name: reservation
+          in: path
+          required: true
+          schema:
+            type: integer
+            example: 105
+      responses:
+        '200':
+          description: Durasi berhasil diperpanjang
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+                  new_end_at:
+                    type: string
+                    format: date-time
+                    example: '2026-11-09T11:25:00+08:00'
+        '409':
+          description: Tidak dapat diperpanjang karena jadwal berikutnya sudah menunggu
+
+  /keti/reservasi/{reservation}/lapor:
+    post:
+      tags:
+        - Portal Keti - Reservasi Ruang
+      summary: Lapor Kendala Fasilitas Ruangan
+      description: Mengirimkan laporan masalah fasilitas (misal AC mati, proyektor rusak) langsung ke dashboard dan notifikasi Admin.
+      operationId: reportFacilityIssue
+      parameters:
+        - name: reservation
+          in: path
+          required: true
+          schema:
+            type: integer
+            example: 105
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - issue
+              properties:
+                issue:
+                  type: string
+                  enum:
+                    - 'AC tidak dingin'
+                    - 'Proyektor tidak menyala'
+                    - 'Stopkontak tidak berfungsi'
+                    - 'Kursi atau meja kurang'
+                    - 'Ruang kotor'
+                    - 'Lainnya'
+                  example: 'Proyektor tidak menyala'
+                note:
+                  type: string
+                  maxLength: 250
+                  example: Lampu indikator proyektor merah berkedip, tidak mau konek ke kabel HDMI.
+      responses:
+        '200':
+          description: Laporan kendala berhasil diteruskan ke Admin
+
+  /admin/ruang:
+    get:
+      tags:
+        - Portal Admin - Kelola Ruang
+      summary: Daftar Master Data Ruangan
+      description: Menampilkan seluruh ruangan terdaftar beserta kapasitas, lantai, gedung, dan status aktif.
+      operationId: getAdminRooms
+      responses:
+        '200':
+          description: Daftar ruangan terdaftar
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RoomDetail'
+    post:
+      tags:
+        - Portal Admin - Kelola Ruang
+      summary: Tambah Ruangan Baru
+      description: Menyimpan ruangan kuliah atau laboratorium baru ke sistem.
+      operationId: storeAdminRoom
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - code
+                - capacity
+                - type
+              properties:
+                name:
+                  type: string
+                  example: AE 111
+                code:
+                  type: string
+                  example: AE-111
+                capacity:
+                  type: integer
+                  example: 40
+                type:
+                  type: string
+                  enum: [classroom, lab, studio, workshop]
+                  example: classroom
+                building_id:
+                  type: integer
+                  example: 1
+                floor:
+                  type: integer
+                  example: 1
+                facilities:
+                  type: array
+                  items:
+                    type: string
+                  example: ['AC', 'Proyektor', 'Wi-Fi']
+      responses:
+        '201':
+          description: Ruangan berhasil dibuat
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /admin/penutupan-ruang:
+    post:
+      tags:
+        - Portal Admin - Kelola Ruang
+      summary: Tutup Ruangan Sementara (Closure)
+      description: Mengunci ruangan agar tidak dapat dipesan atau dijadwalkan dalam periode tertentu (misal perbaikan atau ujian khusus).
+      operationId: closeRoom
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - room_id
+                - start_at
+                - end_at
+                - reason
+              properties:
+                room_id:
+                  type: integer
+                  example: 28
+                start_at:
+                  type: string
+                  format: date-time
+                  example: '2026-11-10T07:30:00+08:00'
+                end_at:
+                  type: string
+                  format: date-time
+                  example: '2026-11-12T17:30:00+08:00'
+                reason:
+                  type: string
+                  example: Pemeliharaan pendingin ruangan dan instalasi perangkat baru
+      responses:
+        '201':
+          description: Penutupan ruangan aktif
+
+components:
+  schemas:
+    RoomCard:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 8
+        code:
+          type: string
+          example: AE-101
+        name:
+          type: string
+          example: AE 101
+        building:
+          type: string
+          example: Gedung AE
+        floor:
+          type: integer
+          example: 1
+        capacity:
+          type: integer
+          example: 35
+        type:
+          type: string
+          example: Ruang kuliah
+        status:
+          type: string
+          enum: [available, busy, closed]
+          example: available
+        available_duration:
+          type: string
+          example: Kosong sampai 12:40 WITA (3 jam 25 menit)
+        facilities:
+          type: array
+          items:
+            type: string
+          example: ['AC', 'Proyektor', 'Whiteboard', 'Stopkontak']
+
+    RoomDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 8
+        code:
+          type: string
+          example: AE-101
+        name:
+          type: string
+          example: AE 101
+        capacity:
+          type: integer
+          example: 35
+        building:
+          type: object
+          properties:
+            id:
+              type: integer
+              example: 1
+            name:
+              type: string
+              example: Gedung AE
+        floor:
+          type: integer
+          example: 1
+        type:
+          type: string
+          example: classroom
+        is_active:
+          type: boolean
+          example: true
+        is_bookable:
+          type: boolean
+          example: true
+
+    RoomScheduleMatrix:
+      type: object
+      properties:
+        room_id:
+          type: integer
+          example: 8
+        room_name:
+          type: string
+          example: AE 101
+        slots:
+          type: array
+          items:
+            type: object
+            properties:
+              time:
+                type: string
+                example: '07:30 - 09:10'
+              status:
+                type: string
+                enum: [available, scheduled, booked, in_use, closed]
+                example: scheduled
+              activity:
+                type: string
+                example: Algoritma & Pemrograman (PTIK A)
+
+  responses:
+    ValidationError:
+      description: Kesalahan validasi input form
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: Data yang diberikan tidak valid.
+              errors:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    type: string
+                example:
+                  duration:
+                    - 'Durasi harus antara 30 sampai 180 menit.'
+                  start_at:
+                    - 'Waktu mulai harus diisi dengan format tanggal yang benar.'
+
+    NotFound:
+      description: Sumber daya tidak ditemukan
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: Data tidak ditemukan.

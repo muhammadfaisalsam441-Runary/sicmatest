@@ -5,12 +5,12 @@ namespace App\Http\Controllers\Admin;
 use App\Enums\RoomType;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\RoomRequest;
-use App\Models\Building;
-use App\Models\Facility;
-use App\Models\Period;
-use App\Models\Room;
-use App\Models\RoomClosure;
-use App\Services\RoomService;
+use App\Models\Academic\Period;
+use App\Models\Room\Building;
+use App\Models\Room\Facility;
+use App\Models\Room\Room;
+use App\Models\Room\RoomClosure;
+use App\Services\Room\RoomService;
 use App\Support\AvailabilityCache;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -99,18 +99,25 @@ class RoomController extends Controller
     public function batchUpdate(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'action' => ['required', 'string', 'in:set_building,set_type,add_facilities'],
+            'action' => ['required', 'string', 'in:set_building,set_type,add_facilities,set_capacity'],
             'room_ids' => ['required', 'array', 'min:1'],
             'room_ids.*' => ['integer', 'exists:rooms,id'],
             'building' => ['nullable', 'string', 'max:60'],
             'type' => ['nullable', Rule::enum(RoomType::class)],
             'facilities' => ['nullable', 'string', 'max:255'],
+            'capacity' => ['exclude_unless:action,set_capacity', 'required', 'integer', 'min:1', 'max:1000'],
+        ], [
+            'capacity.required' => 'Masukkan kapasitas ruang.',
+            'capacity.integer' => 'Isi dengan angka bulat, misalnya 40.',
+            'capacity.min' => 'Kapasitas minimal 1 orang.',
+            'capacity.max' => 'Kapasitas maksimal 1.000 orang.',
         ]);
 
         $ids = $validated['room_ids'];
         $count = count($ids);
 
         match ($validated['action']) {
+            'set_capacity' => Room::query()->whereIn('id', $ids)->update(['capacity' => $validated['capacity']]),
             'set_building' => (function () use ($ids, $validated): void {
                 $buildingName = trim((string) ($validated['building'] ?? ''));
                 $buildingId = $buildingName !== '' ? Building::firstOrCreate(['name' => $buildingName, 'code' => Str::upper(Str::slug($buildingName))])->id : null;

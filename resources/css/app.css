@@ -19,6 +19,9 @@
     --color-success-soft: #e2f6ed;
     --color-danger: #a92b31;
     --color-danger-soft: #fdecec; /* perkiraan dari desain */
+    --color-warning: #d97706;
+    --color-warning-soft: #fef3c7;
+    --color-warning-ink: #92400e;
 
     --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';

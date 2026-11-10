@@ -36,7 +36,7 @@
 
     <div class="mt-2 flex items-center justify-between gap-3">
         @if ($room)
-            <x-button variant="danger-outline" x-on:click="$dispatch('close-modal', 'edit-room-{{ $room->id }}'); $dispatch('open-modal', 'delete-room-{{ $room->id }}')">Hapus ruang</x-button>
+            <x-button variant="danger-outline" icon="trash-2" x-on:click="$dispatch('close-modal', 'edit-room-{{ $room->id }}'); $dispatch('open-modal', 'delete-room-{{ $room->id }}')">Hapus ruang</x-button>
         @else
             <span></span>
         @endif

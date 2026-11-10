@@ -3,8 +3,8 @@
 use App\Enums\KetiApplicationStatus;
 use App\Enums\UserRole;
 use App\Mail\VerificationCodeMail;
-use App\Models\ClassGroup;
-use App\Models\User;
+use App\Models\Academic\ClassGroup;
+use App\Models\User\User;
 use Illuminate\Support\Facades\Mail;
 
 test('Keti mendaftar, akun belum terverifikasi, dan kode dikirim', function () {

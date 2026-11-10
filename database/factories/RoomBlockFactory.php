@@ -3,8 +3,8 @@
 namespace Database\Factories;
 
 use App\Enums\RoomBlockSource;
-use App\Models\Room;
-use App\Models\RoomBlock;
+use App\Models\Room\Room;
+use App\Models\Room\RoomBlock;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**

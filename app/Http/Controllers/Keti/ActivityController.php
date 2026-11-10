@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Keti;
 
 use App\Http\Controllers\Controller;
-use App\Models\Reservation;
+use App\Models\Reservation\Reservation;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\View\View;

@@ -4,17 +4,17 @@ use App\Enums\KetiApplicationStatus;
 use App\Enums\ReservationStatus;
 use App\Enums\RoomBlockSource;
 use App\Enums\RoomType;
-use App\Models\AppNotification;
-use App\Models\AuditLog;
-use App\Models\ClassGroup;
-use App\Models\ClassRepresentative;
-use App\Models\KetiApplication;
-use App\Models\Reservation;
-use App\Models\Room;
-use App\Models\RoomBlock;
-use App\Models\User;
-use App\Services\AvailabilityService;
-use App\Services\ReservationService;
+use App\Models\Academic\ClassGroup;
+use App\Models\Reservation\Reservation;
+use App\Models\Room\Room;
+use App\Models\Room\RoomBlock;
+use App\Models\User\AppNotification;
+use App\Models\User\AuditLog;
+use App\Models\User\ClassRepresentative;
+use App\Models\User\KetiApplication;
+use App\Models\User\User;
+use App\Services\Room\AvailabilityService;
+use App\Services\Room\ReservationService;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Hash;
 
@@ -152,6 +152,84 @@ test('admin dapat melakukan aksi massal ubah gedung, jenis ruang, dan tambah fas
 
     expect($room1->fresh()->facilities->pluck('name')->all())->toContain('Proyektor', 'AC')
         ->and($room2->fresh()->facilities->pluck('name')->all())->toContain('Proyektor', 'AC');
+});
+
+test('admin mengubah kapasitas hanya untuk ruang terpilih', function () {
+    $room1 = Room::factory()->create(['capacity' => null]);
+    $room2 = Room::factory()->create(['capacity' => 20]);
+    $other = Room::factory()->create(['capacity' => 50]);
+
+    $this->actingAs($this->admin)
+        ->from(route('admin.rooms.index'))
+        ->post(route('admin.rooms.batch'), [
+            'form' => 'batch_capacity',
+            'action' => 'set_capacity',
+            'room_ids' => [$room1->id, $room2->id],
+            'capacity' => 30,
+        ])
+        ->assertRedirect(route('admin.rooms.index'))
+        ->assertSessionHas('toast.title', 'Berhasil memperbarui 2 ruang');
+
+    expect($room1->fresh()->capacity)->toBe(30)
+        ->and($room2->fresh()->capacity)->toBe(30)
+        ->and($other->fresh()->capacity)->toBe(50)
+        ->and($room1->fresh()->building_id)->toBe($room1->building_id)
+        ->and($room2->fresh()->type)->toBe($room2->type);
+});
+
+test('kapasitas massal yang tidak valid tidak mengubah ruang dan mempertahankan pilihan', function (mixed $capacity, string $message) {
+    $room = Room::factory()->create(['capacity' => 20]);
+
+    $this->actingAs($this->admin)
+        ->from(route('admin.rooms.index'))
+        ->post(route('admin.rooms.batch'), [
+            'form' => 'batch_capacity',
+            'action' => 'set_capacity',
+            'room_ids' => [$room->id],
+            'capacity' => $capacity,
+        ])
+        ->assertRedirect(route('admin.rooms.index'))
+        ->assertSessionHasErrors(['capacity' => $message])
+        ->assertSessionHasInput('room_ids', [$room->id]);
+
+    expect($room->fresh()->capacity)->toBe(20);
+    $this->withCookie(config('session.cookie'), session()->getId())
+        ->get(route('admin.rooms.index'))->assertOk()->assertSee($message);
+})->with([
+    'kosong' => [null, 'Masukkan kapasitas ruang.'],
+    'nol' => [0, 'Kapasitas minimal 1 orang.'],
+    'negatif' => [-1, 'Kapasitas minimal 1 orang.'],
+    'pecahan' => [30.5, 'Isi dengan angka bulat, misalnya 40.'],
+    'teks' => ['tiga puluh', 'Isi dengan angka bulat, misalnya 40.'],
+    'melebihi batas' => [1001, 'Kapasitas maksimal 1.000 orang.'],
+]);
+
+test('kapasitas massal menolak pilihan ruang kosong atau tidak terdaftar', function (array $ids, string $field) {
+    $room = Room::factory()->create(['capacity' => 20]);
+
+    $this->actingAs($this->admin)
+        ->post(route('admin.rooms.batch'), [
+            'action' => 'set_capacity',
+            'room_ids' => $ids,
+            'capacity' => 30,
+        ])->assertSessionHasErrors($field);
+
+    expect($room->fresh()->capacity)->toBe(20);
+})->with([
+    'tidak memilih ruang' => [[], 'room_ids'],
+    'ruang tidak terdaftar' => [[999999], 'room_ids.0'],
+]);
+
+test('Keti dan tamu tidak dapat mengubah kapasitas ruang secara massal', function () {
+    $room = Room::factory()->create(['capacity' => 20]);
+    $payload = ['action' => 'set_capacity', 'room_ids' => [$room->id], 'capacity' => 30];
+
+    $this->actingAs(User::factory()->approvedKeti()->create())
+        ->post(route('admin.rooms.batch'), $payload)->assertForbidden();
+    auth()->logout();
+    $this->post(route('admin.rooms.batch'), $payload)->assertRedirect(route('login'));
+
+    expect($room->fresh()->capacity)->toBe(20);
 });
 
 test('penutupan ruang yang berdampak meminta konfirmasi dan tidak membatalkan reservasi', function () {

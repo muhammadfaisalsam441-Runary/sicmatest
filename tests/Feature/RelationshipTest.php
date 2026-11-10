@@ -2,14 +2,14 @@
 
 use App\Enums\RoomBlockSource;
 use App\Enums\TeachingRole;
-use App\Models\ClassGroup;
-use App\Models\KetiApplication;
-use App\Models\Lecturer;
-use App\Models\Reservation;
-use App\Models\Room;
-use App\Models\RoomBlock;
-use App\Models\ScheduleSession;
-use App\Models\User;
+use App\Models\Academic\ClassGroup;
+use App\Models\Lecturer\Lecturer;
+use App\Models\Reservation\Reservation;
+use App\Models\Room\Room;
+use App\Models\Room\RoomBlock;
+use App\Models\Scheduling\ScheduleSession;
+use App\Models\User\KetiApplication;
+use App\Models\User\User;
 
 test('blok milik reservasi tidak tertukar dengan blok jadwal yang source_id-nya sama', function () {
     $reservation = Reservation::factory()->create();

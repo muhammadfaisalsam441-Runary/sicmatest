@@ -5,10 +5,10 @@ namespace Database\Seeders;
 use App\Enums\CalendarExceptionType;
 use App\Enums\LecturerHomebase;
 use App\Enums\LecturerProfileStatus;
-use App\Models\ClassGroup;
-use App\Models\Course;
-use App\Models\Lecturer;
-use App\Models\Period;
+use App\Models\Academic\ClassGroup;
+use App\Models\Academic\Course;
+use App\Models\Academic\Period;
+use App\Models\Lecturer\Lecturer;
 use Illuminate\Database\Seeder;
 
 /**
@@ -101,12 +101,12 @@ class AcademicSeeder extends Seeder
     private function seedClassGroups(): void
     {
         $classGroups = [
-            ['TEKOM-A-2025', 'Tekom A', 'Teknik Komputer', 2025, 40],
-            ['TEKOM-B-2025', 'Tekom B', 'Teknik Komputer', 2025, 38],
-            ['TEKOM-C-2025', 'Tekom C', 'Teknik Komputer', 2025, 42],
-            ['PTIK-A-2025', 'PTIK A', 'Pendidikan Teknik Informatika dan Komputer', 2025, 36],
-            ['PTIK-B-2025', 'PTIK B', 'Pendidikan Teknik Informatika dan Komputer', 2025, null],
-            ['TEKOM-A-2024', 'Tekom A 2024', 'Teknik Komputer', 2024, 35],
+            ['TEKOM-A-2025', 'Tekom A', 'Teknik Komputer', 2025, 30],
+            ['TEKOM-B-2025', 'Tekom B', 'Teknik Komputer', 2025, 30],
+            ['TEKOM-C-2025', 'Tekom C', 'Teknik Komputer', 2025, 30],
+            ['PTIK-A-2025', 'PTIK A', 'Pendidikan Teknik Informatika dan Komputer', 2025, 30],
+            ['PTIK-B-2025', 'PTIK B', 'Pendidikan Teknik Informatika dan Komputer', 2025, 30],
+            ['TEKOM-A-2024', 'Tekom A 2024', 'Teknik Komputer', 2024, 30],
         ];
 
         foreach ($classGroups as [$code, $name, $program, $cohort, $students]) {

@@ -3,12 +3,12 @@
 use App\Enums\KetiApplicationStatus;
 use App\Enums\RoomBlockSource;
 use App\Enums\ScheduleVersionStatus;
-use App\Models\KetiApplication;
-use App\Models\Reservation;
-use App\Models\Room;
-use App\Models\RoomBlock;
-use App\Models\ScheduleIssue;
-use App\Models\ScheduleVersion;
+use App\Models\Reservation\Reservation;
+use App\Models\Room\Room;
+use App\Models\Room\RoomBlock;
+use App\Models\Scheduling\ScheduleIssue;
+use App\Models\Scheduling\ScheduleVersion;
+use App\Models\User\KetiApplication;
 use Database\Seeders\DatabaseSeeder;
 
 beforeEach(function () {

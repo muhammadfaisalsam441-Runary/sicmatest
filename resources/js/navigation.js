@@ -475,7 +475,8 @@ export function installPortalNavigation(Alpine, renderIcons) {
 
 export function registerStatusPolling(Alpine, navigation) {
     Alpine.data('statusPolling', (options) => ({
-        elapsed: 0,
+        elapsed: options.elapsed ?? 0,
+        progress: options.progress ?? { stage: 'Menunggu antrean', total: 0, placed: 0 },
         timer: null,
         controller: null,
         init() {
@@ -492,6 +493,7 @@ export function registerStatusPolling(Alpine, navigation) {
                 if (!response.ok) return;
                 const data = await response.json();
                 this.elapsed = data.elapsed ?? this.elapsed;
+                this.progress = data.progress ?? this.progress;
                 const changed = options.job
                     ? !['queued', 'running'].includes(data.status)
                     : data.lock_version !== options.version || data.status !== options.status;

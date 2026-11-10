@@ -30,19 +30,19 @@ use App\Enums\ScheduleSource;
 use App\Enums\ScheduleVersionStatus;
 use App\Enums\SolverStatus;
 use App\Exceptions\DomainException;
-use App\Models\ClassGroup;
-use App\Models\LeadershipTerm;
-use App\Models\Lecturer;
-use App\Models\Period;
-use App\Models\Room;
-use App\Models\ScheduleSession;
-use App\Models\ScheduleVersion;
-use App\Models\User;
-use App\Services\DraftService;
-use App\Services\ScheduleBlockBuilder;
-use App\Services\SchedulePublisher;
-use App\Services\SchedulerService;
-use App\Services\ScheduleValidator;
+use App\Models\Academic\ClassGroup;
+use App\Models\Academic\Period;
+use App\Models\Lecturer\LeadershipTerm;
+use App\Models\Lecturer\Lecturer;
+use App\Models\Room\Room;
+use App\Models\Scheduling\ScheduleSession;
+use App\Models\Scheduling\ScheduleVersion;
+use App\Models\User\User;
+use App\Services\Scheduling\ScheduleBlockBuilder;
+use App\Services\Scheduling\ScheduleDraftService;
+use App\Services\Scheduling\SchedulePublisher;
+use App\Services\Scheduling\SchedulerService;
+use App\Services\Scheduling\ScheduleValidator;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\File;
 
@@ -72,7 +72,7 @@ afterEach(function () {
 });
 
 test('skenario 3: draf yang diubah tidak tampil sebelum ditetapkan, lalu tampil setelahnya', function () {
-    $draft = app(DraftService::class)->create($this->period, ScheduleSource::Manual, $this->official);
+    $draft = app(ScheduleDraftService::class)->create($this->period, ScheduleSource::Manual, $this->official);
     $draft->sessions()->sole()->update(['room_id' => $this->ae106->id]);
 
     $this->actingAs($this->keti)->get(route('keti.my-class', ['tanggal' => '2026-11-11']))->assertSee('AE 107')->assertDontSee('AE 106');
@@ -98,7 +98,7 @@ test('skenario 4: hasil susun otomatis yang menempatkan pimpinan di hari Kamis t
     ]);
     expect($job->solver_status)->toBe(SolverStatus::ModelInvalid)
         ->and($job->result)->not->toHaveKey('draft_version_id');
-    $draft = app(DraftService::class)->create($this->period, ScheduleSource::Manual, $this->official);
+    $draft = app(ScheduleDraftService::class)->create($this->period, ScheduleSource::Manual, $this->official);
     $draft->sessions()->sole()->update(['day_of_week' => 4]);
     app(ScheduleValidator::class)->validate($draft);
 

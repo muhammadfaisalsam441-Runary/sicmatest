@@ -2,11 +2,32 @@
 
 namespace Tests\Unit;
 
-use App\Services\PhpScheduleSolver;
+use App\Services\Scheduling\PhpScheduleSolver;
 use PHPUnit\Framework\TestCase;
 
 class PhpScheduleSolverTest extends TestCase
 {
+    public function test_progress_reports_real_placements_and_resets_for_each_search(): void
+    {
+        $solver = new PhpScheduleSolver;
+        $progress = [];
+        $result = $solver->solve($this->input([$this->session(1), $this->session(2)]), null,
+            function (array $update) use (&$progress): void {
+                $progress[] = $update;
+            });
+
+        $this->assertSame('FEASIBLE', $result['status']);
+        $this->assertSame(['stage' => 'Menyiapkan kandidat', 'total' => 2, 'placed' => 0], $progress[0]);
+        $this->assertSame(['stage' => 'Mencari susunan', 'total' => 2, 'placed' => 2], $progress[array_key_last($progress)]);
+        $next = [];
+        $solver->solve($this->input([$this->session(1)]), null,
+            function (array $update) use (&$next): void {
+                $next[] = $update;
+            });
+        $this->assertSame(0, $next[0]['placed']);
+        $this->assertSame(1, $next[0]['total']);
+    }
+
     private function session(int $id, array $overrides = []): array
     {
         return array_replace(['id' => $id, 'duration' => 50, 'mode' => 'offline', 'phase' => 'full',

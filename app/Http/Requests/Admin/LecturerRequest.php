@@ -36,8 +36,11 @@ class LecturerRequest extends FormRequest
             'leadership_position' => ['nullable', 'string', 'max:80'],
             'leadership_from' => ['nullable', 'required_with:leadership_position', 'date'],
             'leadership_to' => ['nullable', 'date', 'after_or_equal:leadership_from'],
-            'target_sks' => ['nullable', 'numeric', 'min:0', 'max:60'],
-            'max_sks' => ['nullable', 'numeric', 'min:0', 'max:60', ...($this->filled('target_sks') ? ['gte:target_sks'] : [])],
+            'target_sks' => ['nullable', 'integer', 'min:0', 'max:60'],
+            'max_sks' => ['nullable', 'integer', 'min:0', 'max:60', ...($this->filled('target_sks') ? ['gte:target_sks'] : [])],
+            'course_selection_present' => ['sometimes', 'accepted'],
+            'course_ids' => ['sometimes', 'array'],
+            'course_ids.*' => ['integer', 'distinct', Rule::exists('courses', 'id')->whereNull('deleted_at')],
         ];
     }
 
@@ -63,6 +66,7 @@ class LecturerRequest extends FormRequest
             'leadership_to' => 'akhir menjabat',
             'target_sks' => 'target SKS',
             'max_sks' => 'maksimum SKS',
+            'course_ids.*' => 'mata kuliah',
         ];
     }
 }

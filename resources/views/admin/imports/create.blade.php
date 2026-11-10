@@ -13,6 +13,12 @@
         <x-page-header title="Impor jadwal perkuliahan" subtitle="Unggah jadwal dalam bentuk Excel atau CSV. Hasilnya diperiksa dulu sebelum disimpan." />
 
         <x-card>
+            <x-schedule-steps :current="3" />
+        </x-card>
+
+        @include('admin.partials.scheduling-tabs')
+
+        <x-card>
             <x-stepper :steps="['Unggah file', 'Periksa hasil', 'Masuk draf']" :current="1" />
         </x-card>
 

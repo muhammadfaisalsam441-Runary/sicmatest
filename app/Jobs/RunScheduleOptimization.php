@@ -2,8 +2,8 @@
 
 namespace App\Jobs;
 
-use App\Models\OptimizationJob;
-use App\Services\SchedulerService;
+use App\Models\Scheduling\OptimizationJob;
+use App\Services\Scheduling\SchedulerService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Throwable;

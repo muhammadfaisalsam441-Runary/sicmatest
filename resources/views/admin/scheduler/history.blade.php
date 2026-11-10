@@ -1,5 +1,5 @@
 @use('App\Enums\OptimizationJobStatus')
-@use('App\Services\SchedulerService')
+@use('App\Services\Scheduling\SchedulerService')
 @use('App\Support\Wita')
 @extends('layouts.admin')
 
@@ -13,6 +13,12 @@
 @section('content')
     <div class="flex flex-col gap-6">
         <x-page-header title="Riwayat penyusunan otomatis" subtitle="Status dan hasil setiap proses dapat dibuka kembali. Status solver disimpan terpisah dari status proses." />
+
+        <x-card>
+            <x-schedule-steps :current="3" />
+        </x-card>
+
+        @include('admin.partials.scheduling-tabs')
 
         <x-card class="flex flex-col gap-3">
             @forelse ($jobs as $job)

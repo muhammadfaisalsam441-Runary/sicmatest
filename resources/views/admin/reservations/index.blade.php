@@ -73,7 +73,7 @@
                                 </td>
                                 <td class="py-3">
                                     @if ($reservation->status === ReservationStatus::Booked)
-                                        <x-button variant="danger-outline" class="px-4! py-2!" x-data x-on:click="$dispatch('open-modal', 'cancel-reservation-{{ $reservation->id }}')">Batalkan</x-button>
+                                        <x-button variant="danger-outline" class="px-4! py-2!" icon="x-circle" x-data x-on:click="$dispatch('open-modal', 'cancel-reservation-{{ $reservation->id }}')">Batalkan</x-button>
                                     @else
                                         <span class="text-muted">—</span>
                                     @endif

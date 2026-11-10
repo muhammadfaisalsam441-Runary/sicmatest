@@ -2,7 +2,7 @@
 
 namespace Database\Factories;
 
-use App\Models\Period;
+use App\Models\Academic\Period;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**

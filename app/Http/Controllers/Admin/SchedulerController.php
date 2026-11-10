@@ -4,10 +4,10 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StartSchedulingRequest;
-use App\Models\ClassGroup;
-use App\Models\OptimizationJob;
-use App\Models\Period;
-use App\Services\SchedulerService;
+use App\Models\Academic\ClassGroup;
+use App\Models\Academic\Period;
+use App\Models\Scheduling\OptimizationJob;
+use App\Services\Scheduling\SchedulerService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -41,7 +41,7 @@ class SchedulerController extends Controller
 
     public function store(StartSchedulingRequest $request, SchedulerService $scheduler): RedirectResponse
     {
-        $job = $scheduler->start(Period::query()->active()->firstOrFail(), $request->scopeData(), (int) $request->validated('time_limit'), $request->user());
+        $job = $scheduler->start(Period::query()->active()->firstOrFail(), $request->scopeData(), (int) config('sicma.scheduler.time_limits.seimbang'), $request->user());
 
         return to_route('admin.scheduler.show', $job);
     }
@@ -50,7 +50,7 @@ class SchedulerController extends Controller
     {
         $job = $scheduler->poll($job);
 
-        return view('admin.scheduler.show', ['job' => $job->load('creator')]);
+        return view('admin.scheduler.show', ['job' => $job->load('creator'), 'canRetry' => $scheduler->canRetry($job)]);
     }
 
     /**
@@ -63,8 +63,9 @@ class SchedulerController extends Controller
         return response()->json([
             'status' => $job->status->value,
             'solver_status' => $job->solver_status?->value,
-            'elapsed' => $job->started_at ? (int) $job->started_at->diffInSeconds(now()) : 0,
+            'elapsed' => $job->started_at ? max(0, (int) $job->started_at->diffInSeconds($job->finished_at ?? now())) : 0,
             'time_limit' => $job->time_limit_seconds,
+            'progress' => $job->result['progress'] ?? ['stage' => $job->status->label(), 'total' => $job->scope['in_scope'] ?? 0, 'placed' => $job->result['placed'] ?? 0],
         ]);
     }
 
@@ -80,5 +81,10 @@ class SchedulerController extends Controller
         return view('admin.scheduler.history', [
             'jobs' => OptimizationJob::query()->with(['creator', 'version'])->latest()->paginate(20),
         ]);
+    }
+
+    public function retry(Request $request, OptimizationJob $job, SchedulerService $scheduler): RedirectResponse
+    {
+        return to_route('admin.scheduler.show', $scheduler->retry($job, $request->user()));
     }
 }

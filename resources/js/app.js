@@ -144,11 +144,14 @@ Alpine.data('lecturerManager', (pageLecturerIds) => ({
 }));
 
 Alpine.data('roomManager', (pageRoomIds = [], defaults = {}) => ({
-    selectedIds: [],
+    selectedIds: defaults.selectedIds ?? [],
     formModalOpen: Boolean(defaults.formModalOpen),
     closureModalOpen: Boolean(defaults.closureModalOpen),
     deleteModalOpen: false,
     batchFacilityModalOpen: false,
+    batchCapacityModalOpen: Boolean(defaults.batchCapacityModalOpen),
+    batchCapacity: defaults.batchCapacity ?? '',
+    batchCapacityConfirming: false,
     batchAction: '',
     batchParams: { building: '', type: '' },
     closureRoomId: defaults.closureRoomId ?? '',
@@ -237,6 +240,22 @@ Alpine.data('roomManager', (pageRoomIds = [], defaults = {}) => ({
             current.push(tag);
             this.formRoom.facilities = current.join(', ');
         }
+    },
+
+    openBatchCapacityModal() {
+        this.batchCapacity = '';
+        this.batchCapacityConfirming = false;
+        this.batchCapacityModalOpen = true;
+        this.$nextTick(() => this.$refs.batchCapacityInput.focus());
+    },
+
+    submitBatchCapacity(event) {
+        if (this.selectedIds.length === 0) return;
+        if (!this.batchCapacityConfirming) {
+            this.batchCapacityConfirming = true;
+            return;
+        }
+        event.target.submit();
     },
 
     submitBatch(action, params = {}) {

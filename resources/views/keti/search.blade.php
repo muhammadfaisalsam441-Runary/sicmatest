@@ -4,9 +4,11 @@
 @section('title', 'Cari Ruangan')
 
 @php
-    $durationOptions = collect([30, 60, 90, 120, 150, 180])
-        ->filter(fn ($minutes) => $minutes >= config('sicma.reservation.min_minutes') && $minutes <= config('sicma.reservation.max_minutes'))
-        ->mapWithKeys(fn ($minutes) => [$minutes => Wita::duration($minutes)]);
+    $sksOptions = config('sicma.reservation.duration_options');
+    $selectedDuration = (int) ($filters['durasi'] ?? config('sicma.reservation.default_minutes'));
+    $durationOptions = collect($sksOptions)
+        ->when(! array_key_exists($selectedDuration, $sksOptions), fn ($options) => $options->put($selectedDuration, Wita::duration($selectedDuration)))
+        ->sortKeys()->all();
     [$openHour, $openMinute] = array_map('intval', explode(':', (string) config('sicma.operating_hours.start')));
     [$closeHour, $closeMinute] = array_map('intval', explode(':', (string) config('sicma.operating_hours.end')));
     $openMinutes = $openHour * 60 + $openMinute;

@@ -3,7 +3,7 @@
 namespace App\Support;
 
 use App\Enums\RoomStatus;
-use App\Services\Availability\AvailabilityResult;
+use App\Services\Room\AvailabilityResult;
 
 /**
  * Mengubah hasil AvailabilityService menjadi data kartu ruang.

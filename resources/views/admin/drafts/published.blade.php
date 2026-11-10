@@ -9,7 +9,7 @@
         <x-page-header title="Jadwal resmi berhasil diperbarui"
                        :subtitle="'Resmi v'.$version->version_no.' • Berlaku '.Wita::longDate($version->effective_from).' • ditetapkan '.($version->publisher?->name ?? 'admin').' '.Wita::stamp($version->published_at)" />
 
-        <x-alert variant="success" title="Resmi v{{ $version->version_no }} aktif">
+        <x-alert variant="success" :title="'Resmi v'.$version->version_no.($version->effective_from->isFuture() ? ' berlaku mulai '.Wita::date($version->effective_from) : ' berlaku hari ini')">
             {{ $sessionCount }} sesi ditetapkan dan {{ $blockCount }} blok ruang dibuat.{{ $version->basedOn ? ' Versi sebelumnya (v'.$version->basedOn->version_no.') tetap tersimpan di riwayat revisi.' : '' }}
         </x-alert>
 

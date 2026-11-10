@@ -2,8 +2,8 @@
 
 namespace App\Policies;
 
-use App\Models\Reservation;
-use App\Models\User;
+use App\Models\Reservation\Reservation;
+use App\Models\User\User;
 
 /**
  * Reservasi milik kelas: hanya Keti aktif kelas tersebut yang boleh melihat & mengelola (B02, B17).

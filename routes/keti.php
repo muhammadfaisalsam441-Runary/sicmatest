@@ -6,6 +6,7 @@ use App\Http\Controllers\Keti\MyClassController;
 use App\Http\Controllers\Keti\NotificationController;
 use App\Http\Controllers\Keti\ProfileController;
 use App\Http\Controllers\Keti\ReservationController;
+use App\Http\Controllers\Keti\RoomCalendarController;
 use App\Http\Controllers\Keti\RoomController;
 use App\Http\Controllers\Keti\RoomSearchController;
 use Illuminate\Support\Facades\Route;
@@ -21,6 +22,7 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::get('/cari-ruangan', RoomSearchController::class)->name('search');
+Route::get('/kalender-ruangan', RoomCalendarController::class)->name('rooms.calendar');
 Route::get('/my-class', MyClassController::class)->name('my-class');
 
 Route::get('/ruangan', [RoomController::class, 'index'])->name('rooms.index');

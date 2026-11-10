@@ -1,13 +1,13 @@
 <?php
 
 use App\Enums\ReservationStatus;
-use App\Models\AppNotification;
-use App\Models\ClassGroup;
-use App\Models\Reservation;
-use App\Models\Room;
-use App\Models\ScheduleSession;
-use App\Models\User;
-use App\Services\ReservationService;
+use App\Models\Academic\ClassGroup;
+use App\Models\Reservation\Reservation;
+use App\Models\Room\Room;
+use App\Models\Scheduling\ScheduleSession;
+use App\Models\User\AppNotification;
+use App\Models\User\User;
+use App\Services\Room\ReservationService;
 use Carbon\CarbonImmutable;
 
 beforeEach(function () {
@@ -95,6 +95,18 @@ test('kelas pemesan diambil dari akun, bukan dari request', function () {
     $reservation = Reservation::query()->sole();
     $response->assertRedirect(route('keti.reservations.show', $reservation));
     expect($reservation->class_group_id)->toBe($this->classGroup->id);
+});
+
+test('pemesanan lewat fetch mengembalikan tujuan detail reservasi', function () {
+    $room = Room::factory()->create();
+
+    $response = $this->actingAs($this->keti)
+        ->postJson(route('keti.reservations.store'), bookingPayload($room))
+        ->assertCreated();
+
+    $reservation = Reservation::query()->sole();
+    $response->assertJsonPath('redirect_url', route('keti.reservations.show', $reservation))
+        ->assertJsonPath('reservation_id', $reservation->id);
 });
 
 test('kirim ulang formulir yang sama tidak menggandakan reservasi', function () {

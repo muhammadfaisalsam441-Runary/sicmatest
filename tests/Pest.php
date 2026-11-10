@@ -1,10 +1,10 @@
 <?php
 
 use App\Enums\RoomBlockSource;
-use App\Models\Period;
-use App\Models\Room;
-use App\Models\RoomBlock;
-use App\Models\ScheduleVersion;
+use App\Models\Academic\Period;
+use App\Models\Room\Room;
+use App\Models\Room\RoomBlock;
+use App\Models\Scheduling\ScheduleVersion;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Tests\TestCase;

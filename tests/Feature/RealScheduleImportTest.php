@@ -2,10 +2,10 @@
 
 use App\Enums\ImportStatus;
 use App\Enums\UserRole;
-use App\Models\Period;
-use App\Models\ScheduleIssue;
-use App\Models\User;
-use App\Services\ScheduleImportService;
+use App\Models\Academic\Period;
+use App\Models\Scheduling\ScheduleIssue;
+use App\Models\User\User;
+use App\Services\Scheduling\ScheduleImportService;
 use Carbon\CarbonImmutable;
 use Database\Seeders\AcademicSeeder;
 use Database\Seeders\AccountSeeder;

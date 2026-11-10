@@ -4,7 +4,7 @@ namespace Database\Seeders;
 
 use App\Enums\LecturerHomebase;
 use App\Enums\LecturerProfileStatus;
-use App\Models\Lecturer;
+use App\Models\Lecturer\Lecturer;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
 use RuntimeException;

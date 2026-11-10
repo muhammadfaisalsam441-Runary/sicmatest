@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\Room;
+use App\Models\Room\Room;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Cache;
 

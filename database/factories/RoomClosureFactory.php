@@ -2,9 +2,9 @@
 
 namespace Database\Factories;
 
-use App\Models\Room;
-use App\Models\RoomClosure;
-use App\Models\User;
+use App\Models\Room\Room;
+use App\Models\Room\RoomClosure;
+use App\Models\User\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**

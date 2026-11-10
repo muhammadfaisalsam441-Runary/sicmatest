@@ -1,0 +1,549 @@
+{
+  "info": {
+    "_postman_id": "c1f8a84e-3367-4bb5-a6e5-79d3a14e101f",
+    "name": "SICMA API Collection",
+    "description": "Koleksi API resmi untuk Sistem Informasi Cek Ruangan & Manajemen Akademik (SICMA) JTIK UNM.\n\nKoleksi ini mencakup:\n- Alur Autentikasi Admin & Ketua Tingkat (Keti)\n- Pencarian Ruangan Kosong Real-time & Matriks Kalender\n- Siklus Hidup Reservasi Ruang (Pesan, Check-in, Selesai, Perpanjang, Lapor)\n- Master Data Ruangan & Penutupan Ruang Admin\n\nVariabel lingkungan default:\n- `base_url`: `http://127.0.0.1:8000`\n- `csrf_token`: Token CSRF Laravel untuk form POST/PUT/DELETE",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000",
+      "type": "string"
+    },
+    {
+      "key": "csrf_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "test_room_id",
+      "value": "8",
+      "type": "string"
+    },
+    {
+      "key": "test_reservation_id",
+      "value": "1",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Autentikasi (Auth)",
+      "description": "Endpoint autentikasi, pendaftaran Keti, verifikasi sesi, dan logout.",
+      "item": [
+        {
+          "name": "Masuk / Login (Admin atau Keti)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrf_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@sicma.test\",\n  \"password\": \"password\",\n  \"remember\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/masuk",
+              "host": ["{{base_url}}"],
+              "path": ["masuk"]
+            },
+            "description": "Melakukan login akun Admin atau Keti. Server akan membuat session cookie."
+          },
+          "response": [
+            {
+              "name": "200 Berhasil Masuk",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"admin@sicma.test\",\n  \"password\": \"password\"\n}"
+                },
+                "url": { "raw": "{{base_url}}/masuk" }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"ok\": true,\n  \"redirect\": \"/admin\"\n}"
+            },
+            {
+              "name": "422 Kredensial Salah",
+              "originalRequest": {
+                "method": "POST",
+                "url": { "raw": "{{base_url}}/masuk" }
+              },
+              "status": "Unprocessable Entity",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"message\": \"Email atau kata sandi tidak cocok dengan catatan kami.\",\n  \"errors\": {\n    \"email\": [\"Email atau kata sandi tidak cocok dengan catatan kami.\"]\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Daftar Akun Ketua Tingkat (Register Keti)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-CSRF-TOKEN", "value": "{{csrf_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Muhammad Fajar\",\n  \"nim\": \"220209501001\",\n  \"email\": \"keti.tekomc@sicma.test\",\n  \"class_group_id\": 3,\n  \"password\": \"password123\",\n  \"password_confirmation\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/daftar",
+              "host": ["{{base_url}}"],
+              "path": ["daftar"]
+            },
+            "description": "Mendaftarkan diri sebagai Ketua Tingkat (Keti) untuk kelas tertentu."
+          },
+          "response": [
+            {
+              "name": "201 Pendaftaran Berhasil",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"ok\": true,\n  \"message\": \"Akun berhasil didaftarkan. Silakan periksa email untuk tautan verifikasi.\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Keluar / Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "X-CSRF-TOKEN", "value": "{{csrf_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/keluar",
+              "host": ["{{base_url}}"],
+              "path": ["keluar"]
+            },
+            "description": "Menghapus sesi login saat ini."
+          },
+          "response": [
+            {
+              "name": "200 Berhasil Logout",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"ok\": true\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Portal Keti - Ketersediaan Ruang",
+      "description": "Endpoint pencarian ruangan kosong, matriks kalender, dan katalog ruang.",
+      "item": [
+        {
+          "name": "Cari Ruangan Kosong Real-time",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/keti/cari-ruangan?hari=hari-ini&jam=09:15&durasi=100&q=AE&orang=35&urutan=terlama",
+              "host": ["{{base_url}}"],
+              "path": ["keti", "cari-ruangan"],
+              "query": [
+                { "key": "hari", "value": "hari-ini", "description": "hari-ini, besok, atau pilih" },
+                { "key": "jam", "value": "09:15", "description": "Jam mulai perkuliahan" },
+                { "key": "durasi", "value": "100", "description": "Durasi dalam menit (misal 2 SKS = 100 mnt)" },
+                { "key": "q", "value": "AE", "description": "Filter nama ruang / kode" },
+                { "key": "orang", "value": "35", "description": "Kapasitas minimal mahasiswa" },
+                { "key": "urutan", "value": "terlama", "description": "terlama, nama, atau kapasitas" }
+              ]
+            },
+            "description": "Mengambil daftar ruangan yang berstatus 'Tersedia' sesuai filter yang ditentukan."
+          },
+          "response": [
+            {
+              "name": "200 Daftar Ruangan Ditemukan",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "[\n  {\n    \"id\": 8,\n    \"code\": \"AE-101\",\n    \"name\": \"AE 101\",\n    \"building\": \"Gedung AE\",\n    \"capacity\": 35,\n    \"status\": \"available\",\n    \"available_duration\": \"Kosong sampai 12:40 WITA (3 jam 25 menit)\",\n    \"facilities\": [\"AC\", \"Proyektor\", \"Whiteboard\"]\n  },\n  {\n    \"id\": 11,\n    \"code\": \"AE-104\",\n    \"name\": \"AE 104\",\n    \"building\": \"Gedung AE\",\n    \"capacity\": 30,\n    \"status\": \"available\",\n    \"available_duration\": \"Kosong sampai 17:30 WITA (8 jam 15 menit)\",\n    \"facilities\": [\"AC\", \"Proyektor\", \"Stopkontak\"]\n  }\n]"
+            }
+          ]
+        },
+        {
+          "name": "Matriks Kalender Visual Ruangan",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/keti/kalender-ruangan?tanggal=2026-11-09&gedung=all&tipe=all",
+              "host": ["{{base_url}}"],
+              "path": ["keti", "kalender-ruangan"],
+              "query": [
+                { "key": "tanggal", "value": "2026-11-09", "description": "Format YYYY-MM-DD" },
+                { "key": "gedung", "value": "all", "description": "ID gedung atau 'all'" },
+                { "key": "tipe", "value": "all", "description": "all, kelas, atau lab" }
+              ]
+            },
+            "description": "Melihat jadwal blok terisi vs waktu kosong seluruh ruangan pada hari tertentu."
+          },
+          "response": [
+            {
+              "name": "200 Data Matriks Kalender",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"date\": \"2026-11-09\",\n  \"operating_hours\": {\n    \"start\": \"07:30\",\n    \"end\": \"17:30\"\n  },\n  \"rooms\": [\n    {\n      \"room_id\": 8,\n      \"room_name\": \"AE 101\",\n      \"slots\": [\n        { \"time\": \"07:30 - 09:10\", \"status\": \"scheduled\", \"title\": \"Pemrograman Web (Tekom A)\" },\n        { \"time\": \"09:15 - 12:40\", \"status\": \"scheduled\", \"title\": \"Struktur Data (Tekom B)\" },\n        { \"time\": \"12:40 - 13:10\", \"status\": \"available\", \"title\": \"Istirahat Siang\" }\n      ]\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Detail Ruangan Spesifik",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/keti/ruangan/{{test_room_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["keti", "ruangan", "{{test_room_id}}"]
+            },
+            "description": "Mendapatkan data lengkap ruangan beserta daftar fasilitas dan status real-time."
+          },
+          "response": [
+            {
+              "name": "200 Detail Ruangan",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"id\": 8,\n  \"code\": \"AE-101\",\n  \"name\": \"AE 101\",\n  \"capacity\": 35,\n  \"building\": {\n    \"id\": 1,\n    \"name\": \"Gedung AE\"\n  },\n  \"floor\": 1,\n  \"type\": \"classroom\",\n  \"is_active\": true,\n  \"is_bookable\": true\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Portal Keti - Siklus Reservasi Ruangan",
+      "description": "Endpoint alur pemesanan ruang, check-in, selesai pakai, perpanjang waktu, dan lapor masalah.",
+      "item": [
+        {
+          "name": "Buat Reservasi Ruangan",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    var json = pm.response.json();",
+                  "    if (json.reservation_id) {",
+                  "        pm.collectionVariables.set('test_reservation_id', json.reservation_id);",
+                  "        console.log('Saved test_reservation_id: ' + json.reservation_id);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-CSRF-TOKEN", "value": "{{csrf_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"room_id\": {{test_room_id}},\n  \"start_at\": \"2026-11-09T09:15:00+08:00\",\n  \"duration\": 100,\n  \"purpose\": \"Kuliah Pengganti Pemrograman Web\",\n  \"participants\": 30,\n  \"idempotency_key\": \"9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/keti/reservasi",
+              "host": ["{{base_url}}"],
+              "path": ["keti", "reservasi"]
+            },
+            "description": "Mengajukan reservasi ruangan baru atas nama kelas Keti."
+          },
+          "response": [
+            {
+              "name": "201 Reservasi Berhasil Dibuat",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"ok\": true,\n  \"reservation_id\": 105,\n  \"redirect_url\": \"http://127.0.0.1:8000/keti/reservasi/105\"\n}"
+            },
+            {
+              "name": "409 Bentrok Jadwal / Ruangan Terisi",
+              "status": "Conflict",
+              "code": 409,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"code\": \"ROOM_UNAVAILABLE\",\n  \"message\": \"Ruangan AE 101 sedang digunakan oleh jadwal perkuliahan lain pada jam tersebut.\"\n}"
+            },
+            {
+              "name": "422 Kesalahan Validasi",
+              "status": "Unprocessable Entity",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"message\": \"Data yang diberikan tidak valid.\",\n  \"errors\": {\n    \"duration\": [\"Durasi harus antara 30 sampai 180 menit.\"]\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Cek Status Reservasi (Polling 30s)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/keti/reservasi/{{test_reservation_id}}/status",
+              "host": ["{{base_url}}"],
+              "path": ["keti", "reservasi", "{{test_reservation_id}}", "status"]
+            },
+            "description": "Endpoint ringan untuk polling berkala status penggunaan ruangan."
+          },
+          "response": [
+            {
+              "name": "200 Status Reservasi",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": \"in_use\",\n  \"end_at\": \"2026-11-09T10:55:00+08:00\",\n  \"lock_version\": 2\n}"
+            }
+          ]
+        },
+        {
+          "name": "Mulai Gunakan Ruangan (Check-in)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "X-CSRF-TOKEN", "value": "{{csrf_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/keti/reservasi/{{test_reservation_id}}/mulai",
+              "host": ["{{base_url}}"],
+              "path": ["keti", "reservasi", "{{test_reservation_id}}", "mulai"]
+            },
+            "description": "Menandai bahwa perkuliahan sudah dimulai secara fisik di ruangan."
+          },
+          "response": [
+            {
+              "name": "200 Check-in Berhasil",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"ok\": true,\n  \"status\": \"in_use\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Selesai Gunakan Ruangan",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "X-CSRF-TOKEN", "value": "{{csrf_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/keti/reservasi/{{test_reservation_id}}/selesai",
+              "host": ["{{base_url}}"],
+              "path": ["keti", "reservasi", "{{test_reservation_id}}", "selesai"]
+            },
+            "description": "Menutup penggunaan ruangan agar ruangan kembali berstatus 'Tersedia'."
+          },
+          "response": [
+            {
+              "name": "200 Selesai Digunakan",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"ok\": true,\n  \"status\": \"finished\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Perpanjang Waktu Pemakaian (+30 menit)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "X-CSRF-TOKEN", "value": "{{csrf_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/keti/reservasi/{{test_reservation_id}}/perpanjang",
+              "host": ["{{base_url}}"],
+              "path": ["keti", "reservasi", "{{test_reservation_id}}", "perpanjang"]
+            },
+            "description": "Menambah 30 menit ke waktu selesai reservasi."
+          },
+          "response": [
+            {
+              "name": "200 Waktu Diperpanjang",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"ok\": true,\n  \"new_end_at\": \"2026-11-09T11:25:00+08:00\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Laporkan Kendala Fasilitas",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-CSRF-TOKEN", "value": "{{csrf_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"issue\": \"Proyektor tidak menyala\",\n  \"note\": \"Lampu indikator merah berkedip saat disambungkan ke kabel HDMI.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/keti/reservasi/{{test_reservation_id}}/lapor",
+              "host": ["{{base_url}}"],
+              "path": ["keti", "reservasi", "{{test_reservation_id}}", "lapor"]
+            },
+            "description": "Melaporkan kerusakan fasilitas pada ruangan yang sedang digunakan."
+          },
+          "response": [
+            {
+              "name": "200 Laporan Diterima",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"ok\": true,\n  \"message\": \"Kendala dicatat untuk pengelola.\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Portal Admin - Kelola Ruang & Penutupan",
+      "description": "Endpoint manajemen master ruangan dan penutupan darurat.",
+      "item": [
+        {
+          "name": "Ambil Semua Ruangan (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/ruang",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "ruang"]
+            },
+            "description": "Menampilkan seluruh ruangan terdaftar beserta detail kapasitas & gedung."
+          },
+          "response": [
+            {
+              "name": "200 Daftar Master Ruang",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "[\n  {\n    \"id\": 8,\n    \"code\": \"AE-101\",\n    \"name\": \"AE 101\",\n    \"capacity\": 35,\n    \"type\": \"classroom\",\n    \"floor\": 1,\n    \"building_id\": 1,\n    \"is_active\": true\n  }\n]"
+            }
+          ]
+        },
+        {
+          "name": "Tambah Ruangan Baru",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-CSRF-TOKEN", "value": "{{csrf_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"AE 111\",\n  \"code\": \"AE-111\",\n  \"capacity\": 40,\n  \"type\": \"classroom\",\n  \"floor\": 1,\n  \"building_id\": 1,\n  \"facilities\": [\"AC\", \"Proyektor\", \"Wi-Fi\"]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/ruang",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "ruang"]
+            },
+            "description": "Mendaftarkan ruangan baru ke sistem."
+          },
+          "response": [
+            {
+              "name": "201 Ruangan Dibuat",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"ok\": true,\n  \"room_id\": 29,\n  \"name\": \"AE 111\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Tutup Ruangan Sementara (Closure)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-CSRF-TOKEN", "value": "{{csrf_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"room_id\": 28,\n  \"start_at\": \"2026-11-10T07:30:00+08:00\",\n  \"end_at\": \"2026-11-12T17:30:00+08:00\",\n  \"reason\": \"Pemeliharaan AC dan instalasi perangkat baru\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/penutupan-ruang",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "penutupan-ruang"]
+            },
+            "description": "Mengunci ruangan agar tidak bisa dipesan dalam rentang waktu tertentu."
+          },
+          "response": [
+            {
+              "name": "201 Ruangan Ditutup",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"ok\": true,\n  \"message\": \"Ruangan berhasil ditutup untuk pemeliharaan.\"\n}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

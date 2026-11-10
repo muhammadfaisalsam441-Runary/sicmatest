@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\ResubmitApplicationRequest;
-use App\Models\ClassGroup;
-use App\Services\KetiApplicationService;
+use App\Models\Academic\ClassGroup;
+use App\Services\Account\KetiApplicationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;

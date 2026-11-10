@@ -19,14 +19,20 @@ return [
     'timezone_label' => 'WITA',
 
     'operating_hours' => [
-        'start' => '07:00', // BELUM DITETAPKAN
-        'end' => '21:30', // BELUM DITETAPKAN
+        'start' => '07:30',
+        'end' => '17:30',
     ],
 
     'reservation' => [
-        'default_minutes' => 60, // desain: "Durasi 1 jam"
+        'default_minutes' => 100,
         'min_minutes' => 30, // BELUM DITETAPKAN
-        'max_minutes' => 180, // BELUM DITETAPKAN
+        'max_minutes' => 200, // 4 SKS = 200 menit
+        'duration_options' => [
+            100 => '2 SKS (100 menit)',
+            150 => '3 SKS (150 menit)',
+            200 => '4 SKS (200 menit)',
+        ],
+        'academic_purposes' => ['Kuliah Pengganti', 'Praktikum Tambahan'],
         'max_days_ahead' => 7, // BELUM DITETAPKAN
         'max_active_per_class' => 3, // BELUM DITETAPKAN
         'checkin_open_minutes_before' => 15, // BELUM DITETAPKAN
@@ -63,13 +69,10 @@ return [
         'fuzzy_enabled' => false, // BELUM DISAHKAN
         // Kapasitas ruang kurang dari jumlah peserta: masalah wajib (true) atau peringatan (false). BELUM DITETAPKAN
         'capacity_blocks_publish' => false,
-        'python_bin' => env('SICMA_PYTHON', 'python3'),
-        'worker_path' => base_path('scheduler-worker/solve.py'),
-        // detached = proses Python terpisah, dipantau halaman proses (tanpa queue worker);
-        // queue = job RunScheduleOptimization (butuh `php artisan queue:work`); sync = tunggu di request.
-        'run_mode' => env('SICMA_SCHEDULER_MODE', 'detached'),
+        'run_mode' => env('SICMA_SCHEDULER_MODE', 'queue'),
         'grace_seconds' => 30,
-        'days' => [1, 2, 3, 4, 5], // Senin–Jumat. BELUM DITETAPKAN
+        'queue_wait_seconds' => 600,
+        'days' => [1, 2, 3, 4, 5], // Perkuliahan hanya Senin–Jumat.
     ],
 
     'polling_seconds' => 30,

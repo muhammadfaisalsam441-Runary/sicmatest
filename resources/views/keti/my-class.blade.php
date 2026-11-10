@@ -7,6 +7,7 @@
     <div class="flex flex-col gap-6">
         <x-page-header title="My Class" subtitle="Jadwal dan ruangan kelasmu." />
         @include('keti.partials.search-tabs', ['active' => 'my-class'])
+        <p class="text-sm text-muted">Perkuliahan berlangsung Senin–Jumat.</p>
 
         <x-card class="flex items-center justify-between">
             <div class="flex flex-col gap-1">

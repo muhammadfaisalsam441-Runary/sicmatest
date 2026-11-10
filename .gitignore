@@ -25,6 +25,15 @@ _ide_helper.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
+# Variasi file konfigurasi lokal
+.env.*
+!.env.example
 
-# Sumber desain PDF (64 MB) disimpan lokal saja; potongan PNG ada di docs/design/frames
-/docs/design/*.pdf
+# File sementara dan hasil ekspor
+/tmp/
+/output/
+
+# Dokumen referensi di root proyek
+/*.pdf
+/*.xlsx
+/*.zip

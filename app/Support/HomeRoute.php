@@ -2,7 +2,7 @@
 
 namespace App\Support;
 
-use App\Models\User;
+use App\Models\User\User;
 
 /**
  * Tujuan setelah masuk sesuai peran dan status akun (Bagian 4.4).

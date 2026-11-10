@@ -40,8 +40,22 @@ class LecturerRequest extends FormRequest
             'leadership_position' => ['nullable', 'string', 'max:80'],
             'leadership_from' => ['nullable', 'required_with:leadership_position', 'date'],
             'leadership_to' => ['nullable', 'date', 'after_or_equal:leadership_from'],
-            'target_sks' => ['nullable', 'numeric', 'min:0', 'max:60'],
-            'max_sks' => ['nullable', 'numeric', 'min:0', 'max:60'],
+            'target_sks' => ['nullable', 'integer', 'min:0', 'max:60'],
+            'max_sks' => ['nullable', 'integer', 'min:0', 'max:60', ...($this->filled('target_sks') ? ['gte:target_sks'] : [])],
+            'course_selection_present' => ['sometimes', 'accepted'],
+            'course_ids' => ['sometimes', 'array'],
+            'course_ids.*' => ['integer', 'distinct', Rule::exists('courses', 'id')->whereNull('deleted_at')],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'max_sks.gte' => 'Maksimum SKS harus lebih besar atau sama dengan target SKS.',
+            'nip.regex' => 'NIP terdiri atas 18 angka.',
         ];
     }
 
@@ -61,16 +75,7 @@ class LecturerRequest extends FormRequest
             'leadership_to' => 'akhir menjabat',
             'target_sks' => 'target SKS',
             'max_sks' => 'maksimum SKS',
-        ];
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    public function messages(): array
-    {
-        return [
-            'nip.regex' => 'NIP terdiri atas 18 angka.',
+            'course_ids.*' => 'mata kuliah',
         ];
     }
 }

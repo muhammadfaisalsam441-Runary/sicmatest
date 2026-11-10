@@ -2,8 +2,8 @@
 
 use App\Enums\LecturerHomebase;
 use App\Enums\LecturerProfileStatus;
-use App\Models\Lecturer;
-use App\Models\User;
+use App\Models\Lecturer\Lecturer;
+use App\Models\User\User;
 use Database\Seeders\AcademicSeeder;
 use Database\Seeders\LecturerRosterSeeder;
 use Illuminate\Http\UploadedFile;
@@ -53,12 +53,14 @@ test('halaman Data Dosen menampilkan NIP dan jabatan fungsional dengan filter Ho
     $this->seed([AcademicSeeder::class, LecturerRosterSeeder::class]);
 
     $this->actingAs($this->admin)
-        ->get(route('admin.lecturers.index', ['filter' => 'jtik']))
+        ->get(route('admin.lecturers.index', ['filter' => 'jtik', 'q' => 'Mappalotteng']))
         ->assertOk()
-        ->assertSee('NIP 196910181994031001')
-        ->assertSee('Lektor Kepala')
-        ->assertSee('Pembina Tingkat I • IV/b')
-        ->assertDontSee('Idawati Garim');
+        ->assertSee('NIP: 196910181994031001')
+        ->assertSee('Lektor Kepala • Pembina Tingkat I • IV/b');
+
+    $this->get(route('admin.lecturers.index', ['filter' => 'jtik', 'q' => 'Idawati']))
+        ->assertOk()
+        ->assertDontSee('NIP: ');
 
     $this->get(route('admin.lecturers.index', ['q' => '199204012018032001']))
         ->assertOk()

@@ -4,9 +4,9 @@ namespace Database\Seeders;
 
 use App\Enums\KetiApplicationStatus;
 use App\Enums\UserRole;
-use App\Models\ClassGroup;
-use App\Models\Period;
-use App\Models\User;
+use App\Models\Academic\ClassGroup;
+use App\Models\Academic\Period;
+use App\Models\User\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 

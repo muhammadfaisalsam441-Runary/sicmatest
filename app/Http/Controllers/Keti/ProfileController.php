@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Keti;
 
 use App\Enums\ReservationStatus;
 use App\Http\Controllers\Controller;
-use App\Models\Reservation;
+use App\Models\Reservation\Reservation;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 

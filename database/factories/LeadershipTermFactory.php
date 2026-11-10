@@ -2,8 +2,8 @@
 
 namespace Database\Factories;
 
-use App\Models\LeadershipTerm;
-use App\Models\Lecturer;
+use App\Models\Lecturer\LeadershipTerm;
+use App\Models\Lecturer\Lecturer;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**

@@ -42,7 +42,7 @@
         @if ($timeLabel)
             <div class="flex flex-col items-end gap-1 text-right">
                 <dt class="text-xs text-muted">{{ $timeLabel }}</dt>
-                <dd @class(['font-semibold', 'text-success' => $isAvailable, 'text-primary' => ! $isAvailable])>{{ $time ?? '—' }}</dd>
+                <dd @class(['font-semibold', 'text-success' => $isAvailable, 'text-ink' => $badge === 'Tutup', 'text-primary' => ! $isAvailable && $badge !== 'Tutup'])>{{ $time ?? '—' }}</dd>
             </div>
         @endif
     </dl>

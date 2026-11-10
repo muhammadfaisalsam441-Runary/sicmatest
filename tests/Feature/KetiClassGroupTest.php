@@ -1,8 +1,8 @@
 <?php
 
-use App\Models\ClassGroup;
-use App\Models\ClassRepresentative;
-use App\Models\User;
+use App\Models\Academic\ClassGroup;
+use App\Models\User\ClassRepresentative;
+use App\Models\User\User;
 
 test('Keti terhubung ke kelas aktif yang diwakilinya hari ini', function () {
     $keti = User::factory()->create();

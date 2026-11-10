@@ -2,7 +2,7 @@
 
 namespace App\View\Composers;
 
-use App\Models\User;
+use App\Models\User\User;
 use Illuminate\View\View;
 
 /**

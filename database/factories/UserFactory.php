@@ -3,10 +3,10 @@
 namespace Database\Factories;
 
 use App\Enums\UserRole;
-use App\Models\ClassGroup;
-use App\Models\ClassRepresentative;
-use App\Models\KetiApplication;
-use App\Models\User;
+use App\Models\Academic\ClassGroup;
+use App\Models\User\ClassRepresentative;
+use App\Models\User\KetiApplication;
+use App\Models\User\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;

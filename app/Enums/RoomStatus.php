@@ -15,12 +15,13 @@ enum RoomStatus: string
     case Uncertain = 'uncertain';
 
     /**
-     * Badge di UI (Bagian 2.1).
+     * Badge di UI.
      */
     public function badge(): string
     {
         return match ($this) {
             self::Available => 'Tersedia',
+            self::Closed => 'Tutup',
             self::Uncertain => 'Belum pasti',
             default => 'Digunakan',
         };

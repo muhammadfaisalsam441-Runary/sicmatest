@@ -3,10 +3,10 @@
 namespace Database\Factories;
 
 use App\Enums\ReservationStatus;
-use App\Models\ClassGroup;
-use App\Models\Reservation;
-use App\Models\Room;
-use App\Models\User;
+use App\Models\Academic\ClassGroup;
+use App\Models\Reservation\Reservation;
+use App\Models\Room\Room;
+use App\Models\User\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 

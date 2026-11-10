@@ -7,7 +7,7 @@
      x-on:keydown.escape.window="open = false"
      x-show="open" x-cloak
      class="fixed inset-0 z-50 flex items-center justify-center p-8"
-     role="dialog" aria-modal="true" @if ($title) aria-label="{{ $title }}" @endif>
+     data-modal-name="{{ $name }}" role="dialog" aria-modal="true" @if ($title) aria-label="{{ $title }}" @endif>
     <div class="absolute inset-0 bg-ink/80" x-on:click="open = false"></div>
     <div x-show="open" x-transition class="relative w-full {{ $width }} rounded-2xl bg-surface p-8 shadow-xl">
         @if ($title)

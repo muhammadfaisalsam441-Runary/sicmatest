@@ -3,9 +3,9 @@
 namespace Database\Seeders;
 
 use App\Enums\RoomType;
-use App\Models\Building;
-use App\Models\Facility;
-use App\Models\Room;
+use App\Models\Room\Building;
+use App\Models\Room\Facility;
+use App\Models\Room\Room;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
 

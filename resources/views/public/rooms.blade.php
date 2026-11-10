@@ -42,11 +42,17 @@
         <div class="flex items-center justify-between">
             <div class="flex flex-col gap-3">
                 <span class="text-xs text-ink">Ringkasan status di semua gedung</span>
-                <x-tabs :items="[
-                    ['label' => 'Semua', 'count' => $summary['all'], 'href' => route('public.rooms', $tabQuery(null)), 'active' => $status === null],
-                    ['label' => 'Tersedia', 'count' => $summary['available'], 'href' => route('public.rooms', $tabQuery('tersedia')), 'active' => $status === 'tersedia'],
-                    ['label' => 'Digunakan', 'count' => $summary['busy'], 'href' => route('public.rooms', $tabQuery('digunakan')), 'active' => $status === 'digunakan'],
-                ]" />
+                @php
+                    $tabs = [
+                        ['label' => 'Semua', 'count' => $summary['all'], 'href' => route('public.rooms', $tabQuery(null)), 'active' => $status === null],
+                        ['label' => 'Tersedia', 'count' => $summary['available'], 'href' => route('public.rooms', $tabQuery('tersedia')), 'active' => $status === 'tersedia'],
+                        ['label' => 'Digunakan', 'count' => $summary['busy'], 'href' => route('public.rooms', $tabQuery('digunakan')), 'active' => $status === 'digunakan'],
+                    ];
+                    if (($summary['closed'] ?? 0) > 0) {
+                        $tabs[] = ['label' => 'Tutup', 'count' => $summary['closed'], 'href' => route('public.rooms', $tabQuery('tutup')), 'active' => $status === 'tutup'];
+                    }
+                @endphp
+                <x-tabs :items="$tabs" />
             </div>
             <button type="button" x-data x-on:click="$dispatch('open-modal', 'cari-ruangan')" class="text-sm font-semibold text-primary hover:underline">Contoh pencarian</button>
         </div>

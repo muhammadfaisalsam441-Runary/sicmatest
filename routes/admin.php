@@ -31,6 +31,7 @@ Route::get('/', DashboardController::class)->name('dashboard');
 
 Route::get('/ruang', [RoomController::class, 'index'])->name('rooms.index');
 Route::post('/ruang', [RoomController::class, 'store'])->name('rooms.store');
+Route::post('/ruang/batch', [RoomController::class, 'batchUpdate'])->name('rooms.batch');
 Route::put('/ruang/{room}', [RoomController::class, 'update'])->name('rooms.update');
 Route::delete('/ruang/{room}', [RoomController::class, 'destroy'])->name('rooms.destroy');
 
@@ -66,7 +67,11 @@ Route::get('/jadwal/impor/{import}', [ImportController::class, 'show'])->name('i
 Route::post('/jadwal/impor/{import}/simpan', [ImportController::class, 'commit'])->name('imports.commit');
 
 Route::post('/draf', [DraftController::class, 'store'])->name('drafts.store');
+Route::get('/pemeriksaan-jadwal', [DraftController::class, 'inspections'])->name('drafts.inspections');
+Route::get('/draf/{version}/pemeriksaan', [DraftController::class, 'show'])->name('drafts.inspect');
 Route::get('/draf/{version}', [DraftController::class, 'show'])->name('drafts.show');
+Route::get('/draf/{version}/unduh/excel', [DraftController::class, 'excel'])->name('drafts.excel');
+Route::get('/draf/{version}/unduh/pdf', [DraftController::class, 'pdf'])->name('drafts.pdf');
 Route::put('/draf/{version}/sesi/{session}', [DraftController::class, 'updateSession'])->scopeBindings()->name('drafts.sessions.update');
 Route::post('/draf/{version}/sesi/{session}/kunci', [DraftController::class, 'toggleLock'])->scopeBindings()->name('drafts.sessions.lock');
 Route::post('/draf/{version}/periksa', [DraftController::class, 'validateDraft'])->name('drafts.validate');
@@ -82,18 +87,28 @@ Route::post('/akademik/mata-kuliah', [AcademicController::class, 'storeCourse'])
 Route::put('/akademik/mata-kuliah/{course}', [AcademicController::class, 'updateCourse'])->name('academic.courses.update');
 Route::delete('/akademik/mata-kuliah/{course}', [AcademicController::class, 'destroyCourse'])->name('academic.courses.destroy');
 Route::post('/akademik/kelas', [AcademicController::class, 'storeClassGroup'])->name('academic.classes.store');
+Route::post('/akademik/kelas/batch', [AcademicController::class, 'batchUpdateClassGroups'])->name('academic.classes.batch');
+Route::put('/akademik/kelas/massal', [AcademicController::class, 'bulkUpdateClasses'])->name('academic.classes.bulk-update');
 Route::put('/akademik/kelas/{classGroup}', [AcademicController::class, 'updateClassGroup'])->name('academic.classes.update');
 Route::delete('/akademik/kelas/{classGroup}', [AcademicController::class, 'destroyClassGroup'])->name('academic.classes.destroy');
 Route::post('/akademik/penawaran', [AcademicController::class, 'storeOffering'])->name('academic.offerings.store');
+Route::post('/akademik/penawaran/batch-delete', [AcademicController::class, 'batchDeleteOfferings'])->name('academic.offerings.batch-delete');
 Route::delete('/akademik/penawaran/{offering}', [AcademicController::class, 'destroyOffering'])->name('academic.offerings.destroy');
 
 Route::get('/dosen', [LecturerController::class, 'index'])->name('lecturers.index');
 Route::post('/dosen', [LecturerController::class, 'store'])->name('lecturers.store');
+Route::post('/dosen/batch', [LecturerController::class, 'batchUpdate'])->name('lecturers.batch');
 Route::put('/dosen/{lecturer}', [LecturerController::class, 'update'])->name('lecturers.update');
 Route::post('/dosen/impor', [LecturerController::class, 'import'])->name('lecturers.import');
 
 Route::get('/pembagian-mengajar', [TeachingAssignmentController::class, 'index'])->name('teaching.index');
+Route::get('/pembagian-mengajar/beban-otomatis', [TeachingAssignmentController::class, 'previewAllocation'])->name('teaching.allocation.preview');
+Route::post('/pembagian-mengajar/beban-otomatis', [TeachingAssignmentController::class, 'applyAllocation'])->name('teaching.allocation.apply');
+Route::get('/pembagian-mengajar/sks-otomatis', [TeachingAssignmentController::class, 'previewPhases'])->name('teaching.phases.preview');
+Route::post('/pembagian-mengajar/sks-otomatis', [TeachingAssignmentController::class, 'applyPhases'])->name('teaching.phases.apply');
 Route::post('/pembagian-mengajar', [TeachingAssignmentController::class, 'store'])->name('teaching.store');
+Route::post('/pembagian-mengajar/batch', [TeachingAssignmentController::class, 'batchStore'])->name('teaching.batch');
+Route::put('/pembagian-mengajar/{assignment}', [TeachingAssignmentController::class, 'update'])->name('teaching.update');
 Route::post('/pembagian-mengajar/{assignment}/kunci', [TeachingAssignmentController::class, 'toggleLock'])->name('teaching.lock');
 Route::delete('/pembagian-mengajar/{assignment}', [TeachingAssignmentController::class, 'destroy'])->name('teaching.destroy');
 
@@ -104,3 +119,4 @@ Route::get('/susun-jadwal/riwayat', [SchedulerController::class, 'history'])->na
 Route::get('/susun-jadwal/proses/{job}', [SchedulerController::class, 'show'])->name('scheduler.show');
 Route::get('/susun-jadwal/proses/{job}/status', [SchedulerController::class, 'status'])->name('scheduler.status');
 Route::post('/susun-jadwal/proses/{job}/batal', [SchedulerController::class, 'cancel'])->name('scheduler.cancel');
+Route::post('/susun-jadwal/proses/{job}/ulang', [SchedulerController::class, 'retry'])->middleware('throttle:10,1')->name('scheduler.retry');

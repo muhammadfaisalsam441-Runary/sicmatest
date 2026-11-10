@@ -4,8 +4,8 @@ namespace Database\Factories;
 
 use App\Enums\ScheduleSource;
 use App\Enums\ScheduleVersionStatus;
-use App\Models\Period;
-use App\Models\ScheduleVersion;
+use App\Models\Academic\Period;
+use App\Models\Scheduling\ScheduleVersion;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**

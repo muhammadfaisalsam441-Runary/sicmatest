@@ -7,11 +7,11 @@ use App\Exceptions\DomainException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Keti\ReportIssueRequest;
 use App\Http\Requests\Keti\StoreReservationRequest;
-use App\Models\Reservation;
-use App\Models\Room;
-use App\Services\AuditLogger;
-use App\Services\NotificationService;
-use App\Services\ReservationService;
+use App\Models\Reservation\Reservation;
+use App\Models\Room\Room;
+use App\Services\Account\AuditLogger;
+use App\Services\Account\NotificationService;
+use App\Services\Room\ReservationService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -51,7 +51,11 @@ class ReservationController extends Controller
         }
 
         if ($request->expectsJson()) {
-            return response()->json(['ok' => true, 'reservation_id' => $reservation->id], 201);
+            return response()->json([
+                'ok' => true,
+                'reservation_id' => $reservation->id,
+                'redirect_url' => route('keti.reservations.show', $reservation),
+            ], 201);
         }
 
         return redirect()->route('keti.reservations.show', $reservation);

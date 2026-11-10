@@ -7,12 +7,18 @@ use App\Enums\LecturerProfileStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\ImportLecturersRequest;
 use App\Http\Requests\Admin\LecturerRequest;
-use App\Models\Lecturer;
-use App\Models\Period;
-use App\Services\LecturerService;
+use App\Models\Academic\Course;
+use App\Models\Academic\CourseOffering;
+use App\Models\Academic\Period;
+use App\Models\Lecturer\Lecturer;
+use App\Models\Lecturer\LecturerExpertise;
+use App\Models\Lecturer\LecturerLoadTarget;
+use App\Models\Lecturer\TeachingAssignment;
+use App\Services\Academic\LecturerService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 /**
@@ -25,30 +31,121 @@ class LecturerController extends Controller
      */
     public const FILTERS = ['semua' => 'Semua', 'jtik' => 'Homebase JTIK', 'luar' => 'Luar JTIK', 'pimpinan' => 'Pimpinan', 'verifikasi' => 'Perlu verifikasi'];
 
-    public function index(Request $request): View
+    public function index(Request $request, LecturerService $lecturerService): View
     {
         $filter = array_key_exists((string) $request->query('filter'), self::FILTERS) ? (string) $request->query('filter') : 'semua';
         $keyword = trim((string) $request->query('q'));
+        $perPage = in_array((int) $request->query('per_page'), [25, 50, 100], true) ? (int) $request->query('per_page') : 25;
         $period = Period::query()->active()->first();
 
-        $lecturers = Lecturer::query()
-            ->with(['leadershipTerms', 'loadTargets' => fn ($query) => $query->where('period_id', $period?->id)])
-            ->withCount(['teachingAssignments as course_count' => fn (Builder $query) => $query->whereHas('courseOffering', fn (Builder $query) => $query->where('period_id', $period?->id))])
-            ->when($keyword !== '', fn (Builder $query) => $query->where(fn (Builder $query) => $query->where('name', 'like', "%{$keyword}%")->orWhere('source_name', 'like', "%{$keyword}%")->orWhere('nip', 'like', "%{$keyword}%")))
+        $query = Lecturer::query()
+            ->with([
+                'leadershipTerms',
+                'loadTargets' => fn ($query) => $query->where('period_id', $period?->id),
+                'expertises' => fn ($query) => $query->where('field', LecturerExpertise::ADMIN_TEACHING)->whereNotNull('course_id'),
+            ])
+            ->when($keyword !== '', fn (Builder $query) => $query->where(fn (Builder $query) => $query->where('name', 'like', "%{$keyword}%")
+                ->orWhere('source_name', 'like', "%{$keyword}%")
+                ->orWhere('nidn', 'like', "%{$keyword}%")
+                ->orWhere('nip', 'like', "%{$keyword}%")
+            ))
             ->when($filter === 'jtik', fn (Builder $query) => $query->where('homebase', LecturerHomebase::Jtik))
             ->when($filter === 'luar', fn (Builder $query) => $query->where('homebase', LecturerHomebase::External))
             ->when($filter === 'pimpinan', fn (Builder $query) => $query->whereHas('leadershipTerms', fn (Builder $query) => $query->activeOn(now())))
             ->when($filter === 'verifikasi', fn (Builder $query) => $query->where('profile_status', LecturerProfileStatus::Unverified))
-            ->orderBy('name')
-            ->get();
+            ->orderBy('name');
+
+        $lecturers = $query->paginate($perPage)->withQueryString();
+        $courses = Course::query()->orderBy('name')->orderBy('code')->get(['id', 'code', 'name']);
+        $courseIds = $courses->pluck('id')->all();
+        $sourceCourses = [];
+
+        if ($period !== null && $lecturers->isNotEmpty()) {
+            $scheduled = TeachingAssignment::query()
+                ->join('course_offerings', 'course_offerings.id', '=', 'teaching_assignments.course_offering_id')
+                ->where('course_offerings.period_id', $period->id)
+                ->whereIn('teaching_assignments.lecturer_id', $lecturers->pluck('id'))
+                ->distinct()
+                ->get(['teaching_assignments.lecturer_id', 'course_offerings.course_id']);
+            foreach ($scheduled as $assignment) {
+                $sourceCourses[$assignment->lecturer_id][] = $assignment->course_id;
+            }
+
+            $offeredIds = CourseOffering::query()->whereBelongsTo($period)->distinct()->pluck('course_id')->flip();
+            $roster = $lecturerService->rosterInstructorIds($lecturers->getCollection(), [$period->id]);
+            foreach ($courses as $course) {
+                if (! $offeredIds->has($course->id)) {
+                    continue;
+                }
+
+                $name = Str::lower(Str::squish($course->name));
+                foreach ($roster[$period->id][$name] ?? [] as $lecturerId) {
+                    $sourceCourses[$lecturerId][] = $course->id;
+                }
+            }
+        }
+
+        $courseSelections = $lecturers->getCollection()->mapWithKeys(function (Lecturer $lecturer) use ($sourceCourses, $courseIds): array {
+            $source = array_values(array_unique(array_intersect($sourceCourses[$lecturer->id] ?? [], $courseIds)));
+            $manual = $lecturer->expertises->pluck('course_id')->intersect($courseIds)->unique()->values()->all();
+
+            return [$lecturer->id => ['source' => $source, 'manual' => $manual, 'count' => count(array_unique([...$source, ...$manual]))]];
+        });
 
         return view('admin.lecturers.index', [
             'lecturers' => $lecturers,
+            'courses' => $courses,
+            'courseSelections' => $courseSelections,
             'filter' => $filter,
             'keyword' => $keyword,
             'period' => $period,
+            'perPage' => $perPage,
             'total' => Lecturer::query()->count(),
             'unverified' => Lecturer::query()->where('profile_status', LecturerProfileStatus::Unverified)->count(),
+            'jtikCount' => Lecturer::query()->where('homebase', LecturerHomebase::Jtik)->count(),
+            'externalCount' => Lecturer::query()->where('homebase', LecturerHomebase::External)->count(),
+            'leaderCount' => Lecturer::query()->whereHas('leadershipTerms', fn (Builder $query) => $query->activeOn(now()))->count(),
+        ]);
+    }
+
+    public function batchUpdate(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'action' => ['required', 'string', 'in:verify,unverify,homebase_jtik,homebase_external,set_target_sks'],
+            'lecturer_ids' => ['required', 'array', 'min:1'],
+            'lecturer_ids.*' => ['integer', 'exists:lecturers,id'],
+            'target_sks' => ['nullable', 'integer', 'min:0', 'max:60'],
+            'max_sks' => ['nullable', 'integer', 'min:0', 'max:60'],
+        ]);
+
+        $ids = $validated['lecturer_ids'];
+        $action = $validated['action'];
+        $count = count($ids);
+
+        match ($action) {
+            'verify' => Lecturer::query()->whereIn('id', $ids)->update(['profile_status' => LecturerProfileStatus::Verified]),
+            'unverify' => Lecturer::query()->whereIn('id', $ids)->update(['profile_status' => LecturerProfileStatus::Unverified]),
+            'homebase_jtik' => Lecturer::query()->whereIn('id', $ids)->update(['homebase' => LecturerHomebase::Jtik]),
+            'homebase_external' => Lecturer::query()->whereIn('id', $ids)->update(['homebase' => LecturerHomebase::External]),
+            'set_target_sks' => (function () use ($ids, $validated): void {
+                $period = Period::query()->active()->first();
+                if ($period !== null) {
+                    foreach ($ids as $id) {
+                        LecturerLoadTarget::query()->updateOrCreate(
+                            ['lecturer_id' => $id, 'period_id' => $period->id],
+                            [
+                                'target_sks' => $validated['target_sks'] ?? null,
+                                'max_sks' => $validated['max_sks'] ?? null,
+                            ]
+                        );
+                    }
+                }
+            })(),
+        };
+
+        return back()->with('toast', [
+            'type' => 'success',
+            'title' => "Berhasil memperbarui {$count} dosen",
         ]);
     }
 

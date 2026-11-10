@@ -2,9 +2,9 @@
 
 namespace Database\Factories;
 
-use App\Models\ClassGroup;
-use App\Models\ClassRepresentative;
-use App\Models\User;
+use App\Models\Academic\ClassGroup;
+use App\Models\User\ClassRepresentative;
+use App\Models\User\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**

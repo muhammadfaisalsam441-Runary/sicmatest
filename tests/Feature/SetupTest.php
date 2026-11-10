@@ -9,7 +9,7 @@ test('aplikasi memakai zona waktu WITA dan bahasa Indonesia', function () {
 });
 
 test('konfigurasi kebijakan SICMA tersedia dengan nilai sementara', function () {
-    expect(config('sicma.reservation.default_minutes'))->toBe(60)
+    expect(config('sicma.reservation.default_minutes'))->toBe(100)
         ->and(config('sicma.verification'))->toBe([
             'code_ttl_minutes' => 15,
             'max_attempts' => 5,

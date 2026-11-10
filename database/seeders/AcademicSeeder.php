@@ -4,10 +4,10 @@ namespace Database\Seeders;
 
 use App\Enums\CalendarExceptionType;
 use App\Enums\LecturerProfileStatus;
-use App\Models\ClassGroup;
-use App\Models\Course;
-use App\Models\Lecturer;
-use App\Models\Period;
+use App\Models\Academic\ClassGroup;
+use App\Models\Academic\Course;
+use App\Models\Academic\Period;
+use App\Models\Lecturer\Lecturer;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
 

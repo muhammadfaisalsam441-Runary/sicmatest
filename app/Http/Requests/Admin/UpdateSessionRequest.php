@@ -38,14 +38,25 @@ class UpdateSessionRequest extends FormRequest
      */
     public function rules(): array
     {
+        $open = (string) config('sicma.operating_hours.start', '07:30');
+        $close = (string) config('sicma.operating_hours.end', '17:30');
+
         return [
             'mode' => ['required', Rule::enum(SessionMode::class)],
-            'day_of_week' => ['nullable', 'required_unless:mode,unscheduled', 'integer', 'between:1,6'],
-            'start_time' => ['nullable', 'required_unless:mode,unscheduled', 'date_format:H:i'],
-            'end_time' => ['nullable', 'required_unless:mode,unscheduled', 'date_format:H:i', 'after:start_time'],
+            'day_of_week' => ['nullable', 'required_unless:mode,unscheduled', 'integer', Rule::in(config('sicma.scheduler.days'))],
+            'start_time' => ['nullable', 'required_unless:mode,unscheduled', 'date_format:H:i', "after_or_equal:{$open}", "before:{$close}"],
+            'end_time' => ['nullable', 'required_unless:mode,unscheduled', 'date_format:H:i', 'after:start_time', "before_or_equal:{$close}"],
             'room_id' => ['nullable', 'required_if:mode,offline', Rule::exists('rooms', 'id')->whereNull('deleted_at')],
             'note' => ['nullable', 'string', 'max:255'],
         ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return ['day_of_week.in' => 'Perkuliahan hanya boleh dijadwalkan Senin–Jumat.'];
     }
 
     /**
@@ -62,7 +73,7 @@ class UpdateSessionRequest extends FormRequest
     }
 
     /**
-     * Data untuk DraftService::updateSession (jam dalam menit sejak 00.00).
+     * Data untuk ScheduleDraftService::updateSession (jam dalam menit sejak 00.00).
      *
      * @return array{mode: string, day_of_week: int|null, start_minute: int|null, end_minute: int|null, room_id: int|null}
      */

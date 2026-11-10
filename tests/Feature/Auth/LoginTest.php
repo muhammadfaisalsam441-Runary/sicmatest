@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\User;
+use App\Models\User\User;
 
 test('halaman masuk tampil untuk tamu', function () {
     $this->get(route('login'))

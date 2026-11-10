@@ -11,12 +11,23 @@
                 <x-button variant="soft" :href="route('keti.search')">Cari ruangan</x-button>
             </x-empty-state>
         @else
-            <x-tabs :items="[
-                ['label' => 'Semua', 'href' => route('keti.favorites.index'), 'active' => $status === null],
-                ['label' => 'Tersedia', 'href' => route('keti.favorites.index', ['status' => 'tersedia']), 'active' => $status === 'tersedia'],
-                ['label' => 'Digunakan', 'href' => route('keti.favorites.index', ['status' => 'digunakan']), 'active' => $status === 'digunakan'],
-            ]" />
-            <h2 class="text-lg font-semibold">{{ $status === 'tersedia' ? $counts['available'].' ruangan tersedia' : ($status === 'digunakan' ? $counts['busy'].' ruangan digunakan' : $counts['all'].' ruangan tersimpan') }}</h2>
+            @php
+                $tabItems = [
+                    ['label' => 'Semua', 'href' => route('keti.favorites.index'), 'active' => $status === null],
+                    ['label' => 'Tersedia', 'href' => route('keti.favorites.index', ['status' => 'tersedia']), 'active' => $status === 'tersedia'],
+                    ['label' => 'Digunakan', 'href' => route('keti.favorites.index', ['status' => 'digunakan']), 'active' => $status === 'digunakan'],
+                ];
+                if (($counts['closed'] ?? 0) > 0) {
+                    $tabItems[] = ['label' => 'Tutup', 'href' => route('keti.favorites.index', ['status' => 'tutup']), 'active' => $status === 'tutup'];
+                }
+            @endphp
+            <x-tabs :items="$tabItems" />
+            <h2 class="text-lg font-semibold">{{ match ($status) {
+                'tersedia' => $counts['available'].' ruangan tersedia',
+                'digunakan' => $counts['busy'].' ruangan digunakan',
+                'tutup' => ($counts['closed'] ?? 0).' ruangan tutup',
+                default => $counts['all'].' ruangan tersimpan',
+            } }}</h2>
 
             @if ($rooms === [])
                 <x-empty-state title="Tidak ada ruangan favorit dengan status ini" message="Ruangan favorit tetap mengikuti ketersediaan saat ini." />

@@ -17,7 +17,7 @@
             <form method="GET" action="{{ route('admin.reservations.index') }}" class="relative">
                 <i data-lucide="search" class="pointer-events-none absolute top-1/2 left-4 size-5 -translate-y-1/2 text-muted"></i>
                 <input type="search" name="q" value="{{ $keyword }}" placeholder="Cari ruang atau kelas pemesan" aria-label="Cari ruang atau kelas pemesan"
-                       class="w-full rounded-control border border-muted/60 bg-surface py-3 pr-4 pl-12 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15">
+                        class="w-full rounded-control border border-muted/60 bg-surface py-3 pr-4 pl-12 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15">
                 @if ($filter !== 'semua')<input type="hidden" name="status" value="{{ $filter }}">@endif
             </form>
 
@@ -29,7 +29,7 @@
 
             @if ($reservations->isEmpty())
                 <x-empty-state title="{{ $keyword !== '' || $filter !== 'semua' ? 'Tidak ada reservasi yang cocok' : 'Belum ada reservasi' }}"
-                               message="{{ $keyword !== '' || $filter !== 'semua' ? 'Coba kata kunci lain atau hapus filter status.' : 'Reservasi yang dibuat ketua tingkat akan muncul di sini.' }}">
+                                message="{{ $keyword !== '' || $filter !== 'semua' ? 'Coba kata kunci lain atau hapus filter status.' : 'Reservasi yang dibuat ketua tingkat akan muncul di sini.' }}">
                     @if ($keyword !== '' || $filter !== 'semua')
                         <x-button variant="soft" :href="route('admin.reservations.index')">Hapus filter</x-button>
                     @endif
@@ -73,7 +73,7 @@
                                 </td>
                                 <td class="py-3">
                                     @if ($reservation->status === ReservationStatus::Booked)
-                                        <x-button variant="danger-outline" class="px-4! py-2!" x-data x-on:click="$dispatch('open-modal', 'cancel-reservation-{{ $reservation->id }}')">Batalkan</x-button>
+                                        <x-button variant="danger-outline" class="px-4! py-2!" icon="x-circle" x-data x-on:click="$dispatch('open-modal', 'cancel-reservation-{{ $reservation->id }}')">Batalkan</x-button>
                                     @else
                                         <span class="text-muted">—</span>
                                     @endif

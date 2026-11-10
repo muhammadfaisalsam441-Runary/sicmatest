@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\User;
+use App\Models\User\User;
 use Illuminate\Support\Facades\Gate;
 
 test('tamu diarahkan ke halaman masuk', function (string $routeName) {

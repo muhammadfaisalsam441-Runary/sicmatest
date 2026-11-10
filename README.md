@@ -1,51 +1,60 @@
-# SICMA — System for Intelligent Class Management & Access
+<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
 
-Website manajemen dan reservasi ruang kelas Jurusan Teknik Informatika dan Komputer (JTIK) Universitas Negeri Makassar.
-Tiga area: **Portal Publik** (tanpa login), **Portal Keti** (ketua tingkat), dan **Panel Admin**, dengan satu halaman masuk bersama di `/masuk`.
+<p align="center">
+<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
+<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
+<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
+<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
+</p>
 
 > Website desktop (lebar ≥ 1024 px). Semua waktu dalam WITA (Asia/Makassar). Ruang, kelas, mata kuliah, dosen, dan Jadwal resmi
 > berasal dari **Jadwal TA Ganjil 2026/2027 JTIK** (PDF update 21 Agustus 2026). Akun admin/Keti dan reservasi adalah **data simulasi** dengan nama fiktif.
 
-## Teknologi
+Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
 
-Laravel 13 (PHP 8.3+), MySQL 8 / MariaDB, Blade + Tailwind CSS v4 (Vite) + Alpine.js, ikon Lucide, Pest,
-phpoffice/phpspreadsheet (impor Excel/CSV), worker penyusun jadwal Python + OR-Tools CP-SAT (`scheduler-worker/`).
+- [Simple, fast routing engine](https://laravel.com/docs/routing).
+- [Powerful dependency injection container](https://laravel.com/docs/container).
+- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
+- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
+- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
+- [Robust background job processing](https://laravel.com/docs/queues).
+- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
 
-## Instalasi
+Laravel is accessible, powerful, and provides tools required for large, robust applications.
 
-```bash
-composer install
-npm install
-cp .env.example .env
-php artisan key:generate
-```
+## Learning Laravel
 
-Atur database di `.env` (contoh MariaDB XAMPP):
+Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
 
-```dotenv
-DB_CONNECTION=mariadb
-DB_DATABASE=sicma
-DB_USERNAME=root
-DB_PASSWORD=
-```
+In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
 
-Lalu:
+You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
 
-```bash
-php artisan migrate:fresh --seed
-npm run build          # atau `npm run dev` saat pengembangan
-php artisan test
-```
+## Agentic Development
 
-Dengan Laravel Herd, situs tersedia di `http://sicma-jtik.test`. Tanpa Herd: `php artisan serve`.
-
-### Worker penyusun jadwal (Susun Jadwal otomatis)
+Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
 
 ```bash
-python -m pip install -r scheduler-worker/requirements.txt
+composer require laravel/boost --dev
+
+php artisan boost:install
 ```
 
-Isi path Python di `.env` bila `python` tidak ada di PATH:
+Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+
+## Contributing
+
+Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+
+## Code of Conduct
+
+In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+
+## Security Vulnerabilities
+
+If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+
+## License
 
 ```dotenv
 SICMA_PYTHON="C:/Users/<nama>/AppData/Local/Programs/Python/Python312/python.exe"

@@ -1,5 +1,6 @@
 @use('App\Enums\ReservationStatus')
 @use('App\Support\Wita')
+@use('Illuminate\Support\Str')
 @extends('layouts.keti')
 
 @php
@@ -12,15 +13,24 @@
     };
     $remaining = $status === ReservationStatus::InUse ? max(0, (int) now()->diffInMinutes($reservation->end_at, false)) : null;
     $room = $reservation->room;
+    $academicBookingBlocked = ! in_array($reservation->start_at->dayOfWeekIso, config('sicma.scheduler.days'), true)
+        && in_array(Str::lower(Str::squish($reservation->purpose)), array_map(fn ($purpose) => Str::lower(Str::squish($purpose)), config('sicma.reservation.academic_purposes')), true);
+    if ($academicBookingBlocked && $status === ReservationStatus::Booked) {
+        $subtitle = 'Pilih kembali hari kuliah yang sesuai.';
+    }
 @endphp
 
 @section('title', $title)
 
 @section('content')
     <div class="flex flex-col gap-6"
-         @if ($status->isActive()) x-data="{ version: {{ $reservation->lock_version }} }"
-         x-init="setInterval(async () => { try { const r = await fetch('{{ route('keti.reservations.status', $reservation) }}', { headers: { Accept: 'application/json' } }); const d = await r.json(); if (d.lock_version !== version || d.status !== '{{ $status->value }}') location.reload(); } catch (e) {} }, {{ (int) config('sicma.polling_seconds') * 1000 }})" @endif>
+         @if ($status->isActive()) x-data="statusPolling({ url: @js(route('keti.reservations.status', $reservation)), interval: {{ (int) config('sicma.polling_seconds') * 1000 }}, version: {{ $reservation->lock_version }}, status: @js($status->value) })" @endif>
         <x-page-header :title="$title" :subtitle="$subtitle" />
+        @if ($academicBookingBlocked && $status->isActive())
+            <x-info-box title="Reservasi perkuliahan di luar hari kuliah">
+                <p>Kuliah Pengganti dan Praktikum Tambahan hanya Senin–Jumat. Reservasi ini tidak bisa dimulai atau diperpanjang. Batalkan pesanan yang belum digunakan, lalu pesan ulang pada hari kuliah.</p>
+            </x-info-box>
+        @endif
 
         @if ($status === ReservationStatus::Cancelled)
             <x-empty-state title="Pesanan dibatalkan" message="Pembatalan tercatat. Kamu dapat mencari ruangan lain." icon="check">
@@ -56,10 +66,12 @@
 
                     <div class="grid grid-cols-2 gap-3">
                         @if ($status === ReservationStatus::Booked && $canManage)
-                            <form method="POST" action="{{ route('keti.reservations.start', $reservation) }}">
-                                @csrf
-                                <x-button type="submit" class="w-full">Mulai gunakan</x-button>
-                            </form>
+                            @unless ($academicBookingBlocked)
+                                <form method="POST" action="{{ route('keti.reservations.start', $reservation) }}">
+                                    @csrf
+                                    <x-button type="submit" class="w-full">Mulai gunakan</x-button>
+                                </form>
+                            @endunless
                             <x-button variant="danger-outline" x-data x-on:click="$dispatch('open-modal', 'batal-pesanan')">Batalkan</x-button>
                         @elseif ($status === ReservationStatus::InUse && $canManage)
                             <form method="POST" action="{{ route('keti.reservations.finish', $reservation) }}">
@@ -75,7 +87,11 @@
                 </x-card>
 
                 <x-card class="flex flex-col gap-4">
-                    @if ($status === ReservationStatus::Booked)
+                    @if ($status === ReservationStatus::Booked && $academicBookingBlocked)
+                        <h2 class="text-xl font-semibold">Pilih hari kuliah</h2>
+                        <p class="text-sm text-ink">Pesan ulang untuk Senin–Jumat melalui menu Booking Ruangan.</p>
+                        <x-button :href="route('keti.rooms.calendar')">Buka Booking Ruangan</x-button>
+                    @elseif ($status === ReservationStatus::Booked)
                         <h2 class="text-xl font-semibold">Sudah berada di ruangan?</h2>
                         <p class="text-sm text-ink">Tekan Mulai gunakan untuk mencatat awal pemakaian. Batalkan jika ruangan tidak jadi dipakai.</p>
                         <p class="text-xs text-muted">Mulai gunakan dapat ditekan mulai {{ Wita::clock($reservation->start_at->copy()->subMinutes((int) config('sicma.reservation.checkin_open_minutes_before'))) }}.</p>
@@ -85,7 +101,9 @@
                         <p class="text-sm text-ink">Selesaikan penggunaan setelah meninggalkan ruangan.</p>
                         @if ($canManage)
                             <div class="grid grid-cols-2 gap-3">
-                                <x-button variant="secondary" x-data x-on:click="$dispatch('open-modal', 'perpanjang')">+{{ config('sicma.reservation.extend_minutes') }} menit</x-button>
+                                @unless ($academicBookingBlocked)
+                                    <x-button variant="secondary" x-data x-on:click="$dispatch('open-modal', 'perpanjang')">+{{ config('sicma.reservation.extend_minutes') }} menit</x-button>
+                                @endunless
                                 <x-button variant="secondary" x-data x-on:click="$dispatch('open-modal', 'lapor-kendala')">Lapor kendala</x-button>
                             </div>
                         @endif

@@ -1,9 +1,9 @@
 <?php
 
 use App\Mail\VerificationCodeMail;
-use App\Models\AppNotification;
-use App\Models\User;
-use App\Services\EmailVerificationService;
+use App\Models\User\AppNotification;
+use App\Models\User\User;
+use App\Services\Account\EmailVerificationService;
 use Illuminate\Support\Facades\Mail;
 
 function sendCodeTo(User $user): string

@@ -2,8 +2,8 @@
 
 namespace App\Policies;
 
-use App\Models\AppNotification;
-use App\Models\User;
+use App\Models\User\AppNotification;
+use App\Models\User\User;
 
 /**
  * Notifikasi hanya bisa dibaca/ditandai oleh pemiliknya.

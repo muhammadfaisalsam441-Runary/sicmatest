@@ -11,13 +11,17 @@ use App\Models\Reservation\Reservation;
 use App\Models\Room\Room;
 use App\Services\Account\AuditLogger;
 use App\Services\Account\NotificationService;
+use App\Services\Room\AvailabilityService;
 use App\Services\Room\ReservationService;
+use App\Services\Room\SearchCriteria;
+use App\Support\BookingPayload;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
+use Throwable;
 
 class ReservationController extends Controller
 {
@@ -47,7 +51,8 @@ class ReservationController extends Controller
             }
 
             return redirect()->route('keti.reservations.failed')
-                ->with('reservation_error', ['code' => $exception->errorCode, 'message' => $exception->getMessage()]);
+                ->with('reservation_error', ['code' => $exception->errorCode, 'message' => $exception->getMessage()])
+                ->with('reservation_request', ['room_id' => (int) $data['room_id'], 'start_at' => $start->format('Y-m-d H:i'), 'duration' => (int) $data['duration']]);
         }
 
         if ($request->expectsJson()) {
@@ -61,10 +66,43 @@ class ReservationController extends Controller
         return redirect()->route('keti.reservations.show', $reservation);
     }
 
-    public function failed(): View
+    public function failed(AvailabilityService $availability): View
     {
+        $request = session('reservation_request');
+        $alternatives = [];
+        $start = null;
+        $duration = null;
+
+        // Saran ruang lain yang kosong sepanjang durasi yang sama (status dihitung ulang, bukan dari cache).
+        if (is_array($request)) {
+            $start = CarbonImmutable::parse($request['start_at']);
+            $duration = (int) $request['duration'];
+
+            if ($start->greaterThanOrEqualTo(CarbonImmutable::now()->subMinutes(5))) {
+                try {
+                    $alternatives = $availability->search(new SearchCriteria(start: $start, durationMinutes: $duration, status: 'available'))
+                        ->reject(fn ($result): bool => $result->room->id === (int) $request['room_id'])
+                        ->take(3)
+                        ->map(fn ($result): array => [
+                            'name' => $result->room->name,
+                            'location' => $result->locationLabel(),
+                            'until' => $result->freeUntil,
+                            'booking' => BookingPayload::make($result->room->id, $result->room->name, $result->locationLabel(), $result->room->capacity, $start, $duration),
+                        ])
+                        ->values()
+                        ->all();
+                } catch (Throwable $exception) {
+                    report($exception);
+                }
+            }
+        }
+
         return view('keti.reservations.failed', [
             'error' => session('reservation_error', ['code' => 'UNKNOWN', 'message' => 'Ketersediaan ruang belum dapat dikonfirmasi. Pilih ruangan berstatus Tersedia atau coba lagi.']),
+            'alternatives' => $alternatives,
+            'start' => $start,
+            'duration' => $duration,
+            'academicAllowed' => $start === null || ReservationService::allowsAcademicPurposes($start),
         ]);
     }
 

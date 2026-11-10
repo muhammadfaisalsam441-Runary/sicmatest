@@ -320,11 +320,32 @@ class ReservationService
     /**
      * Batasi booking perkuliahan ke hari kuliah, termasuk untuk reservasi lama.
      */
+    /**
+     * Kegiatan yang paling akhir dipakai kelas ini, untuk mengisi pilihan bawaan saat memesan.
+     */
+    public function lastPurpose(ClassGroup $classGroup): ?string
+    {
+        return Reservation::query()
+            ->where('class_group_id', $classGroup->id)
+            ->whereIn('purpose', config('sicma.reservation.purposes'))
+            ->latest('created_at')
+            ->latest('id')
+            ->value('purpose');
+    }
+
+    /**
+     * Apakah kegiatan akademik (Kuliah Pengganti, Praktikum Tambahan) boleh dipilih pada tanggal ini.
+     */
+    public static function allowsAcademicPurposes(CarbonInterface $start): bool
+    {
+        return in_array($start->dayOfWeekIso, config('sicma.scheduler.days'), true);
+    }
+
     private function assertAcademicBookingDay(string $purpose, CarbonInterface $start): void
     {
         $academicPurposes = array_map(fn (string $value): string => Str::lower(Str::squish($value)), config('sicma.reservation.academic_purposes'));
         if (in_array(Str::lower(Str::squish($purpose)), $academicPurposes, true)
-            && ! in_array($start->dayOfWeekIso, config('sicma.scheduler.days'), true)) {
+            && ! self::allowsAcademicPurposes($start)) {
             throw new DomainException('INVALID_TEACHING_DAY', 'Kuliah Pengganti dan Praktikum Tambahan hanya boleh dilaksanakan Senin–Jumat. Pilih hari kuliah atau kegiatan umum yang sesuai.');
         }
     }

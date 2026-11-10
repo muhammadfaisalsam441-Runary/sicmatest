@@ -1,3 +1,4 @@
+@use('App\Support\BookingPayload')
 @use('App\Support\Wita')
 @extends('layouts.keti')
 
@@ -18,60 +19,47 @@
             sprintf('%02d:%02d', intdiv($minutes, 60), $minutes % 60) => sprintf('%02d:%02d WITA', intdiv($minutes, 60), $minutes % 60),
         ]));
     $buildingOptions = $buildings->pluck('name', 'id')->put('lainnya', 'Gedung belum didata');
+    // Filter yang dibawa saat mengganti gedung/urutan di atas hasil.
+    $carry = array_filter([
+        'q' => $filters['q'] ?? null, 'tanggal' => $filters['tanggal'] ?? null, 'mulai' => $filters['mulai'] ?? null,
+        'durasi' => $filters['durasi'] ?? null, 'orang' => $filters['orang'] ?? null,
+    ], fn ($value) => $value !== null && $value !== '');
 @endphp
 
 @section('content')
     <div class="flex flex-col gap-6" x-data="{ loading: false }">
         <x-page-header title="Cari Ruangan" subtitle="Temukan ruangan kosong yang sesuai untuk kelasmu." />
 
-        <form method="GET" action="{{ route('keti.search') }}" class="flex items-center gap-3 rounded-card border border-border bg-surface p-3" role="search">
-            @foreach (array_filter(['tanggal' => $filters['tanggal'] ?? null, 'durasi' => $filters['durasi'] ?? null, 'gedung' => $filters['gedung'] ?? null, 'orang' => $filters['orang'] ?? null, 'urutan' => $filters['urutan'] ?? null]) as $name => $value)
+        {{-- Satu bilah pencarian: semua kriteria utama tanpa pindah tab. --}}
+        <form id="pencarian" method="GET" action="{{ route('keti.search') }}" role="search"
+              class="grid grid-cols-12 items-end gap-3 rounded-card border border-border bg-surface p-4" x-on:submit="loading = true">
+            @foreach (array_filter(['gedung' => $filters['gedung'] ?? null, 'urutan' => $filters['urutan'] ?? null]) as $name => $value)
                 <input type="hidden" name="{{ $name }}" value="{{ $value }}">
             @endforeach
-            <label class="relative flex-1">
-                <span class="sr-only">Cari nama ruangan atau gedung</span>
-                <i data-lucide="search" class="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-muted"></i>
-                <input type="search" name="q" value="{{ $filters['q'] ?? '' }}" placeholder="Cari nama ruangan atau gedung"
-                       class="w-full rounded-control border border-muted/60 py-3 pr-4 pl-11 text-sm focus:border-primary focus:ring-2 focus:ring-primary/15 focus:outline-none">
+            <label class="col-span-3 flex flex-col gap-1.5">
+                <span class="text-xs font-medium text-muted">Ruangan</span>
+                <span class="relative">
+                    <i data-lucide="search" class="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-muted"></i>
+                    <input type="search" name="q" value="{{ $filters['q'] ?? '' }}" placeholder="Nama ruangan atau gedung"
+                           class="w-full rounded-control border border-muted/60 py-3 pr-4 pl-11 text-sm focus:border-primary focus:ring-2 focus:ring-primary/15 focus:outline-none">
+                </span>
             </label>
-            <x-select name="mulai" :options="$timeOptions" :value="$filters['mulai'] ?? 'sekarang'" class="w-64" aria-label="Waktu mulai" />
-            <x-button type="submit" class="w-36">Cari</x-button>
+            <x-field label="Tanggal" name="tanggal" class="col-span-2">
+                <x-input type="date" name="tanggal" :value="$filters['tanggal'] ?? now()->toDateString()" :min="now()->toDateString()" :max="now()->addDays((int) config('sicma.reservation.max_days_ahead'))->toDateString()" />
+            </x-field>
+            <x-field label="Jam mulai" name="mulai" class="col-span-2">
+                <x-select name="mulai" :options="$timeOptions" :value="$filters['mulai'] ?? 'sekarang'" />
+            </x-field>
+            <x-field label="Durasi" name="durasi" class="col-span-2">
+                <x-select name="durasi" :options="$durationOptions" :value="$selectedDuration" />
+            </x-field>
+            <x-field label="Jumlah orang" name="orang" class="col-span-1">
+                <x-input type="number" name="orang" min="1" max="500" :value="$filters['orang'] ?? null" placeholder="Bebas" />
+            </x-field>
+            <x-button type="submit" class="col-span-2" icon="search">Cari</x-button>
         </form>
 
-        @include('keti.partials.search-tabs', ['active' => $showFilter ? 'filter' : 'sekarang'])
-
-        @if ($showFilter)
-            <x-card>
-                <form method="GET" action="{{ route('keti.search') }}" class="flex flex-col gap-5">
-                    <h2 class="text-lg font-semibold">Atur pencarian</h2>
-                    <div class="grid grid-cols-3 gap-4">
-                        <x-field label="Tanggal" name="tanggal">
-                            <x-input type="date" name="tanggal" :value="$filters['tanggal'] ?? now()->toDateString()" :min="now()->toDateString()" :max="now()->addDays((int) config('sicma.reservation.max_days_ahead'))->toDateString()" />
-                        </x-field>
-                        <x-field label="Waktu mulai" name="mulai">
-                            <x-select name="mulai" :options="$timeOptions" :value="$filters['mulai'] ?? 'sekarang'" />
-                        </x-field>
-                        <x-field label="Durasi pemakaian" name="durasi">
-                            <x-select name="durasi" :options="$durationOptions" :value="$filters['durasi'] ?? config('sicma.reservation.default_minutes')" />
-                        </x-field>
-                        <x-field label="Gedung" name="gedung">
-                            <x-select name="gedung" :options="$buildingOptions" :value="$filters['gedung'] ?? null" placeholder="Semua gedung" />
-                        </x-field>
-                        <x-field label="Jumlah orang" name="orang" hint="Kosongkan bila bebas.">
-                            <x-input type="number" name="orang" min="1" :value="$filters['orang'] ?? null" placeholder="Bebas" />
-                        </x-field>
-                        <x-field label="Urutan" name="urutan">
-                            <x-select name="urutan" :options="['terlama' => 'Waktu terlama', 'nama' => 'Nama ruangan', 'kapasitas' => 'Kapasitas terbesar']" :value="$filters['urutan'] ?? 'terlama'" />
-                        </x-field>
-                    </div>
-                    <div class="flex gap-3">
-                        <x-button type="submit">Terapkan filter</x-button>
-                        <x-button variant="secondary" :href="route('keti.search', ['tab' => 'filter'])">Atur ulang</x-button>
-                        <x-button variant="secondary" :href="route('keti.search', request()->except('tab'))">Kembali</x-button>
-                    </div>
-                </form>
-            </x-card>
-        @endif
+        @include('keti.partials.search-tabs', ['active' => 'sekarang'])
 
         <div x-show="loading" x-cloak>
             <x-loading-state message="Memuat data ruangan…" />
@@ -81,22 +69,37 @@
             @if ($loadFailed)
                 <x-error-state message="Periksa koneksi internet, lalu coba lagi." :retry="request()->fullUrl()" />
             @elseif ($rooms === [])
-                <x-empty-state title="Tidak ada ruangan yang cocok" message="Coba ubah waktu, gedung, atau jumlah orang.">
-                    <x-button variant="soft" :href="route('keti.search', [...request()->except('tab'), 'tab' => 'filter'])">Ubah filter</x-button>
+                <x-empty-state title="Tidak ada ruangan yang cocok" message="Coba ubah waktu, durasi, gedung, atau jumlah orang.">
+                    <x-button variant="soft" href="#pencarian" x-on:click="$nextTick(() => document.querySelector('#pencarian input[name=q]')?.focus())">Ubah filter</x-button>
                 </x-empty-state>
             @else
-                <div class="flex items-center justify-between">
-                    <h2 class="text-xl font-semibold">{{ count($rooms) }} ruangan tersedia</h2>
-                    <span class="text-xs text-muted">{{ $criteriaLabel }}{{ $isNow ? '' : ' • '.Wita::stamp($start) }}</span>
+                <div class="flex items-end justify-between gap-4">
+                    <div class="flex flex-col gap-1">
+                        <h2 class="text-xl font-semibold">{{ count($rooms) }} ruangan tersedia</h2>
+                        <span class="text-xs text-muted">{{ $criteriaLabel }}{{ $isNow ? '' : ' • '.Wita::stamp($start) }}</span>
+                    </div>
+                    <form method="GET" action="{{ route('keti.search') }}" class="flex items-center gap-2" x-on:change="loading = true; $el.requestSubmit()">
+                        @foreach ($carry as $name => $value)
+                            <input type="hidden" name="{{ $name }}" value="{{ $value }}">
+                        @endforeach
+                        <x-select name="gedung" :options="$buildingOptions" :value="$filters['gedung'] ?? null" placeholder="Semua gedung" class="w-48" aria-label="Gedung" />
+                        <x-select name="urutan" :options="['terlama' => 'Waktu terlama', 'nama' => 'Nama ruangan', 'kapasitas' => 'Kapasitas terbesar']" :value="$filters['urutan'] ?? 'terlama'" class="w-48" aria-label="Urutan" />
+                        <noscript><x-button type="submit" variant="secondary">Terapkan</x-button></noscript>
+                    </form>
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                     @foreach ($rooms as $room)
                         <x-room-card size="large" :name="$room['name']" :badge="$room['badge']" :location="$room['location']" :capacity="$room['capacity']"
                                      :facilities="$room['facilities']" :time-label="$room['time_label']" :time="$room['time']" :remaining="$room['remaining']"
-                                     :href="route('keti.rooms.show', ['room' => $room['id'], 'mulai' => $isNow ? null : $start->format('Y-m-d H:i'), 'durasi' => $duration])" />
+                                     :href="route('keti.rooms.show', ['room' => $room['id'], 'mulai' => $isNow ? null : $start->format('Y-m-d H:i'), 'durasi' => $duration])"
+                                     :booking="BookingPayload::make($room['id'], $room['name'], $room['location'], $room['capacity'], $start, $duration)" />
                     @endforeach
                 </div>
             @endif
         </div>
     </div>
 @endsection
+
+@push('dialogs')
+    @include('keti.partials.booking-modal', ['academicAllowed' => $academicAllowed])
+@endpush

@@ -4,5 +4,4 @@
     ['label' => 'Sekarang', 'href' => route('keti.search'), 'active' => $active === 'sekarang'],
     ['label' => 'Booking Ruangan', 'href' => route('keti.rooms.calendar'), 'active' => $active === 'kalender'],
     ['label' => 'My Class', 'href' => route('keti.my-class'), 'active' => $active === 'my-class'],
-    ['label' => 'Filter', 'href' => route('keti.search', [...request()->except('tab'), 'tab' => 'filter']), 'active' => $active === 'filter'],
 ]" />

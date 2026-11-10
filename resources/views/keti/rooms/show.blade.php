@@ -1,3 +1,4 @@
+@use('App\Support\BookingPayload')
 @use('App\Support\Wita')
 @extends('layouts.keti')
 
@@ -9,14 +10,7 @@
     $durationOptions = collect($sksOptions)
         ->when(! array_key_exists($duration, $sksOptions) && $duration >= config('sicma.reservation.min_minutes') && $duration <= config('sicma.reservation.max_minutes'), fn ($collection) => $collection->put($duration, Wita::duration($duration))->sortKeys())
         ->all();
-    $purposeOptions = [
-        'Kuliah Pengganti' => 'Kuliah Pengganti',
-        'Diskusi / Kerja Kelompok' => 'Diskusi / Kerja Kelompok',
-        'Praktikum Tambahan' => 'Praktikum Tambahan',
-        'Seminar / Ujian' => 'Seminar / Ujian',
-        'Kegiatan Organisasi / Himpunan' => 'Kegiatan Organisasi / Himpunan',
-        'Lainnya' => 'Lainnya',
-    ];
+    $booking = BookingPayload::make($room->id, $room->name, $current->locationLabel(), $room->capacity, $start, $duration);
 @endphp
 
 @section('content')
@@ -104,10 +98,36 @@
                 </x-card>
             </div>
 
-            <x-card class="flex flex-col gap-4">
-                <form method="GET" action="{{ route('keti.rooms.show', $room) }}" class="flex flex-col gap-4">
-                    <h2 class="text-xl font-semibold">Rencanakan pemakaian</h2>
-                    <p class="text-sm text-muted">Booking bisa dilakukan kapan saja untuk pemakaian pukul {{ config('sicma.operating_hours.start') }}–{{ config('sicma.operating_hours.end') }} WITA.</p>
+            {{-- Panel pemesanan: waktu dipilih + tombol Pesan; ubah waktu dibuka bila diperlukan. --}}
+            <x-card class="flex flex-col gap-4" x-data="{ editing: @js(! $canBook && $suggestedStart === null) }">
+                <h2 class="text-xl font-semibold">{{ $canBook ? 'Gunakan untuk kelasmu' : 'Waktu pilihan belum bisa dipesan' }}</h2>
+                <p class="font-semibold text-primary">Kelas {{ $classGroup->name }}</p>
+                @if ($suggestedStart !== null)
+                    <p class="text-sm text-primary">Slot kosong terdekat dipilihkan: {{ Wita::date($start) }} • {{ Wita::range($start, $end) }}.</p>
+                @endif
+
+                <div class="flex flex-col gap-1 rounded-control bg-page p-4">
+                    <span class="text-xs text-muted">{{ $isNow ? 'Mulai sekarang' : 'Mulai '.Wita::date($start) }} • Durasi {{ Wita::duration($duration) }}</span>
+                    <span class="text-xl font-semibold">{{ Wita::range($start, $end) }}</span>
+                </div>
+
+                @if ($canBook)
+                    <x-button class="w-full" x-on:click="$dispatch('open-booking', {{ \Illuminate\Support\Js::from($booking) }})">Pesan ruang</x-button>
+                @else
+                    @if ($requested->status === \App\Enums\RoomStatus::Closed)
+                        <p class="text-sm text-muted">{{ $requested->busyUntil ? 'Buka kembali '.Wita::clock($requested->busyUntil).'. ' : '' }}{{ $requested->reason ?? 'Ruangan tidak dapat dipesan di luar jam operasional kampus.' }}</p>
+                    @else
+                        <p class="text-sm text-muted">{{ $requested->reason ?? 'Ruangan tidak tersedia untuk waktu yang dipilih.' }} Pilih jam lain atau lihat slot kosong ruangan ini.</p>
+                    @endif
+                    <x-button class="w-full" :href="route('keti.rooms.calendar', ['q' => $room->name, 'durasi' => $duration])">Lihat slot kosong</x-button>
+                    <x-button variant="secondary" class="w-full" :href="route('keti.search')">Cari ruangan lain</x-button>
+                @endif
+
+                <button type="button" class="self-start text-sm font-semibold text-primary hover:underline" x-on:click="editing = ! editing" x-bind:aria-expanded="editing.toString()">
+                    <span x-text="editing ? 'Tutup ubah waktu' : 'Ubah waktu'">Ubah waktu</span>
+                </button>
+                <form method="GET" action="{{ route('keti.rooms.show', $room) }}" class="flex flex-col gap-4" x-show="editing" x-cloak>
+                    <p class="text-sm text-muted">Pemakaian pukul {{ config('sicma.operating_hours.start') }}–{{ config('sicma.operating_hours.end') }} WITA.</p>
                     <x-field label="Tanggal dan jam mulai (WITA)" name="mulai">
                         <x-input type="datetime-local" name="mulai" :value="$start->format('Y-m-d\TH:i')" :min="$current->start->format('Y-m-d\TH:i')" :max="$lastBookingDate->format('Y-m-d\TH:i')" required />
                     </x-field>
@@ -118,38 +138,7 @@
                         <input type="hidden" name="orang" value="{{ $participants }}">
                     @endif
                     <x-button type="submit" variant="secondary">Cek ketersediaan</x-button>
-                    <x-button variant="ghost" :href="route('keti.rooms.calendar', ['q' => $room->name, 'durasi' => $duration])">Lihat semua slot kosong</x-button>
                 </form>
-                <hr class="border-border">
-                @if ($suggestedStart !== null)
-                    <p class="text-sm text-primary">Slot kosong terdekat dipilihkan: {{ Wita::date($start) }} • {{ Wita::range($start, $end) }}.</p>
-                @endif
-                @if ($canBook)
-                    <h2 class="text-xl font-semibold">Gunakan untuk kelasmu</h2>
-                    <p class="font-semibold text-primary">Kelas {{ $classGroup->name }}</p>
-                    <p class="text-sm text-muted">{{ auth()->user()->name }} • Ketua tingkat</p>
-                    <hr class="border-border">
-                    <p class="text-xs text-muted">{{ $isNow ? 'Mulai sekarang' : 'Mulai '.Wita::date($start) }} • Durasi {{ Wita::duration($duration) }}</p>
-                    <p class="text-xl font-semibold">{{ Wita::range($start, $end) }}</p>
-                    <x-button class="w-full" x-data x-on:click="$dispatch('open-modal', 'pesan-ruang')">Pesan ruang</x-button>
-                @else
-                    <h2 class="text-xl font-semibold">Waktu pilihan belum bisa dipesan</h2>
-                    <p class="font-semibold text-primary">Kelas {{ $classGroup->name }}</p>
-                    <p class="text-sm text-muted">{{ $requested->reason ?? 'Ruangan tidak tersedia untuk waktu yang dipilih.' }}</p>
-                    <hr class="border-border">
-                    @if ($requested->status === \App\Enums\RoomStatus::Closed)
-                        <p class="text-xs text-muted">Jadwal buka</p>
-                        <p class="text-xl font-semibold">{{ $requested->busyUntil ? 'Buka kembali '.Wita::clock($requested->busyUntil) : '—' }}</p>
-                        <p class="text-sm text-muted">{{ $requested->reason ?? 'Ruangan tidak dapat dipesan di luar jam operasional kampus.' }}</p>
-                    @else
-                        <p class="text-xs text-muted">Waktu pemakaian</p>
-                        <p class="text-xl font-semibold">{{ $currentAgenda['range'] ?? '—' }}</p>
-                        <p class="text-sm text-muted">Pilih tanggal dan jam lain atau lihat slot kosong untuk ruangan ini.</p>
-                    @endif
-                    <x-button class="w-full" :href="route('keti.search')">Cari ruangan lain</x-button>
-                    <x-button class="w-full" disabled>Pesan ruang</x-button>
-                @endif
-                <x-button variant="secondary" class="w-full" :href="route('keti.activity')">Lihat aktivitas</x-button>
             </x-card>
         </div>
     </div>
@@ -157,26 +146,6 @@
 
 @push('dialogs')
     @if ($canBook)
-        <x-modal name="pesan-ruang" title="Pesan {{ $room->name }}">
-            <form method="POST" action="{{ route('keti.reservations.store') }}" class="flex flex-col gap-4">
-                @csrf
-                <input type="hidden" name="room_id" value="{{ $room->id }}">
-                <input type="hidden" name="start_at" value="{{ $start->format('Y-m-d H:i') }}">
-                <input type="hidden" name="duration" value="{{ $duration }}">
-                <input type="hidden" name="idempotency_key" value="{{ $idempotencyKey }}">
-
-                <x-info-box title="Kelas {{ $classGroup->name }}">
-                    <p>{{ Wita::date($start) }} • {{ Wita::range($start, $end) }}</p>
-                </x-info-box>
-                <x-field label="Kegiatan" name="purpose">
-                    <x-select name="purpose" :options="$purposeOptions" :value="$academicBookingAllowed ? 'Kuliah Pengganti' : 'Diskusi / Kerja Kelompok'" :disabled-options="$academicBookingAllowed ? [] : config('sicma.reservation.academic_purposes')" required />
-                </x-field>
-                <p class="text-sm text-muted">Kuliah Pengganti dan Praktikum Tambahan hanya Senin–Jumat. Pada Sabtu/Minggu, ruangan dapat dipesan untuk kegiatan umum sesuai ketersediaan.</p>
-                <div class="grid grid-cols-2 gap-3">
-                    <x-button variant="secondary" x-on:click="$dispatch('close-modal', 'pesan-ruang')">Batal</x-button>
-                    <x-button type="submit">Pesan ruang</x-button>
-                </div>
-            </form>
-        </x-modal>
+        @include('keti.partials.booking-modal', ['academicAllowed' => $academicBookingAllowed, 'initial' => $booking, 'idempotencyKey' => $idempotencyKey])
     @endif
 @endpush

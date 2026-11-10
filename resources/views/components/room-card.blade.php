@@ -9,6 +9,7 @@
     'remaining' => null,
     'note' => null,
     'href' => null,
+    'booking' => null,
     'size' => 'compact',
 ])
 
@@ -51,10 +52,18 @@
         <p class="text-xs text-muted">{{ $note }}</p>
     @endif
 
-    @if ($remaining || $href || $slot->isNotEmpty())
+    @if ($remaining || $href || $booking || $slot->isNotEmpty())
         <div class="flex items-center justify-between gap-4">
             <span class="text-sm text-muted">{{ $remaining }}</span>
-            @if ($href)
+            @if ($booking)
+                {{-- Portal Keti: pesan langsung dari kartu; detail ruangan sebagai tautan kedua. --}}
+                <div class="flex items-center gap-4">
+                    @if ($href)
+                        <a href="{{ $href }}" class="text-sm font-semibold text-primary hover:underline">Detail ruangan</a>
+                    @endif
+                    <x-button x-data x-on:click="$dispatch('open-booking', {{ \Illuminate\Support\Js::from($booking) }})" :aria-label="'Pesan '.$name">Pesan</x-button>
+                </div>
+            @elseif ($href)
                 <x-button variant="soft" :href="$href">Detail ruangan</x-button>
             @endif
             {{ $slot }}

@@ -1,3 +1,4 @@
+@use('App\Support\BookingPayload')
 @use('App\Support\Wita')
 @extends('layouts.keti')
 
@@ -107,8 +108,15 @@
 
                 <div class="flex flex-col divide-y divide-border">
                     @foreach ($row['windows'] as $window)
-                        @php($selectId = 'mulai-'.$row['room']->id.'-'.$loop->index)
-                        <form method="GET" action="{{ route('keti.rooms.show', $row['room']) }}" class="grid items-end gap-3 py-3.5 first:pt-1 last:pb-0 sm:grid-cols-[auto_1fr_auto]">
+                        @php
+                            $selectId = 'mulai-'.$row['room']->id.'-'.$loop->index;
+                            $location = ($row['room']->building?->name ?? 'Gedung belum didata').' • Lantai '.($row['room']->floor ?? '—');
+                            $payloads = collect($window['starts'])->mapWithKeys(fn ($start) => [
+                                $start->format('Y-m-d H:i') => BookingPayload::make($row['room']->id, $row['room']->name, $location, $row['room']->capacity, $start, $duration),
+                            ]);
+                        @endphp
+                        <form method="GET" action="{{ route('keti.rooms.show', $row['room']) }}" class="grid items-end gap-3 py-3.5 first:pt-1 last:pb-0 sm:grid-cols-[auto_1fr_auto]"
+                              x-data="{ start: @js($payloads->keys()->first()), payloads: @js($payloads) }">
                             <div class="flex min-w-44 flex-col justify-center rounded-control border border-border bg-page px-3.5 py-2">
                                 <span class="text-xs text-muted">Kosong pada</span>
                                 <p class="text-sm font-bold text-primary">{{ Wita::range($window['start'], $window['end']) }}</p>
@@ -118,16 +126,20 @@
                                     <label for="{{ $selectId }}" class="font-medium text-ink">Pilih waktu pemakaian</label>
                                     <span class="text-muted">Durasi: {{ $duration }} menit</span>
                                 </div>
-                                <x-select name="mulai" :id="$selectId" :options="collect($window['starts'])->mapWithKeys(fn ($start) => [$start->format('Y-m-d H:i') => Wita::range($start, $start->addMinutes($duration))])" />
+                                <x-select name="mulai" :id="$selectId" :options="collect($window['starts'])->mapWithKeys(fn ($start) => [$start->format('Y-m-d H:i') => Wita::range($start, $start->addMinutes($duration))])" x-model="start" />
                             </div>
                             <input type="hidden" name="durasi" value="{{ $duration }}">
                             @if (isset($filters['orang']))
                                 <input type="hidden" name="orang" value="{{ $filters['orang'] }}">
                             @endif
-                            <x-button type="submit" :aria-label="'Pesan '.$row['room']->name.' pada '.Wita::range($window['start'], $window['end'])" class="whitespace-nowrap px-6">
-                                <span>Pesan</span>
-                                <i data-lucide="arrow-right" class="size-4"></i>
-                            </x-button>
+                            <div class="flex items-center gap-3">
+                                <button type="submit" class="text-sm font-semibold text-primary hover:underline">Detail</button>
+                                {{-- Pesan langsung: buka modal konfirmasi dengan jam yang dipilih, tanpa pindah halaman. --}}
+                                <x-button x-on:click="$dispatch('open-booking', payloads[start])" :aria-label="'Pesan '.$row['room']->name.' pada '.Wita::range($window['start'], $window['end'])" class="whitespace-nowrap px-6">
+                                    <span>Pesan</span>
+                                    <i data-lucide="arrow-right" class="size-4"></i>
+                                </x-button>
+                            </div>
                         </form>
                     @endforeach
                 </div>
@@ -137,3 +149,7 @@
         @endforelse
     </div>
 @endsection
+
+@push('dialogs')
+    @include('keti.partials.booking-modal', ['academicAllowed' => \App\Services\Room\ReservationService::allowsAcademicPurposes($date)])
+@endpush

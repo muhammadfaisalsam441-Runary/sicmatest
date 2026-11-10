@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Keti\RoomSearchRequest;
 use App\Models\Room\Building;
 use App\Services\Room\AvailabilityService;
+use App\Services\Room\ReservationService;
 use App\Services\Room\SearchCriteria;
 use App\Support\RoomCardPresenter;
 use App\Support\Wita;
@@ -63,7 +64,7 @@ class RoomSearchController extends Controller
                 SearchCriteria::SORT_CAPACITY => 'Kapasitas terbesar',
                 default => 'Waktu terlama',
             },
-            'showFilter' => $request->query('tab') === 'filter',
+            'academicAllowed' => ReservationService::allowsAcademicPurposes($start),
         ]);
     }
 }

@@ -36,6 +36,7 @@ use App\Models\User\Setting;
 use App\Models\User\User;
 use App\Policies\AppNotificationPolicy;
 use App\Policies\ReservationPolicy;
+use App\View\Composers\BookingModalComposer;
 use App\View\Composers\PortalComposer;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -107,6 +108,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(AppNotification::class, AppNotificationPolicy::class);
 
         View::composer(['layouts.keti', 'layouts.admin'], PortalComposer::class);
+        View::composer('keti.partials.booking-modal', BookingModalComposer::class);
 
         Gate::define('publish-schedule', fn (User $user): bool => $user->isAdmin() && $user->can_publish && $user->is_active);
 

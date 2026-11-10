@@ -4,7 +4,7 @@
         @foreach ([
             ['Siapa yang bisa memesan ruangan?', 'Ketua tingkat dengan akun terdaftar. Pengunjung publik dapat melihat informasi ketersediaan ruang.'],
             ['Bagaimana mendapatkan akun Keti?', 'Daftar sebagai Keti, verifikasi email, lalu tunggu pemeriksaan kelas oleh admin JTIK.'],
-            ['Apakah status ruang selalu pasti?', 'Periksa waktu pembaruan yang tercantum. Tampilan ini menggunakan data simulasi dengan status Tersedia dan Digunakan.'],
+            ['Apakah status ruang selalu pasti?', config('sicma.public_portal.show_sim_label') && config('sicma.public_portal.sim_label') === 'Data simulasi' ? 'Periksa waktu pembaruan yang tercantum. Tampilan ini menggunakan data simulasi dengan status Tersedia dan Digunakan.' : 'Periksa waktu pembaruan yang tercantum. Status dihitung dari jadwal resmi, reservasi, dan penutupan ruang.'],
             ['Seberapa baru informasi ruangan?', 'Status dihitung ulang dari jadwal resmi, reservasi, dan penutupan ruang. Waktu pembaruan selalu tercantum di dekat data.'],
         ] as [$question, $answer])
             <article class="flex flex-col gap-2 rounded-card border border-border bg-surface px-6 py-5">

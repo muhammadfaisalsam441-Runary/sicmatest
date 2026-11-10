@@ -2,7 +2,9 @@
 @use('App\Support\Wita')
 <x-modal name="pratinjau-ketersediaan" width="max-w-md">
     <div class="flex flex-col gap-4">
-        <x-status-badge variant="primary" class="self-start">Data simulasi</x-status-badge>
+        @if (config('sicma.public_portal.show_sim_label'))
+            <x-status-badge variant="primary" class="self-start">{{ config('sicma.public_portal.sim_label') }}</x-status-badge>
+        @endif
         <h2 class="text-xl font-semibold text-ink">Pratinjau ketersediaan ruang</h2>
         <p class="text-sm leading-relaxed text-muted">Tersedia berarti ruangan dapat digunakan. Digunakan berarti ruangan sedang dipakai.</p>
         <p class="text-sm text-ink">Pembaruan: {{ Wita::stamp($checkedAt) }}</p>

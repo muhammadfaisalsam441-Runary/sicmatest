@@ -96,7 +96,7 @@
                     <h2 class="text-xl font-semibold">Status ruang saat ini</h2>
                     <div class="flex items-center gap-4">
                         @if (config('sicma.public_portal.show_sim_label'))
-                            <x-status-badge variant="primary">Data simulasi</x-status-badge>
+                            <x-status-badge variant="primary">{{ config('sicma.public_portal.sim_label') }}</x-status-badge>
                         @endif
                         <a href="{{ route('admin.usage-logs.index') }}" class="text-sm font-semibold text-primary hover:underline">Lihat log lengkap</a>
                     </div>

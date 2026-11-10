@@ -59,7 +59,10 @@ return [
 
     'public_portal' => [
         'cache_seconds' => 60,
-        'show_sim_label' => true,
+        // Label di dekat status ruang. Desain memakai "Data simulasi"; ganti lewat .env saat memakai jadwal resmi,
+        // mis. SICMA_DATA_LABEL="Jadwal resmi", atau sembunyikan dengan SICMA_SHOW_DATA_LABEL=false.
+        'show_sim_label' => (bool) env('SICMA_SHOW_DATA_LABEL', true),
+        'sim_label' => env('SICMA_DATA_LABEL', 'Data simulasi'),
     ],
 
     'scheduler' => [

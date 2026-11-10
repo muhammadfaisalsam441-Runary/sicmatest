@@ -102,6 +102,7 @@ class LecturerController extends Controller
             'perPage' => $perPage,
             'total' => Lecturer::query()->count(),
             'unverified' => Lecturer::query()->where('profile_status', LecturerProfileStatus::Unverified)->count(),
+            'missingNidn' => Lecturer::query()->where(fn (Builder $query) => $query->whereNull('nidn')->orWhere('nidn', ''))->count(),
             'jtikCount' => Lecturer::query()->where('homebase', LecturerHomebase::Jtik)->count(),
             'externalCount' => Lecturer::query()->where('homebase', LecturerHomebase::External)->count(),
             'leaderCount' => Lecturer::query()->whereHas('leadershipTerms', fn (Builder $query) => $query->activeOn(now()))->count(),

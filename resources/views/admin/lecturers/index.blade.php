@@ -109,6 +109,13 @@
                     @endif
                 </div>
             </form>
+
+            @if ($missingNidn > 0)
+                <p class="text-xs text-muted">
+                    <i data-lucide="info" class="inline size-3.5 align-[-2px]"></i>
+                    {{ $missingNidn }} dari {{ $total }} dosen belum memiliki NIDN. Lengkapi lewat tombol Edit bila datanya sudah ada.
+                </p>
+            @endif
         </x-card>
 
         {{-- TABEL DATA DOSEN --}}
@@ -179,7 +186,7 @@
                                             @if ($lecturer->nidn)
                                                 <span class="font-mono text-[11px] text-muted">NIDN: {{ $lecturer->nidn }}</span>
                                             @else
-                                                <span class="text-danger text-[11px] font-medium">NIDN belum diisi</span>
+                                                <span class="text-[11px] text-muted/70">NIDN belum diisi</span>
                                             @endif
 
                                             @if ($lecturer->source_name && $lecturer->source_name !== $lecturer->name)

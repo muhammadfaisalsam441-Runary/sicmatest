@@ -1,10 +1,15 @@
 <?php
 
 use App\Enums\KetiApplicationStatus;
+use App\Enums\RescheduleStatus;
 use App\Enums\ReservationStatus;
 use App\Enums\RoomBlockSource;
 use App\Enums\RoomType;
+use App\Enums\SessionPhase;
+use App\Enums\TeachingRole;
 use App\Models\Academic\ClassGroup;
+use App\Models\Academic\SessionReschedule;
+use App\Models\Lecturer\Lecturer;
 use App\Models\Reservation\Reservation;
 use App\Models\Room\Building;
 use App\Models\Room\Room;
@@ -14,8 +19,10 @@ use App\Models\User\AuditLog;
 use App\Models\User\ClassRepresentative;
 use App\Models\User\KetiApplication;
 use App\Models\User\User;
+use App\Services\Academic\MeetingRescheduleService;
 use App\Services\Room\AvailabilityService;
 use App\Services\Room\ReservationService;
+use App\Support\Wita;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Hash;
 
@@ -480,4 +487,51 @@ test('notifikasi admin bisa ditandai dibaca', function () {
     $this->post(route('admin.notifications.read-all'));
 
     expect($this->admin->appNotifications()->unread()->count())->toBe(0);
+});
+
+/**
+ * Pertemuan Pemrograman Web – Tekom C (Senin 9 Nov 07:30, AE 107) yang dipindah ke Rabu 4 Nov 13:00 di AE 209.
+ */
+function adminMovedMeeting(): SessionReschedule
+{
+    $classGroup = ClassGroup::factory()->create(['name' => 'Tekom C']);
+    $partner = Lecturer::factory()->create(['name' => 'Sari Dewi']);
+    $ae107 = Room::factory()->create(['name' => 'AE 107']);
+    $ae209 = Room::factory()->create(['name' => 'AE 209']);
+    $session = meetingSession([$classGroup], ['title' => 'Pemrograman Web', 'room_id' => $ae107->id], [[$partner, TeachingRole::Partner, SessionPhase::AfterUts]]);
+
+    return app(MeetingRescheduleService::class)->move(
+        User::factory()->approvedKeti($classGroup)->create(), $session, CarbonImmutable::parse('2026-11-09'),
+        CarbonImmutable::parse('2026-11-04 13:00'), $ae209, [$partner->id], (string) str()->uuid(),
+    );
+}
+
+test('riwayat reservasi admin menandai pemindahan pertemuan beserta jadwal asal dan dosen', function () {
+    $reschedule = adminMovedMeeting();
+    $original = $reschedule->original_start_at;
+
+    $this->actingAs($this->admin)->get(route('admin.reservations.index'))->assertOk()
+        ->assertSee('Pindahan')
+        ->assertSee('dari '.Wita::longDate($original).' '.Wita::clock($original, false))
+        ->assertSee('Sari Dewi');
+});
+
+test('dashboard admin menampilkan kuliah pengganti dengan nama mata kuliahnya', function () {
+    adminMovedMeeting();
+    $this->travelTo(CarbonImmutable::parse('2026-11-04 13:10'));
+
+    $this->actingAs($this->admin)->get(route('admin.dashboard'))->assertOk()
+        ->assertSee('Kuliah Pengganti: Pemrograman Web');
+
+    expect(app(AvailabilityService::class)->forRoom(Room::query()->where('name', 'AE 107')->sole(), CarbonImmutable::parse('2026-11-09 08:00'))->isAvailable())->toBeTrue();
+});
+
+test('admin membatalkan pengganti dengan alasan dan pertemuan kembali ke jam asli', function () {
+    $reschedule = adminMovedMeeting();
+
+    $this->actingAs($this->admin)->post(route('admin.reservations.cancel', $reschedule->reservation_id), ['reason' => 'Ruang dipakai rapat jurusan'])
+        ->assertRedirect();
+
+    expect($reschedule->fresh()->status)->toBe(RescheduleStatus::Cancelled)
+        ->and(RoomBlock::query()->where('source_type', RoomBlockSource::Schedule)->where('start_at', '2026-11-09 07:30:00')->sole()->is_active)->toBeTrue();
 });

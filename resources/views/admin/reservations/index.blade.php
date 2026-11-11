@@ -59,6 +59,11 @@
                                 <td class="py-3 pr-4">{{ Wita::clock($reservation->start_at, false) }}–{{ Wita::clock($reservation->end_at, false) }}</td>
                                 <td class="py-3 pr-4 text-muted">
                                     {{ $reservation->purpose }}
+                                    @if ($moved = $reservation->sessionReschedule)
+                                        <span class="ml-1 rounded-full bg-primary-soft px-2 py-0.5 text-xs font-semibold text-primary">Pindahan</span>
+                                        <span class="block text-xs">{{ $moved->session_title }} • dari {{ Wita::longDate($moved->original_start_at) }} {{ Wita::clock($moved->original_start_at, false) }}</span>
+                                        <span class="block text-xs">Dosen: {{ $moved->lecturers->pluck('name')->implode(', ') }}</span>
+                                    @endif
                                     @if ($reservation->status === ReservationStatus::Cancelled && $reservation->cancel_reason)
                                         <span class="block text-xs">Alasan batal: {{ $reservation->cancel_reason }}</span>
                                     @endif

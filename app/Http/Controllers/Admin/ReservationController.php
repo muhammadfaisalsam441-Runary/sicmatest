@@ -28,7 +28,7 @@ class ReservationController extends Controller
         $keyword = trim((string) $request->query('q'));
 
         $reservations = Reservation::query()
-            ->with(['room', 'classGroup', 'creator', 'canceller'])
+            ->with(['room', 'classGroup', 'creator', 'canceller', 'sessionReschedule.lecturers'])
             ->when($keyword !== '', fn (Builder $query) => $query->where(fn (Builder $query) => $query
                 ->whereHas('room', fn (Builder $query) => $query->where('name', 'like', "%{$keyword}%"))
                 ->orWhereHas('classGroup', fn (Builder $query) => $query->where('name', 'like', "%{$keyword}%"))))

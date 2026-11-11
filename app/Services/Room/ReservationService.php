@@ -38,7 +38,8 @@ class ReservationService
      * Pesan ruang atas nama kelas Keti.
      *
      * @throws DomainException ACCOUNT_NOT_APPROVED | NOT_CLASS_REPRESENTATIVE | ROOM_CLOSED | ROOM_CONFLICT |
-     *                         OUTSIDE_OPERATING_HOURS | INVALID_DURATION | INVALID_TIME | CAPACITY_EXCEEDED | TOO_MANY_ACTIVE_RESERVATIONS
+     *                         OUTSIDE_OPERATING_HOURS | INVALID_DURATION | INVALID_TIME | CAPACITY_EXCEEDED | TOO_MANY_ACTIVE_RESERVATIONS |
+     *                         CLASS_TIME_CONFLICT
      */
     public function create(User $keti, Room $room, CarbonInterface $start, CarbonInterface $end, string $purpose, ?int $participants, string $idempotencyKey): Reservation
     {
@@ -49,11 +50,20 @@ class ReservationService
             return $existing;
         }
 
+        // Dibaca di luar transaksi agar baris kelas bisa dikunci sebelum snapshot terbentuk.
+        $classGroupId = $keti->activeClassGroup()?->id;
+
         try {
-            $reservation = DB::transaction(function () use ($keti, $room, $start, $end, $purpose, $participants, $idempotencyKey): Reservation {
-                // Lock ruang harus menjadi perintah pertama: pada REPEATABLE READ, snapshot transaksi
-                // terbentuk oleh pembacaan pertama, sehingga pemeriksaan sesudah lock melihat data terbaru.
+            $reservation = DB::transaction(function () use ($keti, $room, $start, $end, $purpose, $participants, $idempotencyKey, $classGroupId): Reservation {
+                // Lock ruang dan kelas harus menjadi perintah pertama: pada REPEATABLE READ, snapshot transaksi
+                // terbentuk oleh pembacaan biasa pertama, sehingga pemeriksaan sesudah lock melihat data terbaru.
+                // Lock kelas mencegah dua pesanan kelas yang sama (di ruang berbeda) lolos bersamaan dari
+                // batas reservasi aktif dan pemeriksaan bentrok jadwal kelas.
                 $lockedRoom = Room::query()->whereKey($room->id)->lockForUpdate()->firstOrFail();
+
+                if ($classGroupId !== null) {
+                    ClassGroup::query()->whereKey($classGroupId)->lockForUpdate()->first();
+                }
 
                 if ($existing = $this->findByIdempotencyKey($keti, $idempotencyKey)) {
                     return $existing;
@@ -61,8 +71,14 @@ class ReservationService
 
                 $classGroup = $this->assertCanReserve($keti);
 
+                if ($classGroup->id !== $classGroupId) {
+                    // Keterhubungan kelas berubah di tengah permintaan; kunci yang diambil bukan milik kelas ini.
+                    throw new DomainException('ACCOUNT_NOT_APPROVED', 'Kelas akunmu baru saja berubah. Muat ulang halaman lalu coba lagi.');
+                }
+
                 $this->assertAcademicBookingDay($purpose, $start);
                 $this->assertValidRequest($lockedRoom, $start, $end, $participants, $classGroup->id);
+                $this->assertClassFree($classGroup, $start, $end);
                 $this->assertRoomFree($lockedRoom, $start, $end);
 
                 $reservation = Reservation::create([
@@ -276,6 +292,7 @@ class ReservationService
         return DB::transaction(function () use ($reservation, $minutes): Reservation {
             Room::query()->whereKey($reservation->room_id)->lockForUpdate()->first();
             $reservation = Reservation::query()->whereKey($reservation->id)->lockForUpdate()->firstOrFail();
+            ClassGroup::query()->whereKey($reservation->class_group_id)->lockForUpdate()->first();
 
             if ($reservation->status !== ReservationStatus::InUse) {
                 throw new DomainException('INVALID_STATUS_TRANSITION', 'Hanya pemakaian yang sedang berlangsung yang bisa diperpanjang.');
@@ -304,6 +321,8 @@ class ReservationService
             if ($conflicts->isNotEmpty()) {
                 throw new DomainException('ROOM_CONFLICT', 'Tidak bisa diperpanjang: ruangan dipakai mulai '.Wita::clock($conflicts->min('start_at')).'.');
             }
+
+            $this->assertClassFree($reservation->classGroup, $currentEnd, $newEnd, ignoreReservationId: $reservation->id, hint: 'Tidak bisa diperpanjang.');
 
             $before = ['end_at' => $currentEnd->toDateTimeString()];
             $reservation->forceFill(['end_at' => $newEnd, 'lock_version' => $reservation->lock_version + 1])->save();
@@ -407,6 +426,37 @@ class ReservationService
         if ($activeCount >= (int) config('sicma.reservation.max_active_per_class')) {
             throw new DomainException('TOO_MANY_ACTIVE_RESERVATIONS', 'Kelasmu sudah memiliki '.$activeCount.' reservasi aktif. Selesaikan atau batalkan salah satunya dulu.');
         }
+    }
+
+    /**
+     * Satu kelas tidak boleh memegang dua reservasi aktif yang waktunya beririsan, walau di ruang berbeda.
+     */
+    private function assertClassFree(
+        ClassGroup $classGroup,
+        CarbonImmutable $start,
+        CarbonImmutable $end,
+        ?int $ignoreReservationId = null,
+        string $hint = 'Batalkan pesanan itu atau pilih jam lain.',
+    ): void {
+        $clash = Reservation::query()
+            ->whereBelongsTo($classGroup)
+            ->whereIn('status', [ReservationStatus::Booked, ReservationStatus::InUse])
+            ->where('start_at', '<', $end)
+            ->where('end_at', '>', $start)
+            ->when($ignoreReservationId !== null, fn ($query) => $query->whereKeyNot($ignoreReservationId))
+            ->with('room')
+            ->orderBy('start_at')
+            ->first();
+
+        if ($clash === null) {
+            return;
+        }
+
+        throw new DomainException(
+            'CLASS_TIME_CONFLICT',
+            "Kelas {$classGroup->name} sudah memesan {$clash->room->name} pukul ".Wita::range($clash->start_at, $clash->end_at).'. '.$hint,
+            ['reservation_id' => $clash->id],
+        );
     }
 
     /**

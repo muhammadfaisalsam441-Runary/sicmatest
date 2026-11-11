@@ -134,6 +134,23 @@ test('ruang yang sudah dipesan kelas lain menampilkan "Pemesanan gagal"', functi
         ->assertSee('Cari ruangan lain');
 });
 
+test('kelas yang sudah punya pesanan di jam itu tidak ditawari ruang lain', function () {
+    $booked = Room::factory()->create(['name' => 'AE 107']);
+    Room::factory()->create(['name' => 'AE 209']);
+    $this->actingAs($this->keti)->post(route('keti.reservations.store'), bookingPayload($booked));
+
+    $this->actingAs($this->keti)
+        ->post(route('keti.reservations.store'), bookingPayload(Room::factory()->create(['name' => 'AE 215'])))
+        ->assertRedirect(route('keti.reservations.failed'))
+        ->assertSessionHas('reservation_error.code', 'CLASS_TIME_CONFLICT');
+
+    $this->get(route('keti.reservations.failed'))->assertOk()
+        ->assertSee('Kelas Tekom C sudah memesan AE 107')
+        ->assertDontSee('Ruangan lain yang kosong di jam yang sama');
+
+    expect(Reservation::query()->count())->toBe(1);
+});
+
 test('alur Dipesan → Mulai gunakan → Selesai menggunakan', function () {
     $room = Room::factory()->create(['name' => 'AE 107']);
     $this->actingAs($this->keti)->post(route('keti.reservations.store'), bookingPayload($room));

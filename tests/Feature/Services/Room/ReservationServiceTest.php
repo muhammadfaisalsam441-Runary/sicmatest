@@ -136,6 +136,49 @@ test('jumlah reservasi aktif per kelas dibatasi', function () {
     expectDomainError(fn () => reserveFor($keti, Room::factory()->create(), '2026-11-04 14:00', '2026-11-04 15:00'), 'TOO_MANY_ACTIVE_RESERVATIONS');
 });
 
+test('satu kelas tidak bisa memesan dua ruang yang waktunya beririsan', function () {
+    $keti = User::factory()->approvedKeti(ClassGroup::factory()->create(['name' => 'Tekom C']))->create();
+    reserveFor($keti, Room::factory()->create(['name' => 'AE 107']), '2026-11-04 10:00', '2026-11-04 11:00');
+
+    try {
+        reserveFor($keti, Room::factory()->create(), '2026-11-04 10:30', '2026-11-04 11:30');
+        test()->fail('CLASS_TIME_CONFLICT tidak dilempar.');
+    } catch (DomainException $exception) {
+        expect($exception->errorCode)->toBe('CLASS_TIME_CONFLICT')
+            ->and($exception->getMessage())->toContain('Tekom C')->toContain('AE 107');
+    }
+
+    expect(Reservation::query()->count())->toBe(1)
+        ->and(RoomBlock::query()->count())->toBe(1);
+});
+
+test('pesanan kelas yang bersambung, dibatalkan, atau milik kelas lain tidak dianggap bentrok', function () {
+    $keti = User::factory()->approvedKeti()->create();
+    $first = reserveFor($keti, Room::factory()->create(), '2026-11-04 10:00', '2026-11-04 11:00');
+
+    $adjacent = reserveFor($keti, Room::factory()->create(), '2026-11-04 11:00', '2026-11-04 12:00');
+
+    app(ReservationService::class)->cancel($first, $keti);
+    $afterCancel = reserveFor($keti, Room::factory()->create(), '2026-11-04 10:00', '2026-11-04 11:00');
+
+    $otherClass = reserveFor(User::factory()->approvedKeti()->create(), Room::factory()->create(), '2026-11-04 10:00', '2026-11-04 11:00');
+
+    expect($adjacent->status)->toBe(ReservationStatus::Booked)
+        ->and($afterCancel->status)->toBe(ReservationStatus::Booked)
+        ->and($otherClass->status)->toBe(ReservationStatus::Booked);
+});
+
+test('perpanjangan ditolak bila beririsan dengan pesanan kelas sendiri di ruang lain', function () {
+    $keti = User::factory()->approvedKeti()->create();
+    $current = reserveFor($keti, Room::factory()->create(), '2026-11-04 10:00', '2026-11-04 11:00');
+    reserveFor($keti, Room::factory()->create(), '2026-11-04 11:15', '2026-11-04 12:00');
+
+    $this->service->start($current, $keti);
+
+    expectDomainError(fn () => $this->service->extend($current, $keti), 'CLASS_TIME_CONFLICT');
+    expect($current->fresh()->end_at->format('H:i'))->toBe('11:00');
+});
+
 test('mulai gunakan dua kali lalu selesai menghasilkan waktu aktual yang konsisten', function () {
     $keti = User::factory()->approvedKeti()->create();
     $reservation = reserveFor($keti, Room::factory()->create());

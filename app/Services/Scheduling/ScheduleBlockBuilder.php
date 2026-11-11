@@ -5,6 +5,7 @@ namespace App\Services\Scheduling;
 use App\Enums\RoomBlockSource;
 use App\Enums\SessionPhase;
 use App\Models\Academic\Period;
+use App\Models\Academic\SessionReschedule;
 use App\Models\Room\RoomBlock;
 use App\Models\Scheduling\ScheduleSession;
 use App\Models\Scheduling\ScheduleVersion;
@@ -80,6 +81,12 @@ class ScheduleBlockBuilder
         $timestamp = now()->format('Y-m-d H:i:s');
         $rows = [];
 
+        // Pertemuan yang dipindah Keti tetap dicatat, tetapi nonaktif agar ruang aslinya tetap terbuka.
+        $version->loadMissing('sessions.participants');
+        $reschedules = SessionReschedule::query()->active()
+            ->whereBetween('original_start_at', [$from, $to->endOfDay()])
+            ->get();
+
         foreach ($version->sessions as $session) {
             if (! $session->blocksRoom() || ! in_array($session->day_of_week, config('sicma.scheduler.days'), true)) {
                 continue;
@@ -90,14 +97,17 @@ class ScheduleBlockBuilder
                     continue;
                 }
 
+                $start = $date->addMinutes($session->start_minute);
+                $moved = $reschedules->contains(fn (SessionReschedule $reschedule): bool => $reschedule->matches($session, $start));
+
                 $rows[] = [
                     'room_id' => $session->room_id,
-                    'start_at' => $date->addMinutes($session->start_minute)->format('Y-m-d H:i:s'),
+                    'start_at' => $start->format('Y-m-d H:i:s'),
                     'end_at' => $date->addMinutes($session->end_minute)->format('Y-m-d H:i:s'),
                     'source_type' => RoomBlockSource::Schedule->value,
                     'source_id' => $session->id,
                     'schedule_version_id' => $version->id,
-                    'is_active' => true,
+                    'is_active' => ! $moved,
                     'created_at' => $timestamp,
                     'updated_at' => $timestamp,
                 ];

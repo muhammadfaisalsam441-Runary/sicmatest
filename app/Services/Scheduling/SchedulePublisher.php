@@ -5,11 +5,9 @@ namespace App\Services\Scheduling;
 use App\Enums\IssueSeverity;
 use App\Enums\RoomBlockSource;
 use App\Enums\ScheduleVersionStatus;
-use App\Enums\UserRole;
 use App\Exceptions\DomainException;
 use App\Models\Room\RoomBlock;
 use App\Models\Scheduling\ScheduleVersion;
-use App\Models\User\ClassRepresentative;
 use App\Models\User\User;
 use App\Services\Account\AuditLogger;
 use App\Services\Account\NotificationService;
@@ -158,11 +156,7 @@ class SchedulePublisher
             ->distinct()
             ->pluck('session_participants.class_group_id');
 
-        $ketis = User::query()
-            ->where('role', UserRole::Keti)
-            ->where('is_active', true)
-            ->whereIn('id', ClassRepresentative::query()->activeOn(now())->whereIn('class_group_id', $classGroupIds)->select('user_id'))
-            ->get();
+        $ketis = $this->notifications->ketisOf($classGroupIds);
 
         $this->notifications->notify(
             $ketis,

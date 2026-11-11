@@ -3,6 +3,7 @@
 namespace App\Services\Room;
 
 use App\Enums\RoomBlockSource;
+use App\Models\Academic\ClassGroup;
 use App\Models\Reservation\Reservation;
 use App\Models\Room\RoomBlock;
 use App\Models\Room\RoomClosure;
@@ -31,7 +32,7 @@ class RoomAgendaDescriber
         $closureIds = $blocks->where('source_type', RoomBlockSource::Closure)->pluck('source_id')->filter()->unique()->all();
 
         $sessions = $scheduleIds === [] ? collect() : ScheduleSession::query()->with('participants')->whereKey($scheduleIds)->get()->keyBy('id');
-        $reservations = $reservationIds === [] ? collect() : Reservation::query()->with('classGroup')->whereKey($reservationIds)->get()->keyBy('id');
+        $reservations = $reservationIds === [] ? collect() : Reservation::query()->with(['classGroup', 'sessionReschedule'])->whereKey($reservationIds)->get()->keyBy('id');
         $closures = $closureIds === [] ? collect() : RoomClosure::query()->whereKey($closureIds)->get()->keyBy('id');
 
         return $blocks->mapWithKeys(function (RoomBlock $block) use ($sessions, $reservations, $closures): array {
@@ -45,8 +46,7 @@ class RoomAgendaDescriber
                     'kind' => 'schedule',
                 ],
                 RoomBlockSource::Reservation => [
-                    'title' => $reservations->get($block->source_id)?->purpose ?? 'Reservasi',
-                    'class' => $reservations->get($block->source_id)?->classGroup?->name,
+                    ...$this->reservationLabels($reservations->get($block->source_id)),
                     'range' => $range,
                     'kind' => 'reservation',
                 ],
@@ -99,13 +99,33 @@ class RoomAgendaDescriber
      */
     private function reservation(RoomBlock $block, string $range): array
     {
-        $reservation = Reservation::query()->with('classGroup')->find($block->source_id);
+        $reservation = Reservation::query()->with(['classGroup', 'sessionReschedule'])->find($block->source_id);
 
         return [
-            'title' => $reservation?->purpose ?? 'Reservasi',
-            'class' => $reservation?->classGroup?->name,
+            ...$this->reservationLabels($reservation),
             'range' => $range,
             'kind' => 'reservation',
+        ];
+    }
+
+    /**
+     * Judul & kelas reservasi; pengganti pertemuan kuliah memakai nama mata kuliah dan semua kelas pesertanya.
+     *
+     * @return array{title: string, class: string|null}
+     */
+    private function reservationLabels(?Reservation $reservation): array
+    {
+        $reschedule = $reservation?->sessionReschedule;
+
+        if ($reschedule === null) {
+            return ['title' => $reservation?->purpose ?? 'Reservasi', 'class' => $reservation?->classGroup?->name];
+        }
+
+        $classes = ClassGroup::query()->whereKey(array_filter(explode(',', $reschedule->participant_key)))->orderBy('name')->pluck('name');
+
+        return [
+            'title' => 'Kuliah Pengganti: '.$reschedule->session_title,
+            'class' => $classes->isEmpty() ? $reservation->classGroup?->name : $classes->implode(' + '),
         ];
     }
 }

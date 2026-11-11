@@ -5,7 +5,9 @@ use App\Enums\ScheduleSource;
 use App\Enums\ScheduleVersionStatus;
 use App\Exceptions\DomainException;
 use App\Models\Academic\ClassGroup;
+use App\Models\Academic\CourseOffering;
 use App\Models\Academic\Period;
+use App\Models\Academic\SessionReschedule;
 use App\Models\Lecturer\LeadershipTerm;
 use App\Models\Lecturer\Lecturer;
 use App\Models\Reservation\Reservation;
@@ -17,6 +19,7 @@ use App\Models\User\AppNotification;
 use App\Models\User\AuditLog;
 use App\Models\User\User;
 use App\Services\Room\AvailabilityService;
+use App\Services\Room\ReservationService;
 use App\Services\Scheduling\ScheduleBlockBuilder;
 use App\Services\Scheduling\ScheduleDraftService;
 use App\Services\Scheduling\SchedulePublisher;
@@ -133,4 +136,62 @@ test('route tetapkan hanya untuk admin dengan izin dan menampilkan halaman berha
         ->assertRedirect(route('admin.drafts.published', $this->draft));
 
     $this->withoutVite()->get(route('admin.drafts.published', $this->draft))->assertOk()->assertSee('Jadwal resmi berhasil diperbarui');
+});
+
+/**
+ * Pertemuan Rabu 11 Nov 10:00 (sesi resmi di AE 107) yang sudah dipindah Keti.
+ */
+function movedWednesdayMeeting(array $attributes = []): SessionReschedule
+{
+    $session = test()->official->sessions()->first();
+
+    RoomBlock::query()->where('source_type', RoomBlockSource::Schedule)->where('source_id', $session->id)
+        ->where('start_at', '2026-11-11 10:00:00')->update(['is_active' => false]);
+
+    return SessionReschedule::factory()->create([
+        'schedule_session_id' => $session->id,
+        'session_title' => $session->title,
+        'participant_key' => SessionReschedule::participantKey([test()->classGroup->id]),
+        'original_start_at' => '2026-11-11 10:00',
+        'original_end_at' => '2026-11-11 12:30',
+        'original_room_id' => test()->room->id,
+        ...$attributes,
+    ]);
+}
+
+function draftBlockOn(string $start): RoomBlock
+{
+    return RoomBlock::query()->whereBelongsTo(test()->draft, 'scheduleVersion')->where('source_type', RoomBlockSource::Schedule)
+        ->where('start_at', $start)->sole();
+}
+
+test('pemindahan pertemuan tetap berlaku setelah jadwal ditetapkan ulang (penawaran mata kuliah sama)', function () {
+    $offering = CourseOffering::factory()->create(['period_id' => $this->period->id, 'class_group_id' => $this->classGroup->id]);
+    $this->official->sessions()->update(['course_offering_id' => $offering->id]);
+    $this->draft->sessions()->update(['course_offering_id' => $offering->id, 'title' => 'Judul baru di draf']);
+    movedWednesdayMeeting(['course_offering_id' => $offering->id]);
+
+    app(SchedulePublisher::class)->publish($this->draft, $this->publisher, CarbonImmutable::parse('2026-11-09'), $this->draft->lock_version);
+
+    expect(draftBlockOn('2026-11-11 10:00:00')->is_active)->toBeFalse()
+        ->and(draftBlockOn('2026-11-18 10:00:00')->is_active)->toBeTrue();
+});
+
+test('pemindahan pertemuan tanpa penawaran tetap berlaku lewat judul dan kelas peserta', function () {
+    movedWednesdayMeeting();
+
+    app(SchedulePublisher::class)->publish($this->draft, $this->publisher, CarbonImmutable::parse('2026-11-09'), $this->draft->lock_version);
+
+    expect(draftBlockOn('2026-11-11 10:00:00')->is_active)->toBeFalse()
+        ->and(draftBlockOn('2026-11-18 10:00:00')->is_active)->toBeTrue();
+});
+
+test('slot asli yang sudah dipesan kelas lain tidak menahan penetapan jadwal baru', function () {
+    movedWednesdayMeeting();
+    app(ReservationService::class)->create(User::factory()->approvedKeti()->create(), $this->room, CarbonImmutable::parse('2026-11-11 10:00'), CarbonImmutable::parse('2026-11-11 11:40'), 'Rapat', null, (string) str()->uuid());
+
+    app(SchedulePublisher::class)->publish($this->draft, $this->publisher, CarbonImmutable::parse('2026-11-09'), $this->draft->lock_version);
+
+    expect($this->draft->fresh()->status)->toBe(ScheduleVersionStatus::Official)
+        ->and(draftBlockOn('2026-11-11 10:00:00')->is_active)->toBeFalse();
 });

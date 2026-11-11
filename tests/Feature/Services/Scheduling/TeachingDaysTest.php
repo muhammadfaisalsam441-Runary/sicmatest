@@ -195,8 +195,6 @@ class TeachingDaysTest extends TestCase
     public static function academicWeekends(): array
     {
         return [
-            ['2026-11-07 10:00', 'Kuliah Pengganti'],
-            ['2026-11-08 10:00', 'Kuliah Pengganti'],
             ['2026-11-07 10:00', 'Praktikum Tambahan'],
             ['2026-11-08 10:00', ' praktikum   tambahan '],
         ];
@@ -220,7 +218,6 @@ class TeachingDaysTest extends TestCase
         $room = Room::factory()->create();
         $this->actingAs(User::factory()->approvedKeti()->create());
         $response = $this->get(route('keti.rooms.show', ['room' => $room->id, 'mulai' => '2026-11-07 10:00']))->assertOk();
-        $this->assertMatchesRegularExpression('/<option value="Kuliah Pengganti"[^>]*disabled/', $response->getContent());
         $this->assertMatchesRegularExpression('/<option value="Praktikum Tambahan"[^>]*disabled/', $response->getContent());
         foreach (['2026-11-07 10:00', '2026-11-08 10:00'] as $start) {
             $this->postJson(route('keti.reservations.store'), [

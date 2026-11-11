@@ -4,6 +4,7 @@ namespace App\Services\Account;
 
 use App\Enums\UserRole;
 use App\Models\User\AppNotification;
+use App\Models\User\ClassRepresentative;
 use App\Models\User\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -33,6 +34,27 @@ class NotificationService
                 ]);
             }
         });
+    }
+
+    /**
+     * Keti aktif yang saat ini mewakili kelas-kelas tersebut.
+     *
+     * @param  iterable<int>  $classGroupIds
+     * @return Collection<int, User>
+     */
+    public function ketisOf(iterable $classGroupIds): Collection
+    {
+        $ids = collect($classGroupIds)->all();
+
+        if ($ids === []) {
+            return new Collection;
+        }
+
+        return User::query()
+            ->where('role', UserRole::Keti)
+            ->where('is_active', true)
+            ->whereIn('id', ClassRepresentative::query()->activeOn(now())->whereIn('class_group_id', $ids)->select('user_id'))
+            ->get();
     }
 
     /**

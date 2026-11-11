@@ -34,7 +34,7 @@
                     <x-select name="purpose" id="booking-purpose" :options="$bookingPurposes" :value="$bookingDefaultPurpose" :disabled-options="$bookingDisabledPurposes" x-model="purpose" required />
                 </x-field>
                 @unless ($academicAllowed)
-                    <p class="text-sm text-muted">Kuliah Pengganti dan Praktikum Tambahan hanya Senin–Jumat. Pada Sabtu/Minggu, ruangan dapat dipesan untuk kegiatan umum sesuai ketersediaan.</p>
+                    <p class="text-sm text-muted">Praktikum Tambahan hanya Senin–Jumat. Pada Sabtu/Minggu, ruangan dapat dipesan untuk kegiatan umum sesuai ketersediaan.</p>
                 @endunless
 
                 <div class="grid grid-cols-2 gap-3">

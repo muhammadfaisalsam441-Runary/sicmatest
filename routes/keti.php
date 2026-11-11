@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Keti\ActivityController;
 use App\Http\Controllers\Keti\FavoriteController;
+use App\Http\Controllers\Keti\MeetingRescheduleController;
 use App\Http\Controllers\Keti\MyClassController;
 use App\Http\Controllers\Keti\NotificationController;
 use App\Http\Controllers\Keti\ProfileController;
@@ -24,6 +25,8 @@ use Illuminate\Support\Facades\Route;
 Route::get('/cari-ruangan', RoomSearchController::class)->name('search');
 Route::get('/kalender-ruangan', RoomCalendarController::class)->name('rooms.calendar');
 Route::get('/my-class', MyClassController::class)->name('my-class');
+Route::get('/my-class/pindahkan', [MeetingRescheduleController::class, 'create'])->name('meetings.reschedule');
+Route::post('/my-class/pindahkan', [MeetingRescheduleController::class, 'store'])->middleware('throttle:20,1')->name('meetings.reschedule.store');
 
 Route::get('/ruangan', [RoomController::class, 'index'])->name('rooms.index');
 Route::get('/ruangan/{room}', [RoomController::class, 'show'])->name('rooms.show');

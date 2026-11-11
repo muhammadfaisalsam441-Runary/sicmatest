@@ -20,7 +20,6 @@ use App\Support\AvailabilityCache;
 use Carbon\CarbonPeriod;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 /**
@@ -229,34 +228,46 @@ class AcademicController extends Controller
 
     public function batchUpdateClassGroups(Request $request): RedirectResponse
     {
-        $validated = $request->validate([
+        $action = (string) $request->input('action');
+
+        $rules = [
             'action' => ['required', 'string', 'in:set_student_count,set_cohort_year,set_study_program,activate,archive'],
             'class_ids' => ['required', 'array', 'min:1'],
             'class_ids.*' => ['integer', 'exists:class_groups,id'],
-            'student_count' => ['nullable', 'integer', 'min:1', 'max:500'],
-            'cohort_year' => ['nullable', 'integer', 'between:2000,2100'],
-            'study_program' => ['nullable', 'string', 'max:120'],
-        ]);
+        ];
+
+        if ($action === 'set_student_count') {
+            $rules['student_count'] = ['required', 'integer', 'min:1', 'max:500'];
+        } elseif ($action === 'set_cohort_year') {
+            $rules['cohort_year'] = ['required', 'integer', 'between:2000,2100'];
+        } elseif ($action === 'set_study_program') {
+            $rules['study_program'] = ['required', 'string', 'max:120'];
+        }
+
+        $validated = $request->validate($rules);
 
         $ids = $validated['class_ids'];
-        $action = $validated['action'];
         $count = count($ids);
 
         match ($action) {
-            'set_student_count' => ClassGroup::query()->whereIn('id', $ids)->update(['student_count' => $validated['student_count'] ?? null]),
+            'set_student_count' => ClassGroup::query()->whereIn('id', $ids)->update(['student_count' => (int) $validated['student_count']]),
             'set_cohort_year' => (function () use ($ids, $validated): void {
-                if (! empty($validated['cohort_year'])) {
-                    foreach (ClassGroup::query()->whereIn('id', $ids)->get() as $class) {
-                        $code = Str::upper(Str::slug($class->name.' '.$validated['cohort_year']));
-                        if (ClassGroup::query()->where('code', $code)->where('id', '!=', $class->id)->exists()) {
-                            $code = $code.'-'.$class->id;
-                        }
-                        $class->update(['cohort_year' => $validated['cohort_year'], 'code' => $code]);
+                $newYear = (int) $validated['cohort_year'];
+                foreach (ClassGroup::query()->whereIn('id', $ids)->get() as $class) {
+                    $name = trim($class->name);
+                    if ($class->cohort_year !== null && preg_match('/\b'.preg_quote((string) $class->cohort_year, '/').'$/', $name)) {
+                        $name = preg_replace('/\b'.preg_quote((string) $class->cohort_year, '/').'$/', (string) $newYear, $name) ?? $name;
                     }
+                    $code = ClassGroup::formatCode($name, $newYear, $class->id);
+                    $class->update([
+                        'name' => $name,
+                        'cohort_year' => $newYear,
+                        'code' => $code,
+                    ]);
                 }
             })(),
             'set_study_program' => (function () use ($ids, $validated): void {
-                $prodi = trim((string) ($validated['study_program'] ?? ''));
+                $prodi = trim((string) $validated['study_program']);
                 if ($prodi !== '') {
                     ClassGroup::query()->whereIn('id', $ids)->update(['study_program' => $prodi]);
                 }
@@ -283,7 +294,7 @@ class AcademicController extends Controller
             'classes.*.name' => ['required', 'string', 'max:60'],
             'classes.*.study_program' => ['required', 'string', 'max:120'],
             'classes.*.cohort_year' => ['required', 'integer', 'between:2000,2100'],
-            'classes.*.student_count' => ['nullable'],
+            'classes.*.student_count' => ['nullable', 'integer', 'min:1', 'max:500'],
             'classes.*.is_active' => ['nullable'],
         ]);
 
@@ -302,10 +313,14 @@ class AcademicController extends Controller
                 : null;
             $studyProgram = trim($item['study_program']);
 
-            $code = Str::upper(Str::slug($name.' '.$cohortYear));
-            if (ClassGroup::query()->where('code', $code)->where('id', '!=', $classGroup->id)->exists()) {
-                $code = $code.'-'.$classGroup->id;
+            if ($classGroup->cohort_year !== null
+                && $classGroup->cohort_year !== $cohortYear
+                && $name === $classGroup->name
+                && preg_match('/\b'.preg_quote((string) $classGroup->cohort_year, '/').'$/', $name)) {
+                $name = preg_replace('/\b'.preg_quote((string) $classGroup->cohort_year, '/').'$/', (string) $cohortYear, $name) ?? $name;
             }
+
+            $code = ClassGroup::formatCode($name, $cohortYear, $classGroup->id);
 
             $classGroup->update([
                 'name' => $name,

@@ -1,4 +1,7 @@
-            <div class="flex flex-col gap-6" x-data="classManager(@js($classesPayload ?? []))" @sicma:navigated.document="batchModalOpen = false">
+            <div class="flex flex-col gap-6"
+                 x-data="classManager(@js($classesPayload ?? []))"
+                 :data-editing="(editMode || batchModalOpen || selectedIds.length > 0) ? 'true' : null"
+                 @sicma:navigated.document="batchModalOpen = false">
                 {{-- Toolbar Pencarian, Filter Prodi, dan Tombol Mode Edit Massal --}}
                 <x-card class="flex flex-col gap-4">
                     <div class="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-4">
@@ -28,7 +31,7 @@
 
                         {{-- Tombol Toggle Edit Massal di Tabel --}}
                         <div class="flex items-center gap-2">
-                            <button type="button" @click="editMode = !editMode"
+                            <button type="button" @click="toggleEditMode()"
                                     :class="editMode ? 'bg-amber-500 text-white ring-2 ring-amber-400/30' : 'bg-page text-ink border border-border hover:bg-primary-soft hover:text-primary'"
                                     class="inline-flex items-center gap-1.5 rounded-control px-3.5 py-2 text-xs font-bold transition shadow-xs cursor-pointer">
                                 <i data-lucide="pencil" class="size-3.5"></i>
@@ -39,7 +42,7 @@
 
                     {{-- Form Pencarian & Filter Prodi/Angkatan --}}
                     <div class="grid grid-cols-1 items-end gap-3 sm:grid-cols-12">
-                        <div class="sm:col-span-6">
+                        <div class="sm:col-span-5">
                             <label class="mb-1 block text-xs font-medium text-muted">Cari Nama Kelas / Kode / Prodi</label>
                             <div class="relative">
                                 <i data-lucide="search" class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted"></i>
@@ -48,7 +51,7 @@
                             </div>
                         </div>
 
-                        <div class="sm:col-span-4">
+                        <div class="sm:col-span-3">
                             <label class="mb-1 block text-xs font-medium text-muted">Filter Program Studi</label>
                             <select x-model="prodiFilter" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
                                 <option value="">Semua Program Studi</option>
@@ -59,8 +62,18 @@
                         </div>
 
                         <div class="sm:col-span-2">
-                            <button type="button" @click="search = ''; prodiFilter = ''; statusFilter = 'semua'"
-                                    x-show="search !== '' || prodiFilter !== '' || statusFilter !== 'semua'"
+                            <label class="mb-1 block text-xs font-medium text-muted">Filter Angkatan</label>
+                            <select x-model="cohortFilter" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
+                                <option value="">Semua Angkatan</option>
+                                @foreach ($distinctCohorts ?? [] as $cohort)
+                                    <option value="{{ $cohort }}">Angkatan {{ $cohort }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div class="sm:col-span-2">
+                            <button type="button" @click="search = ''; prodiFilter = ''; cohortFilter = ''; statusFilter = 'semua'"
+                                    x-show="search !== '' || prodiFilter !== '' || cohortFilter !== '' || statusFilter !== 'semua'"
                                     class="inline-flex h-[38px] w-full items-center justify-center gap-1.5 rounded-control border border-border px-3 text-xs font-semibold text-muted hover:text-ink hover:bg-page transition cursor-pointer">
                                 <i data-lucide="rotate-ccw" class="size-3.5"></i>
                                 <span>Reset Filter</span>
@@ -74,16 +87,19 @@
                             <span class="font-bold text-primary flex items-center gap-1.5">
                                 <i data-lucide="pencil" class="size-4"></i> Mode Edit Massal Aktif
                             </span>
-                            <span class="text-muted">| Isi langsung angka peserta di tabel, atau isi serentak kelas yang masih kosong:</span>
-                            <div class="flex items-center gap-1.5 ml-1">
+                            <span class="text-muted">| Set jumlah mahasiswa cepat:</span>
+                            <div class="flex flex-wrap items-center gap-1.5 ml-1">
                                 <input type="number" min="1" max="500" x-model="fillEmptyValue" class="w-16 rounded border border-border bg-surface px-2 py-1 text-center text-xs font-semibold text-ink focus:border-primary focus:outline-none">
                                 <button type="button" @click="applyFillEmpty()" class="rounded bg-surface px-2.5 py-1 text-xs font-semibold text-primary border border-primary/40 hover:bg-primary hover:text-white transition shadow-xs cursor-pointer">
-                                    Terapkan ke Yang Kosong
+                                    Isi yang Kosong
+                                </button>
+                                <button type="button" @click="applyFillAll()" class="rounded bg-primary/15 px-2.5 py-1 text-xs font-semibold text-primary border border-primary/40 hover:bg-primary hover:text-white transition shadow-xs cursor-pointer"
+                                        x-text="selectedIds.length > 0 ? 'Terapkan ke ' + selectedIds.length + ' Kelas Terpilih' : 'Terapkan ke Semua Tampil (' + visibleIds.length + ')'">
                                 </button>
                             </div>
                         </div>
                         <div class="flex items-center gap-2">
-                            <button type="button" @click="editMode = false" class="rounded-control border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-muted hover:text-ink transition cursor-pointer">
+                            <button type="button" @click="cancelEditMode()" class="rounded-control border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-muted hover:text-ink transition cursor-pointer">
                                 Batal
                             </button>
                             <button type="submit" form="bulkClassForm" class="inline-flex items-center gap-1.5 rounded-control bg-primary px-4 py-1.5 text-xs font-bold text-white hover:bg-primary/90 transition shadow-sm cursor-pointer">
@@ -125,11 +141,8 @@
                                         data-search="{{ $searchStr }}"
                                         data-status="{{ $statusKey }}"
                                         data-prodi="{{ $classGroup->study_program }}"
-                                        x-show="
-                                            (!search.trim() || $el.dataset.search.includes(search.trim().toLowerCase())) &&
-                                            (statusFilter === 'semua' || $el.dataset.status === statusFilter) &&
-                                            (!prodiFilter || $el.dataset.prodi === prodiFilter)
-                                        "
+                                        data-cohort="{{ $classGroup->cohort_year }}"
+                                        x-show="isRowVisible({{ $classGroup->id }})"
                                         class="border-b border-border transition hover:bg-primary-soft/20"
                                         :class="{ 'bg-primary-soft/30': selectedIds.map(Number).includes({{ $classGroup->id }}) }">
 
@@ -151,6 +164,7 @@
                                                 <input type="text"
                                                        form="bulkClassForm"
                                                        name="classes[{{ $index }}][name]"
+                                                       value="{{ $classGroup->name }}"
                                                        :disabled="!editMode"
                                                        x-model="classesData[{{ $classGroup->id }}].name"
                                                        required
@@ -166,6 +180,7 @@
                                                 <input type="text"
                                                        form="bulkClassForm"
                                                        name="classes[{{ $index }}][study_program]"
+                                                       value="{{ $classGroup->study_program }}"
                                                        :disabled="!editMode"
                                                        x-model="classesData[{{ $classGroup->id }}].study_program"
                                                        list="prodi-options-grid"
@@ -181,6 +196,7 @@
                                                 <input type="number" min="2000" max="2100"
                                                        form="bulkClassForm"
                                                        name="classes[{{ $index }}][cohort_year]"
+                                                       value="{{ $classGroup->cohort_year }}"
                                                        :disabled="!editMode"
                                                        x-model="classesData[{{ $classGroup->id }}].cohort_year"
                                                        required
@@ -213,6 +229,7 @@
                                                 <input type="number" min="1" max="500"
                                                        form="bulkClassForm"
                                                        name="classes[{{ $index }}][student_count]"
+                                                       value="{{ $classGroup->student_count }}"
                                                        :disabled="!editMode"
                                                        x-model="classesData[{{ $classGroup->id }}].student_count"
                                                        placeholder="0 mhs"
@@ -239,6 +256,7 @@
                                                            form="bulkClassForm"
                                                            name="classes[{{ $index }}][is_active]"
                                                            value="1"
+                                                           @checked($classGroup->is_active)
                                                            :disabled="!editMode"
                                                            x-model="classesData[{{ $classGroup->id }}].is_active"
                                                            class="size-4 accent-primary rounded cursor-pointer">
@@ -285,7 +303,7 @@
                     <div x-show="editMode" x-cloak class="flex items-center justify-between border-t border-border pt-4">
                         <span class="text-xs text-muted">Simpan setelah selesai mengubah data kelas di atas.</span>
                         <div class="flex gap-2">
-                            <button type="button" @click="editMode = false" class="rounded-control border border-border bg-surface px-4 py-2 text-xs font-semibold text-muted hover:text-ink transition cursor-pointer">
+                            <button type="button" @click="cancelEditMode()" class="rounded-control border border-border bg-surface px-4 py-2 text-xs font-semibold text-muted hover:text-ink transition cursor-pointer">
                                 Batal
                             </button>
                             <button type="submit" form="bulkClassForm" class="inline-flex items-center gap-1.5 rounded-control bg-primary px-5 py-2 text-xs font-bold text-white hover:bg-primary/90 transition shadow-sm cursor-pointer">
@@ -307,8 +325,14 @@
                      x-transition:leave-end="opacity-0 translate-y-4"
                      class="fixed bottom-6 left-1/2 z-40 flex -translate-x-1/2 flex-wrap items-center gap-3 rounded-xl border border-primary/30 bg-ink px-6 py-3.5 text-surface shadow-2xl">
                     <div class="flex items-center gap-2">
-                        <i data-lucide="check-circle" class="size-5 text-success"></i>
+                        <i data-lucide="circle-check" class="size-5 text-success"></i>
                         <span class="text-sm font-semibold"><span x-text="selectedIds.length"></span> kelas dipilih</span>
+                        <button type="button"
+                                x-show="!isAllSelected()"
+                                @click="toggleSelectAll(true)"
+                                class="ml-1 rounded-md bg-surface/10 px-2 py-1 text-[11px] font-semibold text-surface/90 hover:bg-surface/20 hover:text-white transition cursor-pointer">
+                            Pilih Semua Tampil
+                        </button>
                     </div>
                     <div class="h-4 w-px bg-surface/20"></div>
 
@@ -331,19 +355,19 @@
                     </button>
 
                     {{-- 4. Aktifkan --}}
-                    <button type="button" @click="submitBatch('activate')" class="inline-flex items-center gap-1.5 rounded-lg bg-surface/10 px-3 py-1.5 text-xs font-semibold text-surface hover:bg-surface/20 transition cursor-pointer">
+                    <button type="button" @click="submitBatch('activate')" class="inline-flex items-center gap-1.5 rounded-lg bg-success px-3 py-1.5 text-xs font-semibold text-white hover:bg-success/90 transition cursor-pointer">
                         <i data-lucide="check" class="size-3.5"></i>
                         Aktifkan
                     </button>
 
                     {{-- 5. Arsipkan --}}
-                    <button type="button" @click="submitBatch('archive')" class="inline-flex items-center gap-1.5 rounded-lg bg-danger/80 px-3 py-1.5 text-xs font-semibold text-white hover:bg-danger transition cursor-pointer">
+                    <button type="button" @click="submitBatch('archive')" class="inline-flex items-center gap-1.5 rounded-lg bg-danger/85 px-3 py-1.5 text-xs font-semibold text-white hover:bg-danger transition cursor-pointer">
                         <i data-lucide="lock" class="size-3.5"></i>
                         Arsipkan
                     </button>
 
-                    <button type="button" @click="selectedIds = []" class="text-xs text-surface/70 hover:text-white transition ml-2 cursor-pointer">
-                        Batal
+                    <button type="button" @click="selectedIds = []" class="ml-2 text-xs font-medium text-surface/70 hover:text-white transition cursor-pointer">
+                        Batalkan Pilihan
                     </button>
                 </div>
 
@@ -351,9 +375,9 @@
                 <form x-ref="batchForm" method="POST" action="{{ route('admin.academic.classes.batch') }}" class="hidden">
                     @csrf
                     <input type="hidden" name="action" x-model="batchAction">
-                    <input type="hidden" name="student_count" x-model="batchValue">
-                    <input type="hidden" name="cohort_year" x-model="batchValue">
-                    <input type="hidden" name="study_program" x-model="batchValue">
+                    <input type="hidden" name="student_count" x-model="batchValue" :disabled="batchAction !== 'set_student_count'">
+                    <input type="hidden" name="cohort_year" x-model="batchValue" :disabled="batchAction !== 'set_cohort_year'">
+                    <input type="hidden" name="study_program" x-model="batchValue" :disabled="batchAction !== 'set_study_program'">
                     <template x-for="id in selectedIds" :key="id">
                         <input type="hidden" name="class_ids[]" :value="id">
                     </template>
@@ -372,7 +396,7 @@
                         <div class="flex items-start justify-between border-b border-border pb-3">
                             <div>
                                 <span class="text-xs font-semibold text-primary">Penyesuaian Massal</span>
-                                <h3 class="text-lg font-bold text-ink" x-text="batchLabel + ' (' + selectedIds.length + ' Kelas)'"></h3>
+                                <h3 class="text-lg font-bold text-ink" x-text="batchLabel + ' (' + selectedIds.length + ' Kelas Terpilih)'"></h3>
                             </div>
                             <button type="button" @click="batchModalOpen = false" class="text-muted hover:text-ink">
                                 <i data-lucide="x" class="size-5"></i>
@@ -383,28 +407,35 @@
                             <template x-if="batchAction === 'set_student_count'">
                                 <div>
                                     <label class="mb-1 block text-xs font-medium text-muted">Jumlah Mahasiswa per Kelas</label>
-                                    <input type="number" min="1" max="500" x-model="batchValue" placeholder="Misal: 40" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
-                                    <p class="mt-1 text-[11px] text-muted">Akan diterapkan ke seluruh kelas yang Anda centang.</p>
+                                    <input type="number" min="1" max="500" x-model="batchValue" @keydown.enter.prevent="if (batchValue) { submitBatch(); batchModalOpen = false; }" placeholder="Misal: 40" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
                                 </div>
                             </template>
 
                             <template x-if="batchAction === 'set_cohort_year'">
                                 <div>
                                     <label class="mb-1 block text-xs font-medium text-muted">Tahun Angkatan</label>
-                                    <input type="number" min="2000" max="2100" x-model="batchValue" placeholder="Misal: 2026" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
+                                    <input type="number" min="2000" max="2100" x-model="batchValue" @keydown.enter.prevent="if (batchValue) { submitBatch(); batchModalOpen = false; }" placeholder="Misal: 2026" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
                                 </div>
                             </template>
 
                             <template x-if="batchAction === 'set_study_program'">
                                 <div>
                                     <label class="mb-1 block text-xs font-medium text-muted">Nama Program Studi</label>
-                                    <input type="text" x-model="batchValue" list="prodi-options-batch" placeholder="Misal: Pendidikan Teknik Informatika dan Komputer" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
+                                    <input type="text" x-model="batchValue" @keydown.enter.prevent="if (String(batchValue).trim() !== '') { submitBatch(); batchModalOpen = false; }" list="prodi-options-batch" placeholder="Misal: Pendidikan Teknik Informatika dan Komputer" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
                                 </div>
                             </template>
 
-                            <div class="mt-2 flex items-center justify-end gap-2 border-t border-border pt-4">
+                            <div class="rounded-lg border border-primary/20 bg-primary-soft/40 p-3 text-xs text-ink">
+                                Perubahan ini akan diterapkan serentak ke <strong x-text="selectedIds.length"></strong> kelas yang sedang dicentang.
+                            </div>
+
+                            <div class="mt-1 flex items-center justify-end gap-2 border-t border-border pt-4">
                                 <x-button variant="secondary" type="button" @click="batchModalOpen = false">Batal</x-button>
-                                <x-button variant="primary" type="button" icon="check" @click="submitBatch(); batchModalOpen = false">Terapkan Perubahan</x-button>
+                                <x-button variant="primary" type="button" icon="check"
+                                          x-bind:disabled="String(batchValue ?? '').trim() === ''"
+                                          @click="if (String(batchValue ?? '').trim() !== '') { submitBatch(); batchModalOpen = false; }">
+                                    Terapkan ke Kelas Terpilih
+                                </x-button>
                             </div>
                         </div>
                     </div>

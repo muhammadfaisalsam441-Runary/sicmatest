@@ -100,8 +100,10 @@ class PhpScheduleSolver
                     continue;
                 }
                 foreach (array_unique($starts) as $start) {
-                    $end = $start + $session['duration'];
-                    if (! $this->covered($slots, $start, $end) || ! $this->available($session, $day, $start, $end, $input)) {
+                    $end = isset($session['locked']) ? $start + $session['duration'] : $this->resolveEnd($slots, $start, $session['duration']);
+                    if ($this->overlapsFridayBreak($day, $start, $end, $input)
+                        || ! $this->covered($slots, $start, $end)
+                        || ! $this->available($session, $day, $start, $end, $input)) {
                         continue;
                     }
                     $rooms = $session['mode'] === 'online' ? [['id' => null, 'capacity' => null]] : ($input['rooms'] ?? []);
@@ -184,13 +186,39 @@ class PhpScheduleSolver
     }
 
     /** @param list<array<string, mixed>> $slots */
+    private function resolveEnd(array $slots, int $start, int $duration): int
+    {
+        if ($duration < 95) {
+            return $start + $duration;
+        }
+        $count = $duration >= 190 ? 4 : ($duration >= 140 ? 3 : 2);
+        foreach ($slots as $index => $slot) {
+            if ($slot['start'] !== $start || ! isset($slots[$index + $count - 1])) {
+                continue;
+            }
+            for ($step = 1; $step < $count; $step++) {
+                if ($slots[$index + $step]['start'] > $slots[$index + $step - 1]['end'] + 15) {
+                    return $start + $duration;
+                }
+            }
+            $slotEnd = $slots[$index + $count - 1]['end'];
+            if (abs(($slotEnd - $start) - $duration) <= 10) {
+                return $slotEnd;
+            }
+        }
+
+        return $start + $duration;
+    }
+
+    /** @param list<array<string, mixed>> $slots */
     private function covered(array $slots, int $start, int $end): bool
     {
+        $slotEnds = array_column($slots, 'end');
         $reach = null;
         foreach ($slots as $slot) {
             if ($reach === null && $slot['start'] <= $start && $slot['end'] > $start) {
                 $reach = $slot['end'];
-            } elseif ($reach !== null && $slot['start'] <= $reach + 15) {
+            } elseif ($reach !== null && ($slot['start'] <= $reach + 15 || ($slot['start'] <= $reach + 30 && in_array($end, $slotEnds, true)))) {
                 $reach = max($reach, $slot['end']);
             }
             if ($reach !== null && $reach >= $end) {
@@ -199,6 +227,17 @@ class PhpScheduleSolver
         }
 
         return false;
+    }
+
+    /** @param array<string, mixed> $input */
+    private function overlapsFridayBreak(int $day, int $start, int $end, array $input): bool
+    {
+        if ($day !== 5) {
+            return false;
+        }
+        $break = $input['friday_break'] ?? ['start' => 720, 'end' => 790];
+
+        return $start < $break['end'] && $end > $break['start'];
     }
 
     /** @param array<string, mixed> $session @param array<string, mixed> $input */
@@ -317,7 +356,16 @@ class PhpScheduleSolver
             }
         }
         usort($repairs, fn (array $a, array $b): int => [count($a[1]), $a[0][4]] <=> [count($b[1]), $b[0][4]]);
-        foreach (array_slice($repairs, 0, 12) as [$candidate, $blockers]) {
+        $uniqueRepairs = [];
+        $seenBlockers = [];
+        foreach ($repairs as $repair) {
+            $key = implode(',', $repair[1]);
+            if (! isset($seenBlockers[$key])) {
+                $seenBlockers[$key] = true;
+                $uniqueRepairs[] = $repair;
+            }
+        }
+        foreach (array_slice($uniqueRepairs, 0, 12) as [$candidate, $blockers]) {
             $previous = $this->placed;
             $busy = $this->busy;
             foreach ($blockers as $other) {
@@ -363,9 +411,45 @@ class PhpScheduleSolver
     private function cost(array $session, int $day, int $start, ?int $room): int
     {
         $preferred = $session['preferred'] ?? null;
+        $pattern = ($preferred === null || $preferred['start'] !== $start)
+            ? $this->slotPatternCost((int) ($session['duration'] ?? 0), $day, $start)
+                + $this->cohortPatternCost($session['cohort_profile'] ?? null, $start)
+            : 0;
 
-        return $preferred === null ? $day : (int) ($preferred['day'] !== $day) * 6
-            + (int) ($preferred['start'] !== $start) * 3 + (int) ($preferred['room'] !== $room) * 2;
+        return ($preferred === null ? $day : (int) ($preferred['day'] !== $day) * 6
+            + (int) ($preferred['start'] !== $start) * 3 + (int) ($preferred['room'] !== $room) * 2) + $pattern;
+    }
+
+    private function cohortPatternCost(?string $cohortProfile, int $start): int
+    {
+        return match ($cohortProfile) {
+            'ulang_senior' => $start < 720 ? 0 : ($start < 890 ? 2 : 5),
+            'maba' => $start < 890 ? 0 : 4,
+            default => 0,
+        };
+    }
+
+    private function slotPatternCost(int $duration, int $day, int $start): int
+    {
+        if ($duration >= 190) {
+            return match ($start) {
+                450 => 0,
+                790 => 1,
+                default => 6,
+            };
+        }
+        if ($duration >= 140) {
+            $primary = $day === 5 ? [450, 550, 555, 890] : [450, 605, 890];
+
+            return in_array($start, $primary, true) ? 0 : ($start === 790 ? 2 : 6);
+        }
+        if ($duration >= 90) {
+            $primary = $day === 5 ? [450, 605, 790] : [450, 550, 555, 660, 790];
+
+            return in_array($start, $primary, true) ? 0 : (in_array($start, [890, 940], true) ? 2 : 6);
+        }
+
+        return 0;
     }
 
     private function clock(): float
@@ -429,8 +513,10 @@ class PhpScheduleSolver
             }
             $session = $sessions[$row['id']];
             $room = $row['room_id'];
+            $expectedEnd = isset($session['locked']) ? $row['start_minute'] + $session['duration'] : $this->resolveEnd($slots, $row['start_minute'], $session['duration']);
             if (($session['mode'] === 'online' ? $room !== null : ! is_int($room) || ! isset($rooms[$room]))
-                || $session['duration'] !== $row['end_minute'] - $row['start_minute']
+                || ($row['end_minute'] !== $expectedEnd && $session['duration'] !== $row['end_minute'] - $row['start_minute'])
+                || $this->overlapsFridayBreak($row['day'], $row['start_minute'], $row['end_minute'], $input)
                 || ! $this->covered($slots, $row['start_minute'], $row['end_minute'])
                 || ! $this->available($session, $row['day'], $row['start_minute'], $row['end_minute'], $input)
                 || ($row['day'] === 4 && array_intersect($session['lecturers'], $input['leaders'] ?? []) !== [])
@@ -466,10 +552,13 @@ class PhpScheduleSolver
                 return false;
             }
         }
-        foreach (['fixed', 'rooms', 'leaders', 'availability', 'unavailable', 'room_blocks'] as $key) {
+        foreach (['fixed', 'rooms', 'leaders', 'availability', 'unavailable', 'room_blocks', 'friday_break'] as $key) {
             if (isset($input[$key]) && ! is_array($input[$key])) {
                 return false;
             }
+        }
+        if (isset($input['friday_break']) && ! $this->validInterval($input['friday_break']['start'] ?? null, $input['friday_break']['end'] ?? null)) {
+            return false;
         }
         if (! $this->ids($input['days']) || array_any($input['days'], fn (int $day): bool => $day > 7)
             || ! $this->ids($input['leaders'] ?? [])) {
@@ -493,7 +582,8 @@ class PhpScheduleSolver
             if (! is_array($session) || ! $this->ids([$session['id'] ?? null]) || isset($ids[$session['id']])
                 || ! is_int($session['duration'] ?? null) || $session['duration'] <= 0 || $session['duration'] > 1440
                 || ! in_array($session['mode'] ?? null, ['online', 'offline'], true) || ! $this->validResources($session)
-                || (isset($session['students']) && (! is_int($session['students']) || $session['students'] < 0))) {
+                || (isset($session['students']) && (! is_int($session['students']) || $session['students'] < 0))
+                || (isset($session['cohort_profile']) && ! in_array($session['cohort_profile'], ['maba', 'ulang_senior', 'reguler'], true))) {
                 return false;
             }
             foreach (['locked', 'preferred'] as $key) {

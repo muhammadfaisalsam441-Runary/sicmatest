@@ -29,8 +29,8 @@
 
         <div class="grid grid-cols-3 gap-5">
             <x-stat-card label="Total ruang" :value="$summary['all']" :hint="$buildingHint" />
-            <x-stat-card label="Tersedia sekarang" :value="$summary['available']" tone="success" hint="Tersedia pada data simulasi" />
-            <x-stat-card label="Digunakan sekarang" :value="$summary['busy']" tone="danger" hint="Sedang digunakan pada data simulasi" />
+            <x-stat-card label="Tersedia sekarang" :value="$summary['available']" tone="success" hint="Kosong pada jam ini" />
+            <x-stat-card label="Digunakan sekarang" :value="$summary['busy']" tone="danger" hint="Sedang dipakai kuliah atau reservasi" />
         </div>
 
         @if ($notStarted->isNotEmpty() || $overrunning->isNotEmpty())
@@ -95,9 +95,6 @@
                 <div class="flex items-center justify-between">
                     <h2 class="text-xl font-semibold">Status ruang saat ini</h2>
                     <div class="flex items-center gap-4">
-                        @if (config('sicma.public_portal.show_sim_label'))
-                            <x-status-badge variant="primary">{{ config('sicma.public_portal.sim_label') }}</x-status-badge>
-                        @endif
                         <a href="{{ route('admin.usage-logs.index') }}" class="text-sm font-semibold text-primary hover:underline">Lihat log lengkap</a>
                     </div>
                 </div>

@@ -24,6 +24,8 @@ RUN apt-get update \
 COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
 COPY docker/apache.conf /etc/apache2/sites-available/000-default.conf
 COPY docker/php.ini /usr/local/etc/php/conf.d/sicma.ini
+COPY docker/entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 ENV COMPOSER_ALLOW_SUPERUSER=1
 
 COPY composer.json composer.lock ./
@@ -38,4 +40,5 @@ RUN mkdir -p storage/app/public storage/app/private \
     && ln -s /var/www/html/storage/app/public public/storage
 
 EXPOSE 80
+ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["apache2-foreground"]

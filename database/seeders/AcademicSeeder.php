@@ -43,7 +43,9 @@ class AcademicSeeder extends Seeder
         ]);
 
         $this->seedTimeSlots($period);
-        $this->seedCalendarExceptions($period);
+        if (config('sicma.public_portal.show_sim_label')) {
+            $this->seedCalendarExceptions($period);
+        }
         $this->seedClassGroups();
         $this->seedCourses();
         $this->seedLecturers($period);

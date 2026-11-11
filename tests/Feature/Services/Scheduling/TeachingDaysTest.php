@@ -261,4 +261,23 @@ class TeachingDaysTest extends TestCase
 
         $this->assertDatabaseCount('reservations', 1);
     }
+
+    public function test_friday_break_between_1200_and_1310_is_rejected_and_flagged_by_validator(): void
+    {
+        $draft = $this->version();
+        $session = $this->createSession($draft, 5);
+        $this->actingAs(User::factory()->admin()->create())->put(route('admin.drafts.sessions.update', [$draft, $session]), [
+            'mode' => 'offline', 'day_of_week' => 5, 'start_time' => '11:50', 'end_time' => '12:40', 'room_id' => $session->room_id,
+        ])->assertSessionHasErrors(['start_time' => 'Pada hari Jumat pukul 12.00–13.10 tidak ada perkuliahan.']);
+
+        $this->assertDomainError(fn () => app(ScheduleDraftService::class)->updateSession($session, [
+            'mode' => 'offline', 'day_of_week' => 5, 'start_minute' => 710, 'end_minute' => 760, 'room_id' => $session->room_id,
+        ]), 'FRIDAY_BREAK_CONFLICT');
+
+        $session->forceFill(['day_of_week' => 5, 'start_minute' => 710, 'end_minute' => 760])->save();
+        $issues = app(ScheduleValidator::class)->validate($draft->fresh());
+        $issue = $issues->firstWhere('code', 'FRIDAY_BREAK_CONFLICT');
+        $this->assertNotNull($issue);
+        $this->assertSame(IssueSeverity::Error, $issue->severity);
+    }
 }

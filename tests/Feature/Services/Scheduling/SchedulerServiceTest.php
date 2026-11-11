@@ -193,6 +193,13 @@ test('halaman susun jadwal: pengaturan, periksa kesiapan, mulai, riwayat', funct
         ->post(route('admin.scheduler.check'), ['scope' => 'semester', 'time_limit' => 60])
         ->assertSessionHas('readiness');
 
+    $sampleClass = ClassGroup::query()->first();
+    if ($sampleClass) {
+        $this->from(route('admin.scheduler.create'))
+            ->post(route('admin.scheduler.check'), ['scope' => 'kelas', 'class_ids' => [$sampleClass->id]])
+            ->assertSessionHas('readiness');
+    }
+
     $this->post(route('admin.scheduler.store'), ['scope' => 'semester', 'time_limit' => 60])
         ->assertRedirect(route('admin.scheduler.show', OptimizationJob::query()->sole()));
 

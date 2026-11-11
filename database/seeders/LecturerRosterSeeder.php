@@ -44,13 +44,18 @@ class LecturerRosterSeeder extends Seeder
             }
 
             $row = array_combine($header, $cells);
-            $lecturer = Lecturer::query()->firstOrNew(['name' => $row['Nama di SICMA']]);
+            $lecturer = Lecturer::query()
+                ->where('nip', $row['NIP'])
+                ->orWhere('name', $row['Nama di SICMA'])
+                ->orWhere('name', $row['Nama'])
+                ->first() ?? new Lecturer(['name' => $row['Nama di SICMA']]);
 
             if (! $lecturer->exists) {
                 $lecturer->fill(['source_name' => $row['Nama'], 'is_active' => true]);
             }
 
             $lecturer->fill([
+                'name' => $row['Nama di SICMA'],
                 'nip' => $row['NIP'],
                 'homebase' => LecturerHomebase::Jtik,
                 'profile_status' => LecturerProfileStatus::Verified,

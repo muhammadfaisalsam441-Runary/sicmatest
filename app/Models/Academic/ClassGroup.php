@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Str;
 
 /**
  * Kelas (rombel) yang diwakili seorang Keti, mis. "Tekom C".
@@ -22,6 +23,39 @@ class ClassGroup extends Model
 {
     /** @use HasFactory<ClassGroupFactory> */
     use HasFactory, SoftDeletes;
+
+    /**
+     * Format kode kelas unik tanpa menggandakan tahun angkatan jika sudah ada di nama kelas.
+     */
+    public static function formatCode(string $name, ?int $cohortYear = null, ?int $ignoreId = null): string
+    {
+        $cleanName = Str::squish($name);
+        $source = $cleanName;
+
+        if ($cohortYear !== null && ! preg_match('/\b'.preg_quote((string) $cohortYear, '/').'\b$/', $cleanName)) {
+            $source = trim($cleanName.' '.$cohortYear);
+        }
+
+        $baseCode = Str::upper(Str::slug($source));
+        if ($baseCode === '') {
+            $baseCode = 'KELAS'.($cohortYear ? '-'.$cohortYear : '');
+        }
+
+        $code = $baseCode;
+        $suffix = 2;
+
+        while (static::withTrashed()
+            ->where('code', $code)
+            ->when($ignoreId !== null, fn ($query) => $query->where('id', '!=', $ignoreId))
+            ->exists()) {
+            $code = $ignoreId !== null && $suffix === 2
+                ? $baseCode.'-'.$ignoreId
+                : $baseCode.'-'.$suffix;
+            $suffix++;
+        }
+
+        return $code;
+    }
 
     /**
      * Get the attributes that should be cast.

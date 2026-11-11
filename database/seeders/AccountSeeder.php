@@ -39,6 +39,10 @@ class AccountSeeder extends Seeder
         ]);
         $admin->markEmailAsVerified();
 
+        if (! config('sicma.public_portal.show_sim_label')) {
+            return;
+        }
+
         $periodStart = Period::query()->active()->value('start_date');
 
         // [nama, NIM, email, kode kelas, status pengajuan, catatan admin]

@@ -1,8 +1,8 @@
             <x-card class="flex flex-col gap-4">
                 <div class="flex flex-col gap-1">
                     <h2 class="text-lg font-semibold">Hari &amp; jam kuliah (slot)</h2>
-                    <p class="text-sm font-semibold text-primary">Perkuliahan hanya Senin–Jumat. Sabtu dan Minggu tidak digunakan untuk jadwal kuliah.</p>
-                    <p class="text-sm text-muted">Slot adalah acuan pemeriksaan impor dan susun otomatis. Jam pada jadwal tidak dikoreksi otomatis bila berbeda (mis. 15.40 vs 15.45). Nilai slot adalah data contoh, BELUM DITETAPKAN jurusan.</p>
+                    <p class="text-sm font-semibold text-primary">Perkuliahan hanya Senin–Jumat. Sabtu dan Minggu tidak digunakan untuk jadwal kuliah. Khusus hari Jumat pukul 12.00–13.10 WITA tidak ada perkuliahan.</p>
+                    <p class="text-sm text-muted">Slot adalah acuan pemeriksaan impor dan susun otomatis. Jam pada jadwal tidak dikoreksi otomatis bila berbeda (mis. 15.40 vs 15.45).</p>
                 </div>
                 <form method="POST" action="{{ route('admin.academic.slots.update', $period) }}" class="flex flex-col gap-4">
                     @csrf

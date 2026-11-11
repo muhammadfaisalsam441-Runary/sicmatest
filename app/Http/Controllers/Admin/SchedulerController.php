@@ -26,7 +26,7 @@ class SchedulerController extends Controller
             'period' => $period,
             'base' => $period ? $scheduler->baseVersion($period) : null,
             'official' => $period?->scheduleVersions()->official()->latest('version_no')->first(),
-            'classGroups' => ClassGroup::query()->where('is_active', true)->orderBy('name')->pluck('name', 'id'),
+            'classGroups' => ClassGroup::query()->where('is_active', true)->orderBy('study_program')->orderByDesc('cohort_year')->orderBy('name')->get(['id', 'name', 'study_program', 'cohort_year']),
             'readiness' => session('readiness'),
             'lastJob' => OptimizationJob::query()->latest()->first(),
         ]);

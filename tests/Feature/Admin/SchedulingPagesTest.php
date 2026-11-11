@@ -151,6 +151,56 @@ test('jadwal resmi dan ekspor Excel mengikuti filter ruang serta versi yang dipi
     }
 });
 
+test('jadwal resmi dapat difilter berdasarkan angkatan', function () {
+    $official = ScheduleVersion::factory()->official()->for($this->period)->create();
+    $class2026 = ClassGroup::factory()->create(['cohort_year' => 2026, 'name' => 'PTIK A 2026']);
+    $class2024 = ClassGroup::factory()->create(['cohort_year' => 2024, 'name' => 'PTIK A 2024']);
+
+    $session2026 = ScheduleSession::factory()->for($official, 'version')->create(['title' => 'Algoritma 2026']);
+    $session2026->participants()->attach($class2026);
+
+    $session2024 = ScheduleSession::factory()->for($official, 'version')->create(['title' => 'Basis Data 2024']);
+    $session2024->participants()->attach($class2024);
+
+    $this->actingAs($this->admin)
+        ->get(route('admin.schedules.index', ['angkatan' => 2026]))
+        ->assertOk()
+        ->assertSee('Algoritma 2026')
+        ->assertDontSee('Basis Data 2024')
+        ->assertSee('PTIK A 2026')
+        ->assertDontSee('PTIK A 2024');
+
+    $this->get(route('admin.schedules.index', ['angkatan' => 2024]))
+        ->assertOk()
+        ->assertSee('Basis Data 2024')
+        ->assertDontSee('Algoritma 2026');
+});
+
+test('jadwal resmi dapat difilter berdasarkan prodi', function () {
+    $official = ScheduleVersion::factory()->official()->for($this->period)->create();
+    $classPtik = ClassGroup::factory()->create(['study_program' => 'Pendidikan Teknik Informatika dan Komputer', 'name' => 'PTIK A 2026']);
+    $classTekom = ClassGroup::factory()->create(['study_program' => 'Teknik Komputer', 'name' => 'TEKOM A 2026']);
+
+    $sessionPtik = ScheduleSession::factory()->for($official, 'version')->create(['title' => 'Pemrograman Web PTIK']);
+    $sessionPtik->participants()->attach($classPtik);
+
+    $sessionTekom = ScheduleSession::factory()->for($official, 'version')->create(['title' => 'Mikrokontroler TEKOM']);
+    $sessionTekom->participants()->attach($classTekom);
+
+    $this->actingAs($this->admin)
+        ->get(route('admin.schedules.index', ['prodi' => 'Teknik Komputer']))
+        ->assertOk()
+        ->assertSee('Mikrokontroler TEKOM')
+        ->assertDontSee('Pemrograman Web PTIK')
+        ->assertSee('TEKOM A 2026')
+        ->assertDontSee('PTIK A 2026');
+
+    $this->get(route('admin.schedules.index', ['prodi' => 'Pendidikan Teknik Informatika dan Komputer']))
+        ->assertOk()
+        ->assertSee('Pemrograman Web PTIK')
+        ->assertDontSee('Mikrokontroler TEKOM');
+});
+
 test('Keti dan tamu tidak dapat mengakses pemeriksaan atau penetapan jadwal', function () {
     $draft = ScheduleVersion::factory()->for($this->period)->create();
     $this->actingAs(User::factory()->approvedKeti()->create())
@@ -285,37 +335,49 @@ test('menyimpan form admin lewat fetch tetap mengikuti tujuan tab dari server', 
 });
 
 test('admin dapat melakukan aksi massal ubah jumlah mahasiswa, angkatan, prodi, dan status kelas', function () {
-    $c1 = ClassGroup::factory()->create(['name' => 'PTIK A 2026', 'study_program' => 'PTIK', 'cohort_year' => 2026, 'student_count' => null]);
-    $c2 = ClassGroup::factory()->create(['name' => 'PTIK B 2026', 'study_program' => 'PTIK', 'cohort_year' => 2026, 'student_count' => null]);
-    $c3 = ClassGroup::factory()->create(['name' => 'TEKOM A 2026', 'study_program' => 'TEKOM', 'cohort_year' => 2026, 'student_count' => null]);
+    $c1 = ClassGroup::factory()->create(['name' => 'PTIK A 2026', 'code' => 'PTIK-A-2026', 'study_program' => 'PTIK', 'cohort_year' => 2026, 'student_count' => null]);
+    $c2 = ClassGroup::factory()->create(['name' => 'PTIK B 2026', 'code' => 'PTIK-B-2026', 'study_program' => 'PTIK', 'cohort_year' => 2026, 'student_count' => null]);
+    $c3 = ClassGroup::factory()->create(['name' => 'TEKOM A 2026', 'code' => 'TEKOM-A-2026', 'study_program' => 'TEKOM', 'cohort_year' => 2026, 'student_count' => null]);
 
-    // 1. Set Jumlah Mahasiswa massal
+    // 1. Set Jumlah Mahasiswa massal (termasuk jika browser mengirim field lain dari form tersembunyi)
     $this->actingAs($this->admin)->post(route('admin.academic.classes.batch'), [
         'action' => 'set_student_count',
         'class_ids' => [$c1->id, $c2->id],
         'student_count' => 40,
-    ])->assertRedirect(route('admin.academic.index', ['tab' => 'kelas']));
+        'cohort_year' => 40,
+        'study_program' => 40,
+    ])->assertRedirect(route('admin.academic.index', ['tab' => 'kelas']))
+        ->assertSessionHasNoErrors();
 
     expect($c1->fresh()->student_count)->toBe(40)
         ->and($c2->fresh()->student_count)->toBe(40)
         ->and($c3->fresh()->student_count)->toBeNull();
 
-    // 2. Set Angkatan massal
+    // 2. Set Angkatan massal menyinkronkan tahun di nama & kode tanpa menduplikasi tahun
     $this->post(route('admin.academic.classes.batch'), [
         'action' => 'set_cohort_year',
         'class_ids' => [$c1->id, $c2->id],
         'cohort_year' => 2027,
-    ])->assertRedirect();
+        'student_count' => 2027,
+    ])->assertRedirect()->assertSessionHasNoErrors();
 
-    expect($c1->fresh()->cohort_year)->toBe(2027)
-        ->and($c2->fresh()->cohort_year)->toBe(2027);
+    expect($c1->fresh())
+        ->cohort_year->toBe(2027)
+        ->name->toBe('PTIK A 2027')
+        ->code->toBe('PTIK-A-2027')
+        ->and($c2->fresh())
+        ->cohort_year->toBe(2027)
+        ->name->toBe('PTIK B 2027')
+        ->code->toBe('PTIK-B-2027');
 
     // 3. Set Program Studi massal
     $this->post(route('admin.academic.classes.batch'), [
         'action' => 'set_study_program',
         'class_ids' => [$c1->id, $c2->id],
         'study_program' => 'Pendidikan Teknik Informatika',
-    ])->assertRedirect();
+        'student_count' => 'Pendidikan Teknik Informatika',
+        'cohort_year' => 'Pendidikan Teknik Informatika',
+    ])->assertRedirect()->assertSessionHasNoErrors();
 
     expect($c1->fresh()->study_program)->toBe('Pendidikan Teknik Informatika')
         ->and($c2->fresh()->study_program)->toBe('Pendidikan Teknik Informatika');
@@ -339,14 +401,14 @@ test('admin dapat melakukan aksi massal ubah jumlah mahasiswa, angkatan, prodi, 
 });
 
 test('admin dapat memperbarui banyak kelas sekaligus melalui mode edit massal di tabel', function () {
-    $c1 = ClassGroup::factory()->create(['name' => 'PTIK A', 'study_program' => 'PTIK', 'cohort_year' => 2026, 'student_count' => null]);
-    $c2 = ClassGroup::factory()->create(['name' => 'PTIK B', 'study_program' => 'PTIK', 'cohort_year' => 2026, 'student_count' => null]);
+    $c1 = ClassGroup::factory()->create(['name' => 'PTIK A 2026', 'code' => 'PTIK-A-2026', 'study_program' => 'PTIK', 'cohort_year' => 2026, 'student_count' => null]);
+    $c2 = ClassGroup::factory()->create(['name' => 'PTIK B', 'code' => 'PTIK-B-2026', 'study_program' => 'PTIK', 'cohort_year' => 2026, 'student_count' => null]);
 
     $this->actingAs($this->admin)->put(route('admin.academic.classes.bulk-update'), [
         'classes' => [
             [
                 'id' => $c1->id,
-                'name' => 'PTIK A Unggulan',
+                'name' => 'PTIK A 2026',
                 'study_program' => 'PTIK',
                 'cohort_year' => 2026,
                 'student_count' => 38,
@@ -361,14 +423,17 @@ test('admin dapat memperbarui banyak kelas sekaligus melalui mode edit massal di
                 'is_active' => 1,
             ],
         ],
-    ])->assertRedirect(route('admin.academic.index', ['tab' => 'kelas']));
+    ])->assertRedirect(route('admin.academic.index', ['tab' => 'kelas']))
+        ->assertSessionHasNoErrors();
 
     expect($c1->fresh())
-        ->name->toBe('PTIK A Unggulan')
+        ->name->toBe('PTIK A 2026')
+        ->code->toBe('PTIK-A-2026')
         ->student_count->toBe(38);
 
     expect($c2->fresh())
         ->name->toBe('PTIK B Reguler')
+        ->code->toBe('PTIK-B-REGULER-2026')
         ->student_count->toBe(42);
 });
 

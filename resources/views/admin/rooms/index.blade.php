@@ -31,8 +31,9 @@
         ];
     @endphp
     <div class="flex flex-col gap-6"
-         x-data="roomManager(@js($rooms->pluck('id')->all()), @js($roomManagerDefaults))"
-         @sicma:navigated.document="formModalOpen = false; closureModalOpen = false; deleteModalOpen = false; batchFacilityModalOpen = false; batchCapacityModalOpen = false">
+         x-data="roomManager(@js($rooms->pluck('id')->all()), @js($roomManagerDefaults), @js($roomsPayload ?? []))"
+         :data-editing="(editMode || formModalOpen || closureModalOpen || deleteModalOpen || batchFacilityModalOpen || batchCapacityModalOpen || selectedIds.length > 0) ? 'true' : null"
+         @sicma:navigated.document="formModalOpen = false; closureModalOpen = false; deleteModalOpen = false; batchFacilityModalOpen = false; batchCapacityModalOpen = false; editMode = false">
         <x-page-header title="Data ruang"
                        :subtitle="$totalRooms.' ruang terdaftar'.($periodName ? ' dari jadwal '.$periodName : '').'. Kelola profil ruangan, kapasitas kursi, fasilitas, lokasi gedung, serta status penutupan ruang.'">
             <x-slot:actions>
@@ -100,8 +101,16 @@
                     </a>
                 </div>
 
-                <div class="text-xs text-muted">
-                    Menampilkan <span class="font-semibold text-ink">{{ $rooms->total() }}</span> ruangan
+                <div class="flex flex-wrap items-center gap-3">
+                    <span class="text-xs text-muted">
+                        Menampilkan <span class="font-semibold text-ink">{{ $rooms->total() }}</span> ruangan
+                    </span>
+                    <button type="button" @click="toggleEditMode()"
+                            :class="editMode ? 'bg-amber-500 text-white ring-2 ring-amber-400/30' : 'bg-page text-ink border border-border hover:bg-primary-soft hover:text-primary'"
+                            class="inline-flex items-center gap-1.5 rounded-control px-3.5 py-2 text-xs font-bold transition shadow-xs cursor-pointer">
+                        <i data-lucide="pencil" class="size-3.5"></i>
+                        <span x-text="editMode ? 'Tutup Edit Massal' : '⚡ Edit Massal di Tabel'"></span>
+                    </button>
                 </div>
             </div>
 
@@ -152,6 +161,34 @@
                     @endif
                 </div>
             </form>
+
+            {{-- Bar Bantuan Cepat saat Mode Edit Massal Aktif --}}
+            <div x-show="editMode" x-cloak class="rounded-xl border border-primary/30 bg-primary-soft/30 p-3.5 flex flex-wrap items-center justify-between gap-3 animate-in fade-in duration-200">
+                <div class="flex flex-wrap items-center gap-2 text-xs">
+                    <span class="font-bold text-primary flex items-center gap-1.5">
+                        <i data-lucide="pencil" class="size-4"></i> Mode Edit Massal Aktif
+                    </span>
+                    <span class="text-muted">| Set kapasitas kursi cepat:</span>
+                    <div class="flex flex-wrap items-center gap-1.5 ml-1">
+                        <input type="number" min="1" max="1000" x-model="fillEmptyValue" class="w-16 rounded border border-border bg-surface px-2 py-1 text-center text-xs font-semibold text-ink focus:border-primary focus:outline-none">
+                        <button type="button" @click="applyFillEmpty()" class="rounded bg-surface px-2.5 py-1 text-xs font-semibold text-primary border border-primary/40 hover:bg-primary hover:text-white transition shadow-xs cursor-pointer">
+                            Isi yang Kosong
+                        </button>
+                        <button type="button" @click="applyFillAll()" class="rounded bg-primary/15 px-2.5 py-1 text-xs font-semibold text-primary border border-primary/40 hover:bg-primary hover:text-white transition shadow-xs cursor-pointer"
+                                x-text="selectedIds.length > 0 ? 'Terapkan ke ' + selectedIds.length + ' Ruang Terpilih' : 'Terapkan ke Semua Tampil (' + visibleIds.length + ')'">
+                        </button>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button type="button" @click="cancelEditMode()" class="rounded-control border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-muted hover:text-ink transition cursor-pointer">
+                        Batal
+                    </button>
+                    <button type="submit" form="bulkRoomForm" class="inline-flex items-center gap-1.5 rounded-control bg-primary px-4 py-1.5 text-xs font-bold text-white hover:bg-primary/90 transition shadow-sm cursor-pointer">
+                        <i data-lucide="check" class="size-4"></i>
+                        Simpan Semua Perubahan
+                    </button>
+                </div>
+            </div>
         </x-card>
 
         {{-- TABEL DATA RUANG --}}
@@ -176,10 +213,10 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-border">
-                        @forelse ($rooms as $room)
+                        @forelse ($rooms as $index => $room)
                             @php($isClosed = $closures->firstWhere('room_id', $room->id))
 
-                            <tr class="border-b border-border transition hover:bg-primary-soft/20" :class="{ 'bg-primary-soft/30': selectedIds.includes({{ $room->id }}) }">
+                            <tr class="border-b border-border transition hover:bg-primary-soft/20" :class="{ 'bg-primary-soft/30': selectedIds.map(Number).includes({{ $room->id }}) }">
                                 {{-- Checkbox --}}
                                 <td class="px-4 py-3 text-center">
                                     <input type="checkbox"
@@ -190,60 +227,118 @@
 
                                 {{-- Kode & Nama Ruang --}}
                                 <td class="px-4 py-3">
-                                    <div class="flex flex-col">
+                                    <div x-show="!editMode" class="flex flex-col">
                                         <span class="font-bold text-ink text-sm">{{ $room->name }}</span>
                                         <span class="font-mono text-xs text-muted">Kode: {{ $room->code }}</span>
+                                    </div>
+                                    <div x-show="editMode" x-cloak class="flex flex-col gap-1">
+                                        <input type="hidden" form="bulkRoomForm" name="rooms[{{ $index }}][id]" value="{{ $room->id }}" :disabled="!editMode">
+                                        <input type="text"
+                                               form="bulkRoomForm"
+                                               name="rooms[{{ $index }}][name]"
+                                               value="{{ $room->name }}"
+                                               :disabled="!editMode"
+                                               x-model="roomsData[{{ $room->id }}].name"
+                                               required
+                                               class="w-40 rounded-control border border-border bg-surface px-2.5 py-1 text-sm font-semibold text-ink focus:border-primary focus:outline-none">
+                                        <span class="font-mono text-[10px] text-muted">Kode: {{ $room->code }}</span>
                                     </div>
                                 </td>
 
                                 {{-- Lokasi Gedung & Lantai --}}
                                 <td class="px-4 py-3">
-                                    @if ($room->building)
-                                        <div class="flex items-center gap-2">
-                                            <div class="flex size-7 shrink-0 items-center justify-center rounded-md bg-page border border-border text-primary">
-                                                <i data-lucide="building-2" class="size-3.5"></i>
+                                    <div x-show="!editMode">
+                                        @if ($room->building)
+                                            <div class="flex items-center gap-2">
+                                                <div class="flex size-7 shrink-0 items-center justify-center rounded-md bg-page border border-border text-primary">
+                                                    <i data-lucide="building-2" class="size-3.5"></i>
+                                                </div>
+                                                <div class="flex flex-col">
+                                                    <span class="font-semibold text-ink text-xs">Gedung {{ $room->building->name }}</span>
+                                                    <span class="text-[11px] text-muted">Lantai {{ $room->floor ?? '—' }}</span>
+                                                </div>
                                             </div>
-                                            <div class="flex flex-col">
-                                                <span class="font-semibold text-ink text-xs">Gedung {{ $room->building->name }}</span>
-                                                <span class="text-[11px] text-muted">Lantai {{ $room->floor ?? '—' }}</span>
-                                            </div>
-                                        </div>
-                                    @else
-                                        <span class="inline-flex items-center gap-1 rounded-md bg-warning-soft/80 px-2 py-0.5 text-xs font-medium text-warning-ink border border-warning/30">
-                                            <i data-lucide="triangle-alert" class="size-3 text-warning"></i>
-                                            Gedung belum didata
-                                        </span>
-                                    @endif
+                                        @else
+                                            <span class="inline-flex items-center gap-1 rounded-md bg-warning-soft/80 px-2 py-0.5 text-xs font-medium text-warning-ink border border-warning/30">
+                                                <i data-lucide="triangle-alert" class="size-3 text-warning"></i>
+                                                Gedung belum didata
+                                            </span>
+                                        @endif
+                                    </div>
+                                    <div x-show="editMode" x-cloak class="flex items-center gap-1.5">
+                                        <input type="text"
+                                               form="bulkRoomForm"
+                                               name="rooms[{{ $index }}][building]"
+                                               value="{{ $room->building?->name }}"
+                                               :disabled="!editMode"
+                                               x-model="roomsData[{{ $room->id }}].building"
+                                               list="building-suggestions"
+                                               placeholder="Gedung..."
+                                               class="w-28 rounded-control border border-border bg-surface px-2.5 py-1 text-xs text-ink focus:border-primary focus:outline-none">
+                                        <input type="number" min="0" max="20"
+                                               form="bulkRoomForm"
+                                               name="rooms[{{ $index }}][floor]"
+                                               value="{{ $room->floor }}"
+                                               :disabled="!editMode"
+                                               x-model="roomsData[{{ $room->id }}].floor"
+                                               placeholder="Lt"
+                                               title="Lantai"
+                                               class="w-14 rounded-control border border-border bg-surface px-2 py-1 text-center text-xs text-ink focus:border-primary focus:outline-none">
+                                    </div>
                                 </td>
 
                                 {{-- Tipe Ruangan --}}
                                 <td class="px-4 py-3 text-center">
-                                    @if ($room->type === RoomType::Classroom)
-                                        <span class="inline-flex items-center gap-1 rounded-full border border-border bg-page px-2.5 py-0.5 text-xs font-semibold text-muted">
-                                            <i data-lucide="door-closed" class="size-3 text-primary"></i>
-                                            Ruang Kuliah
-                                        </span>
-                                    @else
-                                        <span class="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700">
-                                            <i data-lucide="wrench" class="size-3 text-indigo-600"></i>
-                                            Laboratorium
-                                        </span>
-                                    @endif
+                                    <div x-show="!editMode">
+                                        @if ($room->type === RoomType::Classroom)
+                                            <span class="inline-flex items-center gap-1 rounded-full border border-border bg-page px-2.5 py-0.5 text-xs font-semibold text-muted">
+                                                <i data-lucide="door-closed" class="size-3 text-primary"></i>
+                                                Ruang Kuliah
+                                            </span>
+                                        @else
+                                            <span class="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700">
+                                                <i data-lucide="wrench" class="size-3 text-indigo-600"></i>
+                                                Laboratorium
+                                            </span>
+                                        @endif
+                                    </div>
+                                    <div x-show="editMode" x-cloak class="flex justify-center">
+                                        <select form="bulkRoomForm"
+                                                name="rooms[{{ $index }}][type]"
+                                                :disabled="!editMode"
+                                                x-model="roomsData[{{ $room->id }}].type"
+                                                class="w-36 rounded-control border border-border bg-surface px-2 py-1 text-xs font-medium text-ink focus:border-primary focus:outline-none">
+                                            <option value="classroom" @selected($room->type === RoomType::Classroom)>Ruang Kuliah</option>
+                                            <option value="lab" @selected($room->type === RoomType::Lab)>Laboratorium</option>
+                                        </select>
+                                    </div>
                                 </td>
 
                                 {{-- Kapasitas Kursi --}}
                                 <td class="px-4 py-3 text-center">
-                                    @if ($room->capacity)
-                                        <span class="inline-flex items-center gap-1 rounded-full bg-page px-2.5 py-0.5 text-xs font-bold text-ink border border-border">
-                                            <i data-lucide="users" class="size-3 text-muted"></i>
-                                            {{ $room->capacity }} Kursi
-                                        </span>
-                                    @else
-                                        <span class="inline-flex items-center gap-1 rounded-md bg-warning-soft/80 px-2 py-0.5 text-xs font-medium text-warning-ink border border-warning/30">
-                                            <i data-lucide="triangle-alert" class="size-3 text-warning"></i>
-                                            Belum diisi
-                                        </span>
-                                    @endif
+                                    <div x-show="!editMode">
+                                        @if ($room->capacity)
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-page px-2.5 py-0.5 text-xs font-bold text-ink border border-border">
+                                                <i data-lucide="users" class="size-3 text-muted"></i>
+                                                {{ $room->capacity }} Kursi
+                                            </span>
+                                        @else
+                                            <button type="button" @click="editMode = true" class="inline-flex items-center gap-1 rounded-md bg-warning-soft/80 px-2 py-0.5 text-xs font-medium text-warning-ink border border-warning/30 hover:underline cursor-pointer" title="Klik untuk edit cepat">
+                                                <i data-lucide="triangle-alert" class="size-3 text-warning"></i>
+                                                Belum diisi
+                                            </button>
+                                        @endif
+                                    </div>
+                                    <div x-show="editMode" x-cloak class="flex justify-center">
+                                        <input type="number" min="1" max="1000"
+                                               form="bulkRoomForm"
+                                               name="rooms[{{ $index }}][capacity]"
+                                               value="{{ $room->capacity }}"
+                                               :disabled="!editMode"
+                                               x-model="roomsData[{{ $room->id }}].capacity"
+                                               placeholder="0 kursi"
+                                               class="w-24 rounded-control border border-primary/40 bg-surface px-2.5 py-1 text-center text-sm font-bold text-ink focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none shadow-xs">
+                                    </div>
                                 </td>
 
                                 {{-- Status Ketersediaan --}}
@@ -354,10 +449,24 @@
                     @endif
                 </div>
             @endif
+
+            {{-- Footer jika dalam editMode --}}
+            <div x-show="editMode" x-cloak class="flex items-center justify-between border-t border-border bg-surface px-4 py-3">
+                <span class="text-xs text-muted">Simpan setelah selesai mengubah data ruangan di atas.</span>
+                <div class="flex gap-2">
+                    <button type="button" @click="cancelEditMode()" class="rounded-control border border-border bg-surface px-4 py-2 text-xs font-semibold text-muted hover:text-ink transition cursor-pointer">
+                        Batal
+                    </button>
+                    <button type="submit" form="bulkRoomForm" class="inline-flex items-center gap-1.5 rounded-control bg-primary px-5 py-2 text-xs font-bold text-white hover:bg-primary/90 transition shadow-sm cursor-pointer">
+                        <i data-lucide="check" class="size-4"></i>
+                        Simpan Semua Perubahan
+                    </button>
+                </div>
+            </div>
         </div>
 
         {{-- FLOATING BATCH ACTION BAR --}}
-        <div x-show="selectedIds.length > 0"
+        <div x-show="selectedIds.length > 0 && !editMode"
              x-cloak
              x-transition:enter="transition ease-out duration-200"
              x-transition:enter-start="opacity-0 translate-y-4"
@@ -369,46 +478,53 @@
             <div class="flex items-center gap-2">
                 <i data-lucide="circle-check" class="size-5 text-success"></i>
                 <span class="text-sm font-semibold"><span x-text="selectedIds.length"></span> ruang dipilih</span>
+                <button type="button"
+                        x-show="!isAllSelected()"
+                        @click="toggleSelectAll(true)"
+                        class="ml-1 rounded-md bg-surface/10 px-2 py-1 text-[11px] font-semibold text-surface/90 hover:bg-surface/20 hover:text-white transition cursor-pointer">
+                    Pilih Semua Tampil
+                </button>
             </div>
             <div class="h-4 w-px bg-surface/20"></div>
 
-            {{-- 1. Batch Set Gedung AE --}}
-            <button type="button" @click="submitBatch('set_building', { building: 'AE' })" class="inline-flex items-center gap-1.5 rounded-lg bg-surface/10 px-3 py-1.5 text-xs font-semibold text-surface hover:bg-surface/20 transition">
-                <i data-lucide="building-2" class="size-3.5"></i>
-                Set Gedung AE
-            </button>
-
-            {{-- 2. Batch Set Gedung Pinisi --}}
-            <button type="button" @click="submitBatch('set_building', { building: 'Pinisi' })" class="inline-flex items-center gap-1.5 rounded-lg bg-surface/10 px-3 py-1.5 text-xs font-semibold text-surface hover:bg-surface/20 transition">
-                <i data-lucide="building-2" class="size-3.5"></i>
-                Set Gedung Pinisi
-            </button>
-
-            {{-- 3. Batch Set Ruang Kuliah --}}
-            <button type="button" @click="submitBatch('set_type', { type: 'classroom' })" class="inline-flex items-center gap-1.5 rounded-lg bg-surface/10 px-3 py-1.5 text-xs font-semibold text-surface hover:bg-surface/20 transition">
-                <i data-lucide="door-closed" class="size-3.5"></i>
-                Jadikan Ruang Kuliah
-            </button>
-
-            {{-- 4. Batch Set Laboratorium --}}
-            <button type="button" @click="submitBatch('set_type', { type: 'lab' })" class="inline-flex items-center gap-1.5 rounded-lg bg-surface/10 px-3 py-1.5 text-xs font-semibold text-surface hover:bg-surface/20 transition">
-                <i data-lucide="wrench" class="size-3.5"></i>
-                Jadikan Lab
-            </button>
-
-            <button type="button" @click="openBatchCapacityModal()" class="inline-flex items-center gap-1.5 rounded-lg bg-surface/10 px-3 py-1.5 text-xs font-semibold text-surface hover:bg-surface/20 transition">
+            {{-- 1. Atur Kapasitas Modal --}}
+            <button type="button" @click="openBatchCapacityModal()" class="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-primary/90 transition cursor-pointer">
                 <i data-lucide="users" class="size-3.5"></i>
                 Atur Kapasitas
             </button>
 
-            {{-- 5. Batch Tambah Fasilitas Modal --}}
-            <button type="button" @click="batchFacilityModalOpen = true" class="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-primary/90 transition">
+            {{-- 2. Batch Tambah Fasilitas Modal --}}
+            <button type="button" @click="batchFacilityModalOpen = true; $nextTick(() => window.renderIcons())" class="inline-flex items-center gap-1.5 rounded-lg bg-surface/10 px-3 py-1.5 text-xs font-semibold text-surface hover:bg-surface/20 transition cursor-pointer">
                 <i data-lucide="plus" class="size-3.5"></i>
                 Tambah Fasilitas
             </button>
 
-            <button type="button" @click="selectedIds = []" class="text-xs text-surface/70 hover:text-white transition ml-2">
-                Batal
+            {{-- 3. Batch Set Gedung AE --}}
+            <button type="button" @click="submitBatch('set_building', { building: 'AE' })" class="inline-flex items-center gap-1.5 rounded-lg bg-surface/10 px-3 py-1.5 text-xs font-semibold text-surface hover:bg-surface/20 transition cursor-pointer">
+                <i data-lucide="building-2" class="size-3.5"></i>
+                Set Gedung AE
+            </button>
+
+            {{-- 4. Batch Set Gedung Pinisi --}}
+            <button type="button" @click="submitBatch('set_building', { building: 'Pinisi' })" class="inline-flex items-center gap-1.5 rounded-lg bg-surface/10 px-3 py-1.5 text-xs font-semibold text-surface hover:bg-surface/20 transition cursor-pointer">
+                <i data-lucide="building-2" class="size-3.5"></i>
+                Set Gedung Pinisi
+            </button>
+
+            {{-- 5. Batch Set Ruang Kuliah --}}
+            <button type="button" @click="submitBatch('set_type', { type: 'classroom' })" class="inline-flex items-center gap-1.5 rounded-lg bg-surface/10 px-3 py-1.5 text-xs font-semibold text-surface hover:bg-surface/20 transition cursor-pointer">
+                <i data-lucide="door-closed" class="size-3.5"></i>
+                Jadikan Ruang Kuliah
+            </button>
+
+            {{-- 6. Batch Set Laboratorium --}}
+            <button type="button" @click="submitBatch('set_type', { type: 'lab' })" class="inline-flex items-center gap-1.5 rounded-lg bg-surface/10 px-3 py-1.5 text-xs font-semibold text-surface hover:bg-surface/20 transition cursor-pointer">
+                <i data-lucide="wrench" class="size-3.5"></i>
+                Jadikan Lab
+            </button>
+
+            <button type="button" @click="selectedIds = []" class="ml-2 text-xs font-medium text-surface/70 hover:text-white transition cursor-pointer">
+                Batalkan Pilihan
             </button>
         </div>
 
@@ -416,11 +532,17 @@
         <form x-ref="batchForm" method="POST" action="{{ route('admin.rooms.batch') }}" class="hidden">
             @csrf
             <input type="hidden" name="action" x-model="batchAction">
-            <input type="hidden" name="building" x-model="batchParams.building">
-            <input type="hidden" name="type" x-model="batchParams.type">
+            <input type="hidden" name="building" x-model="batchParams.building" :disabled="batchAction !== 'set_building'">
+            <input type="hidden" name="type" x-model="batchParams.type" :disabled="batchAction !== 'set_type'">
             <template x-for="id in selectedIds" :key="id">
                 <input type="hidden" name="room_ids[]" :value="id">
             </template>
+        </form>
+
+        {{-- FORM TERSEMBUNYI UNTUK BULK EDIT GRID --}}
+        <form id="bulkRoomForm" method="POST" action="{{ route('admin.rooms.bulk-update') }}" class="hidden">
+            @csrf
+            @method('PUT')
         </form>
 
         {{-- MODAL 1: EDIT / TAMBAH RUANG DINAMIS TUNGGAL --}}
@@ -610,6 +732,7 @@
             </div>
         </div>
 
+        {{-- MODAL 4: BATCH ATUR KAPASITAS --}}
         <div x-show="batchCapacityModalOpen" x-cloak data-modal-name="room-batch-capacity" role="dialog" aria-modal="true" aria-labelledby="batch-capacity-title"
              @keydown.escape.window="batchCapacityModalOpen = false" class="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-ink/80 backdrop-blur-sm" @click="batchCapacityModalOpen = false"></div>
@@ -617,14 +740,14 @@
                 <div class="flex items-start justify-between border-b border-border pb-3">
                     <div>
                         <span class="text-xs font-semibold text-primary">Penyesuaian Massal</span>
-                        <h3 id="batch-capacity-title" class="text-lg font-bold text-ink">Atur Kapasitas</h3>
+                        <h3 id="batch-capacity-title" class="text-lg font-bold text-ink">Atur Kapasitas (<span x-text="selectedIds.length"></span> Ruang Terpilih)</h3>
                     </div>
                     <button type="button" @click="batchCapacityModalOpen = false" aria-label="Tutup pengaturan kapasitas" class="text-muted hover:text-ink">
                         <i data-lucide="x" class="size-5"></i>
                     </button>
                 </div>
 
-                <form method="POST" action="{{ route('admin.rooms.batch') }}" @submit.prevent="submitBatchCapacity($event)" class="mt-4 flex flex-col gap-4">
+                <form method="POST" action="{{ route('admin.rooms.batch') }}" class="mt-4 flex flex-col gap-4">
                     @csrf
                     <input type="hidden" name="form" value="batch_capacity">
                     <input type="hidden" name="action" value="set_capacity">
@@ -633,10 +756,9 @@
                     </template>
 
                     <div>
-                        <label for="batch-capacity" class="mb-1 block text-sm font-medium text-ink">Kapasitas per ruang (orang)</label>
+                        <label for="batch-capacity" class="mb-1 block text-xs font-medium text-muted">Kapasitas Kursi per Ruang (Orang)</label>
                         <x-input name="capacity" id="batch-capacity" type="number" min="1" max="1000" step="1" required
-                                 x-ref="batchCapacityInput" x-model="batchCapacity" x-bind:readonly="batchCapacityConfirming" aria-describedby="batch-capacity-help" />
-                        <p id="batch-capacity-help" class="mt-1 text-xs text-muted">Kapasitas yang sama akan diterapkan ke <span x-text="selectedIds.length"></span> ruangan terpilih.</p>
+                                 x-ref="batchCapacityInput" x-model="batchCapacity" placeholder="Misal: 40" aria-describedby="batch-capacity-help" />
                         @if (old('form') === 'batch_capacity')
                             @error('capacity')
                                 <p id="capacity-error" class="mt-1 text-sm text-danger">{{ $message }}</p>
@@ -647,29 +769,28 @@
                         @endif
                     </div>
 
-                    <p x-show="batchCapacityConfirming" role="status" class="rounded-control border border-primary/20 bg-primary-soft p-3 text-sm text-ink">
-                        Ubah kapasitas <strong x-text="selectedIds.length"></strong> ruangan terpilih menjadi <strong x-text="batchCapacity"></strong> orang per ruang?
-                    </p>
+                    <div id="batch-capacity-help" class="rounded-lg border border-primary/20 bg-primary-soft/40 p-3 text-xs text-ink">
+                        Kapasitas ini akan diterapkan serentak ke <strong x-text="selectedIds.length"></strong> ruangan yang sedang dicentang.
+                    </div>
 
-                    <div class="flex flex-wrap items-center justify-end gap-2 border-t border-border pt-4">
+                    <div class="mt-1 flex flex-wrap items-center justify-end gap-2 border-t border-border pt-4">
                         <x-button variant="secondary" type="button" @click="batchCapacityModalOpen = false">Batal</x-button>
-                        <x-button variant="secondary" type="button" x-show="batchCapacityConfirming" @click="batchCapacityConfirming = false">Kembali</x-button>
-                        <x-button type="submit" x-bind:disabled="selectedIds.length === 0">
-                            <span x-text="batchCapacityConfirming ? 'Simpan Kapasitas' : 'Lanjutkan'"></span>
+                        <x-button variant="primary" type="submit" icon="check" x-bind:disabled="selectedIds.length === 0">
+                            Terapkan ke Ruang Terpilih
                         </x-button>
                     </div>
                 </form>
             </div>
         </div>
 
-        {{-- MODAL 4: BATCH TAMBAH FASILITAS --}}
+        {{-- MODAL 5: BATCH TAMBAH FASILITAS --}}
         <div x-show="batchFacilityModalOpen" x-cloak data-modal-name="room-batch-facility" class="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-ink/80 backdrop-blur-sm" @click="batchFacilityModalOpen = false"></div>
             <div class="relative w-full max-w-md rounded-2xl bg-surface p-6 shadow-2xl">
                 <div class="flex items-start justify-between border-b border-border pb-3">
                     <div>
                         <span class="text-xs font-semibold text-primary">Penyesuaian Massal</span>
-                        <h3 class="text-lg font-bold text-ink">Tambah Fasilitas (<span x-text="selectedIds.length"></span> Ruang)</h3>
+                        <h3 class="text-lg font-bold text-ink">Tambah Fasilitas (<span x-text="selectedIds.length"></span> Ruang Terpilih)</h3>
                     </div>
                     <button type="button" @click="batchFacilityModalOpen = false" class="text-muted hover:text-ink">
                         <i data-lucide="x" class="size-5"></i>
@@ -685,11 +806,14 @@
 
                     <div>
                         <label class="mb-1 block text-xs font-medium text-muted">Fasilitas yang Ditambahkan (Pisahkan koma)</label>
-                        <input type="text" name="facilities" required placeholder="Contoh: AC, Proyektor" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
-                        <p class="mt-1 text-[11px] text-muted">Fasilitas akan ditambahkan tanpa menghapus fasilitas yang sudah ada di ruang terpilih.</p>
+                        <input type="text" name="facilities" required placeholder="Contoh: AC, Proyektor, Papan tulis" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
                     </div>
 
-                    <div class="mt-2 flex items-center justify-end gap-2 border-t border-border pt-4">
+                    <div class="rounded-lg border border-primary/20 bg-primary-soft/40 p-3 text-xs text-ink">
+                        Fasilitas baru akan ditambahkan ke <strong x-text="selectedIds.length"></strong> ruangan terpilih tanpa menghapus fasilitas yang sudah ada.
+                    </div>
+
+                    <div class="mt-1 flex items-center justify-end gap-2 border-t border-border pt-4">
                         <x-button variant="secondary" type="button" @click="batchFacilityModalOpen = false">Batal</x-button>
                         <x-button variant="primary" type="submit" icon="check">Terapkan ke Ruang Terpilih</x-button>
                     </div>

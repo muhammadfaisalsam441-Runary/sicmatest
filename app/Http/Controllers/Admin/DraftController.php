@@ -142,6 +142,10 @@ class DraftController extends Controller
             ->orderBy('start_minute')
             ->orderBy('id')
             ->when($request->integer('hari'), fn ($query, $day) => $query->where('day_of_week', $day))
+            ->when($request->filled('prodi'), fn ($query) => $query->whereHas('participants', fn ($q) => $q->where(fn ($sq) => $sq
+                ->where('study_program', trim((string) $request->query('prodi')))
+                ->orWhere('study_program', 'like', '%'.trim((string) $request->query('prodi')).'%'))))
+            ->when($request->integer('angkatan'), fn ($query, $year) => $query->whereHas('participants', fn ($q) => $q->where('cohort_year', $year)))
             ->when($request->integer('kelas'), fn ($query, $id) => $query->whereHas('participants', fn ($q) => $q->whereKey($id)))
             ->when($request->integer('dosen'), fn ($query, $id) => $query->whereHas('lecturers', fn ($q) => $q->whereKey($id)))
             ->when($request->integer('ruang'), fn ($query, $id) => $query->where('room_id', $id))

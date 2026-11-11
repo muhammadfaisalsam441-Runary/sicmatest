@@ -146,6 +146,11 @@ class ScheduleValidator
                 return [$this->finding('TEACHING_DAY_NOT_ALLOWED', IssueSeverity::Error, [$session->id], "{$label}: perkuliahan hanya boleh dijadwalkan Senin–Jumat.")];
             }
 
+            $fridayBreak = config('sicma.scheduler.friday_break', ['start' => 720, 'end' => 790]);
+            if ($session->day_of_week === 5 && $session->start_minute < $fridayBreak['end'] && $session->end_minute > $fridayBreak['start']) {
+                return [$this->finding('FRIDAY_BREAK_CONFLICT', IssueSeverity::Error, [$session->id], "{$label}: pada hari Jumat pukul 12.00–13.10 tidak ada perkuliahan.")];
+            }
+
             if ($session->mode === SessionMode::Offline && $session->room_id === null) {
                 return [$this->finding('SESSION_WITHOUT_ROOM', IssueSeverity::Error, [$session->id], "{$label} luring belum punya ruang.")];
             }

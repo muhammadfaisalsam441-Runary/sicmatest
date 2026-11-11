@@ -38,15 +38,57 @@ class ScheduleController extends Controller
         abort_if($request->integer('draf') && $candidate === null, 404);
 
         $day = $request->integer('hari') ?: null;
+        $prodi = trim((string) $request->query('prodi'));
+        $cohortYear = $request->integer('angkatan') ?: null;
         $classGroupId = $request->integer('kelas') ?: null;
         $lecturerId = $request->integer('dosen') ?: null;
         $roomId = $request->integer('ruang') ?: null;
         $keyword = trim((string) $request->query('q'));
 
+        $studyPrograms = ClassGroup::query()
+            ->whereNotNull('study_program')
+            ->where('study_program', '!=', '')
+            ->distinct()
+            ->orderBy('study_program')
+            ->pluck('study_program', 'study_program')
+            ->map(fn (string $name): string => match ($name) {
+                'Pendidikan Teknik Informatika dan Komputer' => 'PTIK (Pend. Teknik Informatika dan Komputer)',
+                'Teknik Komputer' => 'TEKOM (Teknik Komputer)',
+                default => $name,
+            })
+            ->all();
+
+        $cohortYears = ClassGroup::query()
+            ->whereNotNull('cohort_year')
+            ->distinct()
+            ->orderByDesc('cohort_year')
+            ->pluck('cohort_year', 'cohort_year')
+            ->map(fn (int $year): string => "Angkatan {$year}")
+            ->all();
+
+        $classGroupsQuery = ClassGroup::query()->orderBy('name');
+        if ($prodi !== '') {
+            $classGroupsQuery->where(fn (Builder $q) => $q
+                ->where('study_program', $prodi)
+                ->orWhere('study_program', 'like', "%{$prodi}%"));
+        }
+        if ($cohortYear) {
+            $classGroupsQuery->where('cohort_year', $cohortYear);
+        }
+        $classGroups = $classGroupsQuery->pluck('name', 'id');
+
+        if (($cohortYear || $prodi !== '') && $classGroupId && ! $classGroups->has($classGroupId)) {
+            $classGroupId = null;
+        }
+
         $sessions = $official === null ? collect() : ScheduleSession::query()
             ->whereBelongsTo($official, 'version')
             ->with(['room', 'participants', 'lecturers'])
             ->when($day, fn (Builder $query, int $day) => $query->where('day_of_week', $day))
+            ->when($prodi !== '', fn (Builder $query) => $query->whereHas('participants', fn (Builder $query) => $query->where(fn (Builder $q) => $q
+                ->where('study_program', $prodi)
+                ->orWhere('study_program', 'like', "%{$prodi}%"))))
+            ->when($cohortYear, fn (Builder $query, int $year) => $query->whereHas('participants', fn (Builder $query) => $query->where('cohort_year', $year)))
             ->when($classGroupId, fn (Builder $query, int $id) => $query->whereHas('participants', fn (Builder $query) => $query->whereKey($id)))
             ->when($lecturerId, fn (Builder $query, int $id) => $query->whereHas('lecturers', fn (Builder $query) => $query->whereKey($id)))
             ->when($roomId, fn (Builder $query, int $id) => $query->where('room_id', $id))
@@ -76,10 +118,14 @@ class ScheduleController extends Controller
             'draft' => $draft,
             'sessions' => $sessions,
             'day' => $day,
+            'prodi' => $prodi,
+            'studyPrograms' => $studyPrograms,
+            'cohortYear' => $cohortYear,
+            'cohortYears' => $cohortYears,
             'classGroupId' => $classGroupId,
             'lecturerId' => $lecturerId,
             'keyword' => $keyword,
-            'classGroups' => ClassGroup::query()->orderBy('name')->pluck('name', 'id'),
+            'classGroups' => $classGroups,
             'lecturers' => Lecturer::query()->orderBy('name')->pluck('name', 'id'),
         ]);
     }

@@ -31,6 +31,7 @@ class AdminDashboardService
         'LECTURER_CONFLICT' => 'bentrok dosen',
         'CLASS_CONFLICT' => 'bentrok kelas',
         'LEADERSHIP_THURSDAY' => 'pimpinan Kamis',
+        'FRIDAY_BREAK_CONFLICT' => 'istirahat Jumat',
         'SESSION_WITHOUT_TIME' => 'sesi tanpa waktu',
         'CAPACITY_EXCEEDED' => 'kapasitas kurang',
         'LOAD_EXCEEDED' => 'beban melebihi batas',

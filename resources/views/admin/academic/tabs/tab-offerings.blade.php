@@ -17,6 +17,7 @@
                     filterSks: '',
                     filterClass: '',
                     selectedIds: [],
+                    visibleIds: @js($offerings->pluck('id')->map(fn ($id) => (int) $id)->values()->all()),
                     visibleCount: {{ $offerings->count() }},
                     deleteModalOpen: false,
                     offeringToDelete: { id: null, name: '', deleteUrl: '' },
@@ -39,9 +40,17 @@
                         this.$nextTick(() => {
                             const rows = this.$el.querySelectorAll('tbody tr[data-search]');
                             let count = 0;
+                            const ids = [];
                             rows.forEach(r => {
-                                if (this.matches(r)) count++;
+                                if (this.matches(r)) {
+                                    count++;
+                                    const cb = r.querySelector('input[type=\'checkbox\'][data-offering-id]');
+                                    if (cb && cb.dataset.offeringId) {
+                                        ids.push(parseInt(cb.dataset.offeringId, 10));
+                                    }
+                                }
                             });
+                            this.visibleIds = ids;
                             this.visibleCount = count;
                         });
                     },
@@ -72,19 +81,18 @@
                     },
 
                     toggleSelectAll(checked) {
-                        const checkboxes = this.$el.querySelectorAll('tbody input[type=\'checkbox\'][data-offering-id]');
-                        let ids = [];
-                        checkboxes.forEach(cb => {
-                            const tr = cb.closest('tr');
-                            if (tr && this.matches(tr)) {
-                                ids.push(parseInt(cb.dataset.offeringId));
-                            }
-                        });
+                        const current = this.selectedIds.map(Number);
                         if (checked) {
-                            this.selectedIds = Array.from(new Set([...this.selectedIds, ...ids]));
+                            this.selectedIds = Array.from(new Set([...current, ...this.visibleIds]));
                         } else {
-                            this.selectedIds = this.selectedIds.filter(id => !ids.includes(id));
+                            this.selectedIds = current.filter(id => !this.visibleIds.includes(id));
                         }
+                    },
+
+                    isAllSelected() {
+                        if (this.visibleIds.length === 0) return false;
+                        const current = this.selectedIds.map(Number);
+                        return this.visibleIds.every(id => current.includes(Number(id)));
                     },
 
                     confirmDelete(id, name, deleteUrl) {
@@ -92,6 +100,7 @@
                         this.deleteModalOpen = true;
                     }
                 }"
+                :data-editing="(deleteModalOpen || batchDeleteModalOpen || selectedIds.length > 0) ? 'true' : null"
                 x-init="
                     $watch('search', () => updateVisibleCount());
                     $watch('filterProdi', () => updateVisibleCount());
@@ -319,6 +328,7 @@
                                         <th class="w-10 px-4 py-3 text-center">
                                             <input type="checkbox"
                                                    @change="toggleSelectAll($event.target.checked)"
+                                                   :checked="isAllSelected()"
                                                    class="size-4 rounded border-border text-primary focus:ring-primary cursor-pointer"
                                                    title="Pilih semua yang tampil">
                                         </th>
@@ -473,16 +483,22 @@
                         <div class="flex items-center gap-2">
                             <i data-lucide="circle-check" class="size-5 text-success"></i>
                             <span class="text-sm font-semibold"><span x-text="selectedIds.length"></span> penawaran dipilih</span>
+                            <button type="button"
+                                    x-show="!isAllSelected()"
+                                    @click="toggleSelectAll(true)"
+                                    class="ml-1 rounded-md border border-surface/20 bg-surface/10 px-2 py-0.5 text-[11px] font-semibold text-surface hover:bg-surface/20 transition cursor-pointer">
+                                Pilih Semua Tampil
+                            </button>
                         </div>
                         <div class="h-4 w-px bg-surface/20"></div>
 
-                        <button type="button" @click="batchDeleteModalOpen = true" class="inline-flex items-center gap-1.5 rounded-lg bg-danger px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-danger/90 transition">
+                        <button type="button" @click="batchDeleteModalOpen = true" class="inline-flex items-center gap-1.5 rounded-lg bg-danger px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-danger/90 transition cursor-pointer">
                             <i data-lucide="trash-2" class="size-3.5"></i>
                             Hapus Penawaran Terpilih
                         </button>
 
-                        <button type="button" @click="selectedIds = []" class="text-xs text-surface/70 hover:text-white transition ml-2">
-                            Batal
+                        <button type="button" @click="selectedIds = []" class="text-xs text-surface/70 hover:text-white transition ml-2 cursor-pointer">
+                            Batalkan Pilihan
                         </button>
                     </div>
 
@@ -514,15 +530,17 @@
                         <div class="absolute inset-0 bg-ink/80 backdrop-blur-sm" @click="batchDeleteModalOpen = false"></div>
                         <div class="relative w-full max-w-md rounded-2xl bg-surface p-6 shadow-2xl">
                             <div class="flex items-start justify-between border-b border-border pb-3">
-                                <h3 class="text-lg font-bold text-ink">Hapus <span x-text="selectedIds.length"></span> Penawaran Kuliah?</h3>
+                                <div>
+                                    <span class="text-xs font-semibold text-danger">Penyesuaian Massal</span>
+                                    <h3 class="text-lg font-bold text-ink">Hapus (<span x-text="selectedIds.length"></span> Penawaran Terpilih)?</h3>
+                                </div>
                                 <button type="button" @click="batchDeleteModalOpen = false" class="text-muted hover:text-ink">
                                     <i data-lucide="x" class="size-5"></i>
                                 </button>
                             </div>
-                            <p class="mt-3 text-xs text-muted">
-                                Seluruh penawaran yang dipilih akan dihapus beserta pembagian SKS dosennya.
-                                Penawaran yang telah memiliki sesi jadwal di draf tidak akan dihapus.
-                            </p>
+                            <div class="mt-4 rounded-lg border border-danger/20 bg-danger-soft/40 p-3 text-xs text-ink">
+                                Seluruh <strong x-text="selectedIds.length"></strong> penawaran yang sedang dicentang akan dihapus beserta pembagian SKS dosennya. Penawaran yang telah memiliki sesi jadwal di draf otomatis dilindungi dan tidak akan dihapus.
+                            </div>
                             <form method="POST" action="{{ route('admin.academic.offerings.batch-delete') }}" class="mt-5">
                                 @csrf
                                 <template x-for="id in selectedIds" :key="id">
@@ -530,7 +548,7 @@
                                 </template>
                                 <div class="flex justify-end gap-2">
                                     <x-button variant="secondary" type="button" @click="batchDeleteModalOpen = false">Batal</x-button>
-                                    <x-button variant="danger" type="submit" icon="trash-2">Ya, Hapus Semua</x-button>
+                                    <x-button variant="danger" type="submit" icon="trash-2">Terapkan Hapus ke Penawaran Terpilih</x-button>
                                 </div>
                             </form>
                         </div>

@@ -55,7 +55,8 @@ export function isEditingField(element) {
 
 export function canBackgroundRefresh(doc = document) {
     if (doc.visibilityState === 'hidden') return false;
-    if ( isEditingField(doc.activeElement)) return false;
+    if (isEditingField(doc.activeElement)) return false;
+    if (doc.querySelector?.('[data-editing="true"]')) return false;
     if (Array.from(doc.querySelectorAll?.('[data-modal-name]') || []).some((modal) => modal.getClientRects?.().length)) {
         return false;
     }
@@ -110,7 +111,8 @@ export function installPortalNavigation(Alpine, renderIcons) {
     }
 
     function notice(message, form = null, success = false) {
-        const root = form || document.querySelector('main') || document.body;
+        const target = form && !form.classList?.contains('hidden') ? form : null;
+        const root = target || document.querySelector('main') || document.body;
         root.querySelector('[data-client-notice]')?.remove();
         const alert = document.createElement('p');
         alert.dataset.clientNotice = '';
@@ -421,8 +423,13 @@ export function installPortalNavigation(Alpine, renderIcons) {
             });
             return;
         }
-        const buttons = Array.from(form.querySelectorAll('button[type="submit"], button:not([type]), input[type="submit"]'))
-            .filter((button) => !button.disabled);
+        const externalButtons = form.id
+            ? Array.from(document.querySelectorAll(`button[form="${CSS.escape(form.id)}"], input[form="${CSS.escape(form.id)}"]`))
+            : [];
+        const buttons = Array.from(new Set([
+            ...form.querySelectorAll('button[type="submit"], button:not([type]), input[type="submit"]'),
+            ...externalButtons,
+        ])).filter((button) => !button.disabled);
         for (const button of buttons) button.disabled = true;
         form.setAttribute('aria-busy', 'true');
         form.inert = true;

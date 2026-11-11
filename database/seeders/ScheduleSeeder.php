@@ -62,6 +62,10 @@ class ScheduleSeeder extends Seeder
         $this->seedSessions($official, $period);
         $blockBuilder->rebuild($official);
 
+        if (! config('sicma.public_portal.show_sim_label')) {
+            return;
+        }
+
         $draft = $period->scheduleVersions()->create([
             'version_no' => 2,
             'status' => ScheduleVersionStatus::Draft,

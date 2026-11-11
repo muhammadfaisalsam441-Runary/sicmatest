@@ -354,6 +354,11 @@ class ScheduleImportService
                 $issues[] = ['level' => 'error', 'message' => 'Hari "'.($raw['day'] ?? '').'" tidak dikenali.'];
             } elseif (! in_array($day, config('sicma.scheduler.days'), true)) {
                 $issues[] = ['level' => 'error', 'message' => 'Perkuliahan hanya boleh dijadwalkan Senin–Jumat. Hari "'.($raw['day'] ?? '').'" tidak diizinkan.'];
+            } elseif ($day === 5 && $start !== null && $end !== null) {
+                $fridayBreak = config('sicma.scheduler.friday_break', ['start' => 720, 'end' => 790]);
+                if ($start < $fridayBreak['end'] && $end > $fridayBreak['start']) {
+                    $issues[] = ['level' => 'warning', 'message' => 'Pada hari Jumat pukul 12.00–13.10 tidak ada perkuliahan; sesi perlu dijadwalkan ulang di draf.'];
+                }
             }
         }
 

@@ -87,7 +87,7 @@
     <x-modal name="cari-ruangan" width="max-w-md">
         <div class="flex flex-col gap-4">
             <h2 class="text-xl font-semibold text-ink">Cari ruangan</h2>
-            <p class="text-sm text-muted">Pilih contoh kata pencarian pada data simulasi.</p>
+            <p class="text-sm text-muted">Pilih contoh kata pencarian cepat.</p>
             <div class="flex flex-col gap-2">
                 <x-button variant="secondary" :href="route('public.rooms', ['q' => 'AE 107'])" class="justify-start">AE 107</x-button>
                 <x-button variant="secondary" :href="route('public.rooms', ['q' => 'AE 999'])" class="justify-start">AE 999 • Tanpa hasil</x-button>

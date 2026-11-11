@@ -13,6 +13,7 @@
 @section('content')
     <div class="flex flex-col gap-6"
          x-data="lecturerManager(@js($lecturers->pluck('id')->all()))"
+         :data-editing="(formModalOpen || batchTargetModalOpen || importModalOpen || selectedIds.length > 0) ? 'true' : null"
          @sicma:navigated.document="formModalOpen = false; batchTargetModalOpen = false; importModalOpen = false">
         <x-page-header title="Data dosen dari jadwal" subtitle="Kelola profil dosen, status verifikasi, penugasan pimpinan, serta target beban SKS untuk penjadwalan.">
             <x-slot:actions>
@@ -316,37 +317,43 @@
              x-transition:leave-end="opacity-0 translate-y-4"
              class="fixed bottom-6 left-1/2 z-40 flex -translate-x-1/2 flex-wrap items-center gap-3 rounded-xl border border-primary/30 bg-ink px-6 py-3.5 text-surface shadow-2xl">
             <div class="flex items-center gap-2">
-                <i data-lucide="check-circle" class="size-5 text-success"></i>
+                <i data-lucide="circle-check" class="size-5 text-success"></i>
                 <span class="text-sm font-semibold"><span x-text="selectedIds.length"></span> dosen dipilih</span>
+                <button type="button"
+                        x-show="!isAllSelected()"
+                        @click="toggleSelectAll(true)"
+                        class="ml-1 rounded-md border border-surface/20 bg-surface/10 px-2 py-0.5 text-[11px] font-semibold text-surface hover:bg-surface/20 transition cursor-pointer">
+                    Pilih Semua Tampil
+                </button>
             </div>
             <div class="h-4 w-px bg-surface/20"></div>
 
-            {{-- 1. Verifikasi Massal --}}
-            <button type="button" @click="submitBatch('verify')" class="inline-flex items-center gap-1.5 rounded-lg bg-success px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-success/90 transition">
-                <i data-lucide="user-check" class="size-3.5"></i>
-                Verifikasi Sekaligus
-            </button>
-
-            {{-- 2. Set Homebase JTIK --}}
-            <button type="button" @click="submitBatch('homebase_jtik')" class="inline-flex items-center gap-1.5 rounded-lg bg-surface/10 px-3 py-1.5 text-xs font-semibold text-surface hover:bg-surface/20 transition">
-                <i data-lucide="building-2" class="size-3.5"></i>
-                Set Homebase JTIK
-            </button>
-
-            {{-- 3. Set Homebase Luar JTIK --}}
-            <button type="button" @click="submitBatch('homebase_external')" class="inline-flex items-center gap-1.5 rounded-lg bg-surface/10 px-3 py-1.5 text-xs font-semibold text-surface hover:bg-surface/20 transition">
-                <i data-lucide="globe" class="size-3.5"></i>
-                Set Luar JTIK
-            </button>
-
-            {{-- 4. Set Target SKS Modal --}}
-            <button type="button" @click="batchTargetModalOpen = true" class="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-primary/90 transition">
+            {{-- 1. Set Target SKS Modal --}}
+            <button type="button" @click="batchTargetModalOpen = true" class="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-primary/90 transition cursor-pointer">
                 <i data-lucide="target" class="size-3.5"></i>
                 Atur Target SKS
             </button>
 
-            <button type="button" @click="selectedIds = []" class="text-xs text-surface/70 hover:text-white transition ml-2">
-                Batal
+            {{-- 2. Verifikasi Massal --}}
+            <button type="button" @click="submitBatch('verify')" class="inline-flex items-center gap-1.5 rounded-lg bg-success px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-success/90 transition cursor-pointer">
+                <i data-lucide="user-check" class="size-3.5"></i>
+                Verifikasi Sekaligus
+            </button>
+
+            {{-- 3. Set Homebase JTIK --}}
+            <button type="button" @click="submitBatch('homebase_jtik')" class="inline-flex items-center gap-1.5 rounded-lg bg-surface/10 px-3 py-1.5 text-xs font-semibold text-surface hover:bg-surface/20 transition cursor-pointer">
+                <i data-lucide="building-2" class="size-3.5"></i>
+                Set Homebase JTIK
+            </button>
+
+            {{-- 4. Set Homebase Luar JTIK --}}
+            <button type="button" @click="submitBatch('homebase_external')" class="inline-flex items-center gap-1.5 rounded-lg bg-surface/10 px-3 py-1.5 text-xs font-semibold text-surface hover:bg-surface/20 transition cursor-pointer">
+                <i data-lucide="globe" class="size-3.5"></i>
+                Set Luar JTIK
+            </button>
+
+            <button type="button" @click="selectedIds = []" class="text-xs text-surface/70 hover:text-white transition ml-2 cursor-pointer">
+                Batalkan Pilihan
             </button>
         </div>
 
@@ -499,7 +506,7 @@
                 <div class="flex items-start justify-between border-b border-border pb-3">
                     <div>
                         <span class="text-xs font-semibold text-primary">Penyesuaian Massal</span>
-                        <h3 class="text-lg font-bold text-ink">Atur Target SKS (<span x-text="selectedIds.length"></span> Dosen)</h3>
+                        <h3 class="text-lg font-bold text-ink">Atur Target SKS (<span x-text="selectedIds.length"></span> Dosen Terpilih)</h3>
                     </div>
                     <button type="button" @click="batchTargetModalOpen = false" class="text-muted hover:text-ink">
                         <i data-lucide="x" class="size-5"></i>
@@ -512,6 +519,10 @@
                     <template x-for="id in selectedIds" :key="id">
                         <input type="hidden" name="lecturer_ids[]" :value="id">
                     </template>
+
+                    <div class="rounded-lg border border-primary/20 bg-primary-soft/40 p-3 text-xs text-ink">
+                        Target dan batas maksimum SKS ini akan diterapkan serentak ke <strong x-text="selectedIds.length"></strong> dosen yang sedang dicentang.
+                    </div>
 
                     <div>
                         <label class="mb-1 block text-xs font-medium text-muted">Target SKS untuk Seluruh Dosen Terpilih</label>

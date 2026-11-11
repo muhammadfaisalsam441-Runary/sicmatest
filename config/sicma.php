@@ -78,6 +78,10 @@ return [
         'grace_seconds' => 30,
         'queue_wait_seconds' => 600,
         'days' => [1, 2, 3, 4, 5], // Perkuliahan hanya Senin–Jumat.
+        'friday_break' => [
+            'start' => 720, // 12:00 WITA
+            'end' => 790,   // 13:10 WITA
+        ],
     ],
 
     'polling_seconds' => 30,

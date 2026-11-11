@@ -22,7 +22,12 @@ class DatabaseSeeder extends Seeder
             LecturerRosterSeeder::class,
             AccountSeeder::class,
             ScheduleSeeder::class,
-            ReservationSeeder::class,
         ]);
+
+        if (config('sicma.public_portal.show_sim_label')) {
+            $this->call([
+                ReservationSeeder::class,
+            ]);
+        }
     }
 }

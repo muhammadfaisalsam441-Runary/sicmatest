@@ -139,191 +139,347 @@ Alpine.data('lecturerManager', (pageLecturerIds) => ({
     submitBatch(action) {
         if (this.selectedIds.length === 0) return;
         this.batchAction = action;
-        this.$nextTick(() => this.$refs.batchForm.submit());
-    },
-}));
-
-Alpine.data('roomManager', (pageRoomIds = [], defaults = {}) => ({
-    selectedIds: defaults.selectedIds ?? [],
-    formModalOpen: Boolean(defaults.formModalOpen),
-    closureModalOpen: Boolean(defaults.closureModalOpen),
-    deleteModalOpen: false,
-    batchFacilityModalOpen: false,
-    batchCapacityModalOpen: Boolean(defaults.batchCapacityModalOpen),
-    batchCapacity: defaults.batchCapacity ?? '',
-    batchCapacityConfirming: false,
-    batchAction: '',
-    batchParams: { building: '', type: '' },
-    closureRoomId: defaults.closureRoomId ?? '',
-    closureStart: defaults.closureStart ?? '',
-    closureEnd: defaults.closureEnd ?? '',
-    closureReason: defaults.closureReason ?? '',
-    roomToDelete: { id: null, name: '' },
-    formRoom: {
-        id: null,
-        name: defaults.name ?? '',
-        code: defaults.code ?? '',
-        type: defaults.type ?? 'classroom',
-        capacity: defaults.capacity ?? '',
-        floor: defaults.floor ?? '',
-        building: defaults.building ?? '',
-        facilities: defaults.facilities ?? '',
-        is_bookable: true,
-    },
-
-    isAllSelected() {
-        const current = this.selectedIds.map(Number);
-        return pageRoomIds.length > 0 && pageRoomIds.every((id) => current.includes(Number(id)));
-    },
-
-    toggleSelectAll(checked) {
-        const pageIds = pageRoomIds.map(Number);
-        const current = this.selectedIds.map(Number);
-        this.selectedIds = checked
-            ? [...new Set([...current, ...pageIds])]
-            : current.filter((id) => !pageIds.includes(id));
-    },
-
-    openCreateModal() {
-        this.formRoom = {
-            id: null,
-            name: '',
-            code: '',
-            type: 'classroom',
-            capacity: '',
-            floor: '',
-            building: '',
-            facilities: '',
-            is_bookable: true,
-        };
-        this.formModalOpen = true;
-        this.$nextTick(() => window.renderIcons());
-    },
-
-    openEditModal(data) {
-        this.formRoom = {
-            id: data.id,
-            name: data.name || '',
-            code: data.code || '',
-            type: data.type || 'classroom',
-            capacity: data.capacity ?? '',
-            floor: data.floor ?? '',
-            building: data.building || '',
-            facilities: data.facilities || '',
-            is_bookable: data.is_bookable ?? true,
-        };
-        this.formModalOpen = true;
-        this.$nextTick(() => window.renderIcons());
-    },
-
-    openClosureModal(roomId) {
-        if (roomId) this.closureRoomId = roomId;
-        this.closureModalOpen = true;
-        this.$nextTick(() => window.renderIcons());
-    },
-
-    openDeleteModal(id, name) {
-        this.roomToDelete = { id, name };
-        this.deleteModalOpen = true;
-        this.$nextTick(() => window.renderIcons());
-    },
-
-    openDeleteFromEdit() {
-        if (!this.formRoom.id) return;
-        this.openDeleteModal(this.formRoom.id, this.formRoom.name);
-        this.formModalOpen = false;
-    },
-
-    addFacilityTag(tag) {
-        const current = (this.formRoom.facilities || '').split(',').map((s) => s.trim()).filter(Boolean);
-        if (!current.includes(tag)) {
-            current.push(tag);
-            this.formRoom.facilities = current.join(', ');
-        }
-    },
-
-    openBatchCapacityModal() {
-        this.batchCapacity = '';
-        this.batchCapacityConfirming = false;
-        this.batchCapacityModalOpen = true;
-        this.$nextTick(() => this.$refs.batchCapacityInput.focus());
-    },
-
-    submitBatchCapacity(event) {
-        if (this.selectedIds.length === 0) return;
-        if (!this.batchCapacityConfirming) {
-            this.batchCapacityConfirming = true;
-            return;
-        }
-        event.target.submit();
-    },
-
-    submitBatch(action, params = {}) {
-        if (this.selectedIds.length === 0) return;
-        this.batchAction = action;
-        this.batchParams.building = params.building || '';
-        this.batchParams.type = params.type || '';
-        this.$nextTick(() => this.$refs.batchForm.submit());
-    },
-}));
-
-Alpine.data('classManager', (initialClasses = {}) => ({
-    editMode: false,
-    selectedIds: [],
-    search: '',
-    statusFilter: 'semua',
-    prodiFilter: '',
-    batchModalOpen: false,
-    batchAction: '',
-    batchLabel: '',
-    batchValue: '',
-    fillEmptyValue: 40,
-    classesData: initialClasses,
-
-    isAllSelected() {
-        const rows = Array.from(document.querySelectorAll('tr[data-id]'))
-            .filter((r) => r.offsetParent !== null)
-            .map((r) => Number(r.dataset.id));
-        if (!rows.length) return false;
-        const current = this.selectedIds.map(Number);
-        return rows.every((id) => current.includes(id));
-    },
-
-    toggleSelectAll(checked) {
-        const rows = Array.from(document.querySelectorAll('tr[data-id]'))
-            .filter((r) => r.offsetParent !== null)
-            .map((r) => Number(r.dataset.id));
-        const current = this.selectedIds.map(Number);
-        this.selectedIds = checked
-            ? [...new Set([...current, ...rows])]
-            : current.filter((id) => !rows.includes(id));
-    },
-
-    applyFillEmpty() {
-        const val = Number(this.fillEmptyValue);
-        if (!val || val <= 0) return;
-        Object.values(this.classesData).forEach((cls) => {
-            if (cls.student_count === '' || cls.student_count === null || cls.student_count === undefined) {
-                cls.student_count = val;
+        this.$nextTick(() => {
+            const form = this.$refs.batchForm;
+            if (!form) return;
+            if (typeof form.requestSubmit === 'function') {
+                form.requestSubmit();
+            } else {
+                form.submit();
             }
         });
     },
-
-    openBatchModal(action, label) {
-        this.batchAction = action;
-        this.batchLabel = label;
-        this.batchValue = '';
-        this.batchModalOpen = true;
-        this.$nextTick(() => window.renderIcons());
-    },
-
-    submitBatch(action = null, value = null) {
-        if (this.selectedIds.length === 0) return;
-        if (action) this.batchAction = action;
-        if (value !== null) this.batchValue = value;
-        this.$nextTick(() => this.$refs.batchForm.submit());
-    },
 }));
+
+Alpine.data('roomManager', (pageRoomIds = [], defaults = {}, initialRooms = {}) => {
+    const cloneRooms = (src) => JSON.parse(JSON.stringify(src || {}));
+
+    return {
+        editMode: false,
+        fillEmptyValue: 40,
+        originalRooms: cloneRooms(initialRooms),
+        roomsData: cloneRooms(initialRooms),
+        selectedIds: defaults.selectedIds ?? [],
+        formModalOpen: Boolean(defaults.formModalOpen),
+        closureModalOpen: Boolean(defaults.closureModalOpen),
+        deleteModalOpen: false,
+        batchFacilityModalOpen: false,
+        batchCapacityModalOpen: Boolean(defaults.batchCapacityModalOpen),
+        batchCapacity: defaults.batchCapacity ?? '',
+        batchCapacityConfirming: false,
+        batchAction: '',
+        batchParams: { building: '', type: '' },
+        closureRoomId: defaults.closureRoomId ?? '',
+        closureStart: defaults.closureStart ?? '',
+        closureEnd: defaults.closureEnd ?? '',
+        closureReason: defaults.closureReason ?? '',
+        roomToDelete: { id: null, name: '' },
+        formRoom: {
+            id: null,
+            name: defaults.name ?? '',
+            code: defaults.code ?? '',
+            type: defaults.type ?? 'classroom',
+            capacity: defaults.capacity ?? '',
+            floor: defaults.floor ?? '',
+            building: defaults.building ?? '',
+            facilities: defaults.facilities ?? '',
+            is_bookable: true,
+        },
+
+        get visibleIds() {
+            return pageRoomIds.map(Number);
+        },
+
+        targetIds() {
+            const selected = this.selectedIds.map(Number);
+            return selected.length > 0 ? selected : this.visibleIds;
+        },
+
+        isAllSelected() {
+            const current = this.selectedIds.map(Number);
+            return pageRoomIds.length > 0 && pageRoomIds.every((id) => current.includes(Number(id)));
+        },
+
+        toggleSelectAll(checked) {
+            const pageIds = pageRoomIds.map(Number);
+            const current = this.selectedIds.map(Number);
+            this.selectedIds = checked
+                ? [...new Set([...current, ...pageIds])]
+                : current.filter((id) => !pageIds.includes(id));
+        },
+
+        toggleEditMode() {
+            if (this.editMode) {
+                this.cancelEditMode();
+            } else {
+                this.editMode = true;
+            }
+        },
+
+        cancelEditMode() {
+            this.roomsData = cloneRooms(this.originalRooms);
+            this.editMode = false;
+        },
+
+        applyFillEmpty() {
+            const val = Number(this.fillEmptyValue);
+            if (!val || val <= 0) return;
+            this.targetIds().forEach((id) => {
+                const room = this.roomsData[id];
+                if (!room) return;
+                if (room.capacity === '' || room.capacity === null || room.capacity === undefined || Number(room.capacity) <= 0) {
+                    room.capacity = val;
+                }
+            });
+        },
+
+        applyFillAll() {
+            const val = Number(this.fillEmptyValue);
+            if (!val || val <= 0) return;
+            this.targetIds().forEach((id) => {
+                const room = this.roomsData[id];
+                if (room) {
+                    room.capacity = val;
+                }
+            });
+        },
+
+        openCreateModal() {
+            this.formRoom = {
+                id: null,
+                name: '',
+                code: '',
+                type: 'classroom',
+                capacity: '',
+                floor: '',
+                building: '',
+                facilities: '',
+                is_bookable: true,
+            };
+            this.formModalOpen = true;
+            this.$nextTick(() => window.renderIcons());
+        },
+
+        openEditModal(data) {
+            this.formRoom = {
+                id: data.id,
+                name: data.name || '',
+                code: data.code || '',
+                type: data.type || 'classroom',
+                capacity: data.capacity ?? '',
+                floor: data.floor ?? '',
+                building: data.building || '',
+                facilities: data.facilities || '',
+                is_bookable: data.is_bookable ?? true,
+            };
+            this.formModalOpen = true;
+            this.$nextTick(() => window.renderIcons());
+        },
+
+        openClosureModal(roomId) {
+            if (roomId) this.closureRoomId = roomId;
+            this.closureModalOpen = true;
+            this.$nextTick(() => window.renderIcons());
+        },
+
+        openDeleteModal(id, name) {
+            this.roomToDelete = { id, name };
+            this.deleteModalOpen = true;
+            this.$nextTick(() => window.renderIcons());
+        },
+
+        openDeleteFromEdit() {
+            if (!this.formRoom.id) return;
+            this.openDeleteModal(this.formRoom.id, this.formRoom.name);
+            this.formModalOpen = false;
+        },
+
+        addFacilityTag(tag) {
+            const current = (this.formRoom.facilities || '').split(',').map((s) => s.trim()).filter(Boolean);
+            if (!current.includes(tag)) {
+                current.push(tag);
+                this.formRoom.facilities = current.join(', ');
+            }
+        },
+
+        openBatchCapacityModal() {
+            this.batchCapacity = this.batchCapacity || '40';
+            this.batchCapacityConfirming = false;
+            this.batchCapacityModalOpen = true;
+            this.$nextTick(() => {
+                window.renderIcons();
+                this.$refs.batchCapacityInput?.focus();
+            });
+        },
+
+        submitBatchCapacity(event) {
+            if (this.selectedIds.length === 0) return;
+            const form = event.target;
+            if (typeof form.requestSubmit === 'function') {
+                form.submit();
+            } else {
+                form.submit();
+            }
+        },
+
+        submitBatch(action, params = {}) {
+            if (this.selectedIds.length === 0) return;
+            this.batchAction = action;
+            this.batchParams.building = params.building || '';
+            this.batchParams.type = params.type || '';
+            this.$nextTick(() => {
+                const form = this.$refs.batchForm;
+                if (!form) return;
+                if (typeof form.requestSubmit === 'function') {
+                    form.requestSubmit();
+                } else {
+                    form.submit();
+                }
+            });
+        },
+    };
+});
+
+Alpine.data('classManager', (initialClasses = {}) => {
+    const cloneClasses = (src) => JSON.parse(JSON.stringify(src || {}));
+
+    return {
+        editMode: false,
+        selectedIds: [],
+        search: '',
+        statusFilter: 'semua',
+        prodiFilter: '',
+        cohortFilter: '',
+        batchModalOpen: false,
+        batchAction: '',
+        batchLabel: '',
+        batchValue: '',
+        fillEmptyValue: 40,
+        originalClasses: cloneClasses(initialClasses),
+        classesData: cloneClasses(initialClasses),
+
+        statusKeyFor(cls) {
+            if (!cls.is_active) return 'arsip';
+            const hasStudents = cls.student_count !== null && cls.student_count !== '' && cls.student_count !== undefined && Number(cls.student_count) > 0;
+            return hasStudents ? 'lengkap' : 'perlu_dilengkapi';
+        },
+
+        isRowVisible(id) {
+            const cls = this.classesData[id] || this.originalClasses[id];
+            if (!cls) return false;
+            const orig = this.originalClasses[id] || cls;
+
+            const q = this.search.trim().toLowerCase();
+            if (q) {
+                const haystack = `${cls.name || ''} ${cls.study_program || ''} ${cls.cohort_year || ''} ${cls.code || ''} ${orig.name || ''} ${orig.code || ''}`.toLowerCase();
+                if (!haystack.includes(q)) return false;
+            }
+
+            if (this.statusFilter !== 'semua') {
+                const origStatus = this.statusKeyFor(orig);
+                const curStatus = this.statusKeyFor(cls);
+                if (origStatus !== this.statusFilter && curStatus !== this.statusFilter) return false;
+            }
+
+            if (this.prodiFilter && cls.study_program !== this.prodiFilter && orig.study_program !== this.prodiFilter) {
+                return false;
+            }
+
+            if (this.cohortFilter && String(cls.cohort_year) !== String(this.cohortFilter) && String(orig.cohort_year) !== String(this.cohortFilter)) {
+                return false;
+            }
+
+            return true;
+        },
+
+        get visibleIds() {
+            return Object.keys(this.classesData)
+                .map(Number)
+                .filter((id) => this.isRowVisible(id));
+        },
+
+        targetIds() {
+            const selected = this.selectedIds.map(Number);
+            return selected.length > 0 ? selected : this.visibleIds;
+        },
+
+        isAllSelected() {
+            const rows = this.visibleIds;
+            if (!rows.length) return false;
+            const current = this.selectedIds.map(Number);
+            return rows.every((id) => current.includes(id));
+        },
+
+        toggleSelectAll(checked) {
+            const rows = this.visibleIds;
+            const current = this.selectedIds.map(Number);
+            this.selectedIds = checked
+                ? [...new Set([...current, ...rows])]
+                : current.filter((id) => !rows.includes(id));
+        },
+
+        toggleEditMode() {
+            if (this.editMode) {
+                this.cancelEditMode();
+            } else {
+                this.editMode = true;
+            }
+        },
+
+        cancelEditMode() {
+            this.classesData = cloneClasses(this.originalClasses);
+            this.editMode = false;
+        },
+
+        applyFillEmpty() {
+            const val = Number(this.fillEmptyValue);
+            if (!val || val <= 0) return;
+            this.targetIds().forEach((id) => {
+                const cls = this.classesData[id];
+                if (!cls) return;
+                if (cls.student_count === '' || cls.student_count === null || cls.student_count === undefined || Number(cls.student_count) <= 0) {
+                    cls.student_count = val;
+                }
+            });
+        },
+
+        applyFillAll() {
+            const val = Number(this.fillEmptyValue);
+            if (!val || val <= 0) return;
+            this.targetIds().forEach((id) => {
+                const cls = this.classesData[id];
+                if (cls) {
+                    cls.student_count = val;
+                }
+            });
+        },
+
+        openBatchModal(action, label) {
+            this.batchAction = action;
+            this.batchLabel = label;
+            this.batchValue = action === 'set_student_count'
+                ? '40'
+                : (action === 'set_cohort_year' ? String(new Date().getFullYear()) : '');
+            this.batchModalOpen = true;
+            this.$nextTick(() => window.renderIcons());
+        },
+
+        submitBatch(action = null, value = null) {
+            if (this.selectedIds.length === 0) return;
+            if (action) this.batchAction = action;
+            if (value !== null) this.batchValue = value;
+            this.$nextTick(() => {
+                const form = this.$refs.batchForm;
+                if (!form) return;
+                if (typeof form.requestSubmit === 'function') {
+                    form.requestSubmit();
+                } else {
+                    form.submit();
+                }
+            });
+        },
+    };
+});
 
 /**
  * UUID v4 untuk idempotency key reservasi. crypto.randomUUID hanya tersedia di konteks aman (HTTPS/localhost),

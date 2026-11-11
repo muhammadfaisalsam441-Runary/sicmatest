@@ -428,6 +428,7 @@ class SchedulerService
 
         $from = CarbonImmutable::today()->max($period->start_date)->max($base->effective_from);
         $to = CarbonImmutable::parse($period->end_date->toDateString());
+        $periodYear = $period->start_date?->year ?? CarbonImmutable::today()->year;
         $lecturers = $inScope->flatMap->lecturers->merge($fixed->flatMap->lecturers)->unique('id');
 
         return [
@@ -438,6 +439,7 @@ class SchedulerService
             'uts_end' => $period->uts_end?->toDateString(),
             'room_blocks' => $this->roomBlocks($period, $from, $to),
             'days' => config('sicma.scheduler.days'),
+            'friday_break' => config('sicma.scheduler.friday_break', ['start' => 720, 'end' => 790]),
             'slots' => $slots->map(fn ($slot): array => ['label' => $slot->label, 'start' => $slot->start_minute, 'end' => $slot->end_minute])->all(),
             'rooms' => Room::query()->where('is_active', true)->get()->map(fn (Room $room): array => ['id' => $room->id, 'capacity' => $room->capacity])->all(),
             'leaders' => $lecturers->filter(fn ($lecturer): bool => $lecturer->leadershipTerms->contains(fn ($term): bool => $term->valid_from->toDateString() <= $to->toDateString()
@@ -469,6 +471,7 @@ class SchedulerService
                 'lecturers' => $session->lecturers->pluck('id')->all(),
                 'classes' => $session->participants->pluck('id')->all(),
                 'students' => $session->participants->pluck('student_count')->contains(null) || $session->participants->isEmpty() ? null : $session->participants->sum('student_count'),
+                'cohort_profile' => $this->cohortProfile($session, $periodYear),
                 'locked' => $session->is_locked && $this->isTimed($session) ? ['day' => $session->day_of_week, 'start' => $session->start_minute, 'room' => $session->room_id] : null,
                 'preferred' => $this->isTimed($session) ? ['day' => $session->day_of_week, 'start' => $session->start_minute, 'room' => $session->room_id] : null,
             ])->values()->all(),
@@ -591,6 +594,21 @@ class SchedulerService
         }
 
         return $rows;
+    }
+
+    private function cohortProfile(ScheduleSession $session, int $periodYear): ?string
+    {
+        if ($session->participants->isEmpty()) {
+            return null;
+        }
+        $isUlangOrSenior = $session->participants->contains(fn ($class): bool => str_contains(strtoupper((string) $class->name), 'ULANG')
+            || ($class->cohort_year !== null && $class->cohort_year <= $periodYear - 3));
+        if ($isUlangOrSenior) {
+            return 'ulang_senior';
+        }
+        $isMaba = $session->participants->contains(fn ($class): bool => $class->cohort_year !== null && $class->cohort_year >= $periodYear);
+
+        return $isMaba ? 'maba' : 'reguler';
     }
 
     private function isTimed(ScheduleSession $session): bool

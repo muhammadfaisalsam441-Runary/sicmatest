@@ -235,4 +235,36 @@ class PhpScheduleSolverTest extends TestCase
         $this->assertCount(4, $result['assignments']);
         $this->assertTrue($solver->accepts($input, $result['assignments']));
     }
+
+    public function test_friday_break_between_1200_and_1310_blocks_candidates_and_solution_validation(): void
+    {
+        $solver = new PhpScheduleSolver;
+        $input = $this->input([$this->session(1)], [
+            'days' => [5],
+            'slots' => [['start' => 710, 'end' => 760], ['start' => 790, 'end' => 840]],
+        ]);
+        $result = $solver->solve($input);
+
+        $this->assertSame('FEASIBLE', $result['status']);
+        $this->assertSame(790, $result['assignments'][0]['start_minute']);
+        $this->assertFalse($solver->accepts($input, [['id' => 1, 'day' => 5, 'start_minute' => 710, 'end_minute' => 760, 'room_id' => 1]]));
+        $this->assertTrue($solver->accepts($input, $result['assignments']));
+    }
+
+    public function test_cohort_profile_prefers_morning_for_remedial_and_daytime_for_freshmen_without_blocking_fallback(): void
+    {
+        $solver = new PhpScheduleSolver;
+        $slots = [['start' => 450, 'end' => 550], ['start' => 790, 'end' => 890], ['start' => 890, 'end' => 990]];
+        $result = $solver->solve($this->input([
+            $this->session(1, ['duration' => 100, 'cohort_profile' => 'ulang_senior']),
+            $this->session(2, ['duration' => 100, 'cohort_profile' => 'maba', 'lecturers' => [2], 'classes' => [2]]),
+            $this->session(3, ['duration' => 100, 'cohort_profile' => 'reguler', 'lecturers' => [3], 'classes' => [3]]),
+        ], ['slots' => $slots]));
+
+        $this->assertSame('FEASIBLE', $result['status']);
+        $byId = array_column($result['assignments'], 'start_minute', 'id');
+        $this->assertSame(450, $byId[1]);
+        $this->assertSame(790, $byId[2]);
+        $this->assertSame(890, $byId[3]);
+    }
 }

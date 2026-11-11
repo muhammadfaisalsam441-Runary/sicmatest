@@ -108,6 +108,63 @@ class RoomService
     }
 
     /**
+     * Edit massal langsung di tabel (Inline Grid).
+     *
+     * @param  list<array{id: int, name: string, type: string, building?: string|null, floor?: int|string|null, capacity?: int|string|null}>  $items
+     * @return int Jumlah ruang yang disimpan
+     */
+    public function bulkUpdate(array $items): int
+    {
+        return DB::transaction(function () use ($items): int {
+            $updatedCount = 0;
+
+            foreach ($items as $item) {
+                $room = Room::query()->find($item['id']);
+                if (! $room) {
+                    continue;
+                }
+
+                $before = $room->only(['name', 'code', 'type', 'capacity', 'floor', 'building_id']);
+                $name = Str::squish((string) $item['name']);
+                $buildingName = Str::squish((string) ($item['building'] ?? '')) ?: null;
+                $floor = is_numeric($item['floor'] ?? null) ? (int) $item['floor'] : null;
+                $capacity = is_numeric($item['capacity'] ?? null) && (int) $item['capacity'] > 0
+                    ? (int) $item['capacity']
+                    : null;
+
+                $code = $room->code;
+                if ($name !== $room->name) {
+                    $baseCode = Str::upper(Str::slug($name));
+                    $code = $baseCode !== '' ? $baseCode : $room->code;
+                    if (Room::withTrashed()->where('code', $code)->where('id', '!=', $room->id)->exists()) {
+                        $code = $code.'-'.$room->id;
+                    }
+                }
+
+                $room->forceFill([
+                    'name' => $name,
+                    'code' => $code,
+                    'type' => RoomType::from((string) $item['type']),
+                    'building_id' => $this->buildingId($buildingName),
+                    'floor' => $floor,
+                    'capacity' => $capacity,
+                ])->save();
+
+                $after = $room->only(['name', 'code', 'type', 'capacity', 'floor', 'building_id']);
+                if ($before !== $after) {
+                    $this->audit->log('room.bulk_updated', $room, $before, $after);
+                }
+
+                $updatedCount++;
+            }
+
+            AvailabilityCache::bust();
+
+            return $updatedCount;
+        });
+    }
+
+    /**
      * Hapus ruang (soft delete). Ditolak bila masih dipakai reservasi aktif atau jadwal resmi,
      * agar reservasi dan jadwal tidak hilang diam-diam (B10).
      *

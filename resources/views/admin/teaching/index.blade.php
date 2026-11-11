@@ -16,7 +16,9 @@
         $teamCount = $teamTeacherCount ?? 0;
     @endphp
     <div class="flex flex-col gap-6"
-         x-data="teachingManager(@js($offerings->pluck('id')->all()), @js($lecturerOptionsByOffering), @js($allLecturersList))">
+         x-data="teachingManager(@js($offerings->pluck('id')->all()), @js($lecturerOptionsByOffering), @js($allLecturersList))"
+         :data-editing="(quickModalOpen || batchModalOpen || rekapModalOpen || selectedIds.length > 0) ? 'true' : null"
+         @sicma:navigated.document="quickModalOpen = false; batchModalOpen = false; rekapModalOpen = false">
         <x-page-header title="Pembagian mengajar dan beban SKS" subtitle="Bagi mata kuliah ke dosen yang layak. Klik langsung pada nama dosen atau tombol Atur Tim untuk mengganti pengajar, peran, atau periode pertemuan.">
             @if ($period)
                 <x-slot:actions>
@@ -164,8 +166,7 @@
                                        class="size-4 rounded border-border text-primary focus:ring-primary cursor-pointer"
                                        title="Pilih semua di halaman ini">
                             </th>
-                            <th class="px-4 py-3">Kelas & Prodi</th>
-                            <th class="w-24 px-3 py-3 text-center">Angkatan</th>
+                            <th class="w-36 px-4 py-3">Kelas</th>
                             <th class="px-4 py-3">Mata Kuliah & Kode</th>
                             <th class="w-20 px-3 py-3 text-center">SKS</th>
                             <th class="px-4 py-3">Dosen Pengampu (SKS)</th>
@@ -215,23 +216,21 @@
                                            class="size-4 rounded border-border text-primary focus:ring-primary cursor-pointer">
                                 </td>
 
-                                {{-- Kelas & Prodi --}}
-                                <td class="px-4 py-3 whitespace-nowrap">
-                                    <div class="flex flex-col">
+                                {{-- Kelas (Kompak) --}}
+                                @php
+                                    $prodiAbbr = match ($offering->classGroup->study_program) {
+                                        'Pendidikan Teknik Informatika dan Komputer' => 'PTIK',
+                                        'Teknik Komputer' => 'TEKOM',
+                                        default => $offering->classGroup->study_program ?? 'JTIK',
+                                    };
+                                    $hasCohortInName = $offering->classGroup->cohort_year && str_contains($offering->classGroup->name, (string) $offering->classGroup->cohort_year);
+                                    $cohortSubtitle = ! $hasCohortInName && $offering->classGroup->cohort_year ? ' \''.substr((string) $offering->classGroup->cohort_year, -2) : '';
+                                @endphp
+                                <td class="w-36 px-4 py-3 whitespace-nowrap">
+                                    <div class="flex flex-col" title="{{ $offering->classGroup->study_program ?? 'JTIK' }}">
                                         <span class="font-bold text-ink text-sm">{{ $offering->classGroup->name }}</span>
-                                        <span class="text-xs text-muted">{{ $offering->classGroup->study_program ?? 'JTIK' }} ({{ $offering->classGroup->student_count ?? 0 }} mhs)</span>
+                                        <span class="text-xs text-muted">{{ $prodiAbbr }}{{ $cohortSubtitle }} • {{ $offering->classGroup->student_count ? $offering->classGroup->student_count.' mhs' : '—' }}</span>
                                     </div>
-                                </td>
-
-                                {{-- Angkatan --}}
-                                <td class="w-24 px-3 py-3 text-center whitespace-nowrap">
-                                    @if ($offering->classGroup->cohort_year)
-                                        <span class="inline-flex items-center justify-center rounded-md border border-border bg-page px-2 py-0.5 text-xs font-semibold text-ink">
-                                            {{ $offering->classGroup->cohort_year }}
-                                        </span>
-                                    @else
-                                        <span class="text-xs text-muted italic">—</span>
-                                    @endif
                                 </td>
 
                                 {{-- Mata Kuliah & Kode --}}
@@ -329,7 +328,7 @@
                                             Kosong
                                         </span>
                                     @elseif ($partnerAssignments->isNotEmpty())
-                                        <span class="inline-flex items-center rounded-full bg-purple-50 px-2.5 py-0.5 text-[11px] font-semibold text-purple-700 border border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800">
+                                        <span class="inline-flex items-center rounded-full bg-primary-soft px-2.5 py-0.5 text-[11px] font-semibold text-primary border border-primary/20">
                                             Team ({{ $partnerAssignments->count() + 1 }})
                                         </span>
                                     @else
@@ -362,7 +361,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="9" class="py-12 text-center text-muted">
+                                <td colspan="8" class="py-12 text-center text-muted">
                                     <i data-lucide="search-x" class="mx-auto size-8 text-muted/60 mb-2"></i>
                                     <p class="font-medium text-ink">Tidak ditemukan penawaran mata kuliah yang sesuai filter.</p>
                                     <p class="text-xs text-muted mt-1">Coba sesuaikan kata kunci atau bersihkan filter pencarian.</p>
@@ -401,21 +400,27 @@
              x-transition:leave="transition ease-in duration-150"
              x-transition:leave-start="opacity-100 translate-y-0"
              x-transition:leave-end="opacity-0 translate-y-4"
-             class="fixed bottom-6 left-1/2 z-40 flex -translate-x-1/2 items-center gap-4 rounded-xl border border-primary/30 bg-ink px-6 py-3.5 text-surface shadow-2xl">
+             class="fixed bottom-6 left-1/2 z-40 flex -translate-x-1/2 flex-wrap items-center gap-3 rounded-xl border border-primary/30 bg-ink px-6 py-3.5 text-surface shadow-2xl">
             <div class="flex items-center gap-2">
                 <i data-lucide="circle-check" class="size-5 text-success"></i>
                 <span class="text-sm font-semibold"><span x-text="selectedIds.length"></span> kelas dipilih</span>
+                <button type="button"
+                        x-show="!isAllSelected()"
+                        @click="toggleSelectAll(true)"
+                        class="ml-1 rounded-md border border-surface/20 bg-surface/10 px-2 py-0.5 text-[11px] font-semibold text-surface hover:bg-surface/20 transition cursor-pointer">
+                    Pilih Semua Tampil
+                </button>
             </div>
             <div class="h-4 w-px bg-surface/20"></div>
             <button type="button"
                     @click="batchModalOpen = true; $nextTick(() => window.renderIcons())"
-                    class="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-primary/90 transition">
-                <i data-lucide="zap" class="size-4"></i>
+                    class="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-primary/90 transition cursor-pointer">
+                <i data-lucide="zap" class="size-3.5"></i>
                 <span>Tugaskan Dosen Sekaligus</span>
             </button>
             <button type="button"
                     @click="selectedIds = []"
-                    class="text-xs text-surface/70 hover:text-white transition">
+                    class="text-xs text-surface/70 hover:text-white transition ml-2 cursor-pointer">
                 Batalkan Pilihan
             </button>
         </div>
@@ -594,9 +599,8 @@
             <div class="relative w-full max-w-lg rounded-2xl bg-surface p-6 shadow-2xl">
                 <div class="flex items-start justify-between border-b border-border pb-3">
                     <div>
-                        <span class="text-xs font-semibold text-primary">Penugasan Massal (Batch)</span>
-                        <h3 class="text-lg font-bold text-ink">Tugaskan Dosen ke <span class="text-primary" x-text="selectedIds.length"></span> Kelas</h3>
-                        <p class="text-xs text-muted">Dosen yang dipilih akan diterapkan ke seluruh kelas yang Anda centang.</p>
+                        <span class="text-xs font-semibold text-primary">Penyesuaian Massal</span>
+                        <h3 class="text-lg font-bold text-ink">Tugaskan Dosen (<span class="text-primary" x-text="selectedIds.length"></span> Kelas Terpilih)</h3>
                     </div>
                     <button type="button" @click="batchModalOpen = false" class="text-muted hover:text-ink">
                         <i data-lucide="x" class="size-5"></i>
@@ -608,6 +612,10 @@
                     <template x-for="id in selectedIds" :key="id">
                         <input type="hidden" name="offering_ids[]" :value="id">
                     </template>
+
+                    <div class="rounded-lg border border-primary/20 bg-primary-soft/40 p-3 text-xs text-ink">
+                        Dosen dan peran yang dipilih di bawah ini akan diterapkan serentak ke <strong x-text="selectedIds.length"></strong> kelas penawaran yang sedang dicentang.
+                    </div>
 
                     <div>
                         <label class="mb-1 block text-xs font-medium text-muted">Pilih Dosen <span class="text-danger">*</span></label>
@@ -646,7 +654,7 @@
 
                     <div class="mt-2 flex items-center justify-end gap-2 border-t border-border pt-4">
                         <x-button variant="secondary" type="button" @click="batchModalOpen = false">Batal</x-button>
-                        <x-button variant="primary" type="submit" icon="zap">Terapkan ke Semua Kelas Terpilih</x-button>
+                        <x-button variant="primary" type="submit" icon="check">Terapkan ke Kelas Terpilih</x-button>
                     </div>
                 </form>
             </div>

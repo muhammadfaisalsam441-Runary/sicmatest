@@ -106,6 +106,13 @@ class ScheduleDraftService
             throw new DomainException('INVALID_TEACHING_DAY', 'Perkuliahan hanya boleh dijadwalkan Senin–Jumat.');
         }
 
+        $fridayBreak = config('sicma.scheduler.friday_break', ['start' => 720, 'end' => 790]);
+        if (! $isUnscheduled && (int) ($data['day_of_week'] ?? 0) === 5
+            && isset($data['start_minute'], $data['end_minute'])
+            && (int) $data['start_minute'] < $fridayBreak['end'] && (int) $data['end_minute'] > $fridayBreak['start']) {
+            throw new DomainException('FRIDAY_BREAK_CONFLICT', 'Pada hari Jumat pukul 12.00–13.10 tidak ada perkuliahan.');
+        }
+
         DB::transaction(function () use ($session, $data, $mode, $isUnscheduled, $note): void {
             $before = $session->only(['mode', 'day_of_week', 'start_minute', 'end_minute', 'room_id']);
 

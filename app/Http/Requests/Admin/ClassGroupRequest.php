@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Models\Academic\ClassGroup;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Str;
@@ -25,8 +26,16 @@ class ClassGroupRequest extends FormRequest
      */
     protected function prepareForValidation(): void
     {
+        $classGroup = $this->route('classGroup');
+        $cohortYear = is_numeric($this->input('cohort_year')) ? (int) $this->input('cohort_year') : null;
+        $rawCode = trim((string) $this->input('code', ''));
+
+        $code = $rawCode !== '' && $classGroup === null
+            ? Str::upper(Str::slug($rawCode))
+            : ClassGroup::formatCode((string) $this->input('name', ''), $cohortYear, $classGroup?->id);
+
         $this->merge([
-            'code' => Str::upper(Str::slug((string) ($this->input('code') ?: $this->input('name').' '.$this->input('cohort_year')))),
+            'code' => $code,
             'is_active' => $this->boolean('is_active', true),
         ]);
     }

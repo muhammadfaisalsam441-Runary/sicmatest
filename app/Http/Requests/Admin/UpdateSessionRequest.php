@@ -52,6 +52,32 @@ class UpdateSessionRequest extends FormRequest
     }
 
     /**
+     * @return array<int, callable>
+     */
+    public function after(): array
+    {
+        return [
+            function ($validator): void {
+                if ($validator->errors()->isNotEmpty() || $this->input('mode') === SessionMode::Unscheduled->value) {
+                    return;
+                }
+
+                if ((int) $this->input('day_of_week') !== 5) {
+                    return;
+                }
+
+                $placement = $this->placement();
+                $fridayBreak = config('sicma.scheduler.friday_break', ['start' => 720, 'end' => 790]);
+
+                if ($placement['start_minute'] !== null && $placement['end_minute'] !== null
+                    && $placement['start_minute'] < $fridayBreak['end'] && $placement['end_minute'] > $fridayBreak['start']) {
+                    $validator->errors()->add('start_time', 'Pada hari Jumat pukul 12.00–13.10 tidak ada perkuliahan.');
+                }
+            },
+        ];
+    }
+
+    /**
      * @return array<string, string>
      */
     public function messages(): array

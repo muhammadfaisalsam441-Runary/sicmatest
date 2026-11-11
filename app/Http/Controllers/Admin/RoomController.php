@@ -14,6 +14,7 @@ use App\Services\Room\RoomService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 /**
@@ -73,9 +74,19 @@ class RoomController extends Controller
             ->get();
 
         $buildings = Building::query()->orderBy('name')->get();
+        $roomsPayload = $rooms->getCollection()->mapWithKeys(fn (Room $r): array => [$r->id => [
+            'id' => $r->id,
+            'name' => $r->name,
+            'code' => $r->code,
+            'building' => $r->building?->name ?? '',
+            'floor' => $r->floor ?? '',
+            'type' => $r->type->value,
+            'capacity' => $r->capacity ?? '',
+        ]])->all();
 
         return view('admin.rooms.index', [
             'rooms' => $rooms,
+            'roomsPayload' => $roomsPayload,
             'totalRooms' => Room::query()->count(),
             'periodName' => Period::query()->active()->value('name'),
             'keyword' => $keyword,
@@ -104,6 +115,26 @@ class RoomController extends Controller
         return back()->with('toast', [
             'type' => 'success',
             'title' => "Berhasil memperbarui {$count} ruang",
+        ]);
+    }
+
+    public function bulkUpdate(Request $request, RoomService $rooms): RedirectResponse
+    {
+        $validated = $request->validate([
+            'rooms' => ['required', 'array', 'min:1'],
+            'rooms.*.id' => ['required', 'integer', Rule::exists('rooms', 'id')->whereNull('deleted_at')],
+            'rooms.*.name' => ['required', 'string', 'max:60'],
+            'rooms.*.type' => ['required', Rule::enum(RoomType::class)],
+            'rooms.*.building' => ['nullable', 'string', 'max:60'],
+            'rooms.*.floor' => ['nullable', 'integer', 'min:0', 'max:20'],
+            'rooms.*.capacity' => ['nullable', 'integer', 'min:1', 'max:1000'],
+        ]);
+
+        $count = $rooms->bulkUpdate($validated['rooms']);
+
+        return back()->with('toast', [
+            'type' => 'success',
+            'title' => "Berhasil menyimpan {$count} ruang",
         ]);
     }
 

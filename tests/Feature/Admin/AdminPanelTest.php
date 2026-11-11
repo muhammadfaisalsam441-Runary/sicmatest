@@ -177,6 +177,48 @@ test('admin mengubah kapasitas hanya untuk ruang terpilih', function () {
         ->and($room2->fresh()->type)->toBe($room2->type);
 });
 
+test('admin dapat memperbarui banyak ruang sekaligus lewat edit massal di tabel', function () {
+    $buildingA = Building::factory()->create(['name' => 'Gedung A']);
+    $buildingB = Building::factory()->create(['name' => 'Gedung B']);
+    $room1 = Room::factory()->for($buildingA)->create(['name' => 'R101', 'code' => 'R101', 'floor' => 1, 'type' => RoomType::Classroom, 'capacity' => 30]);
+    $room2 = Room::factory()->for($buildingA)->create(['name' => 'Lab Lama', 'code' => 'LAB-LAMA', 'floor' => 2, 'type' => RoomType::Lab, 'capacity' => null]);
+
+    $this->actingAs($this->admin)
+        ->from(route('admin.rooms.index'))
+        ->put(route('admin.rooms.bulk-update'), [
+            'rooms' => [
+                $room1->id => [
+                    'name' => 'R101',
+                    'building_id' => $buildingB->id,
+                    'floor' => 2,
+                    'type' => RoomType::Classroom->value,
+                    'capacity' => 45,
+                ],
+                $room2->id => [
+                    'name' => 'Lab Jaringan Baru',
+                    'building_id' => $buildingB->id,
+                    'floor' => 3,
+                    'type' => RoomType::Lab->value,
+                    'capacity' => 36,
+                ],
+            ],
+        ])
+        ->assertRedirect(route('admin.rooms.index'))
+        ->assertSessionHas('toast.title', 'Data 2 ruang diperbarui');
+
+    $room1->refresh();
+    $room2->refresh();
+
+    expect($room1->building_id)->toBe($buildingB->id)
+        ->and($room1->floor)->toBe(2)
+        ->and($room1->capacity)->toBe(45)
+        ->and($room2->name)->toBe('Lab Jaringan Baru')
+        ->and($room2->code)->toBe('LAB-JARINGAN-BARU')
+        ->and($room2->building_id)->toBe($buildingB->id)
+        ->and($room2->floor)->toBe(3)
+        ->and($room2->capacity)->toBe(36);
+});
+
 test('kapasitas massal yang tidak valid tidak mengubah ruang dan mempertahankan pilihan', function (mixed $capacity, string $message) {
     $room = Room::factory()->create(['capacity' => 20]);
 

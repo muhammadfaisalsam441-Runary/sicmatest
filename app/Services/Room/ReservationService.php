@@ -28,6 +28,11 @@ use Illuminate\Support\Str;
  */
 class ReservationService
 {
+    /**
+     * Kegiatan reservasi pengganti untuk pertemuan kuliah yang dipindah Keti.
+     */
+    public const REPLACEMENT_PURPOSE = 'Kuliah Pengganti';
+
     public function __construct(
         private AvailabilityService $availability,
         private AuditLogger $audit,
@@ -81,28 +86,7 @@ class ReservationService
                 $this->assertClassFree($classGroup, $start, $end);
                 $this->assertRoomFree($lockedRoom, $start, $end);
 
-                $reservation = Reservation::create([
-                    'room_id' => $lockedRoom->id,
-                    'class_group_id' => $classGroup->id,
-                    'created_by' => $keti->id,
-                    'start_at' => $start,
-                    'end_at' => $end,
-                    'participants' => $participants,
-                    'purpose' => $purpose,
-                    'status' => ReservationStatus::Booked,
-                    'idempotency_key' => $idempotencyKey,
-                ]);
-
-                RoomBlock::create([
-                    'room_id' => $lockedRoom->id,
-                    'start_at' => $start,
-                    'end_at' => $end,
-                    'source_type' => RoomBlockSource::Reservation,
-                    'source_id' => $reservation->id,
-                    'is_active' => true,
-                ]);
-
-                AvailabilityCache::bust();
+                $reservation = $this->persist($keti, $classGroup, $lockedRoom, $start, $end, $purpose, $participants, $idempotencyKey);
 
                 $this->audit->log('reservation.created', $reservation, null, $reservation->only(['room_id', 'class_group_id', 'start_at', 'end_at', 'purpose', 'status']));
 
@@ -131,6 +115,55 @@ class ReservationService
         }
 
         return $reservation->fresh(['room', 'classGroup']);
+    }
+
+    /**
+     * Reservasi "Kuliah Pengganti" untuk pertemuan yang dipindah. Dipanggil MeetingRescheduleService di dalam transaksi
+     * yang sudah me-lock ruang; aturan waktu, kelas, dan dosen diperiksa pemanggil. Tanpa batas 7 hari dan batas
+     * reservasi aktif, tanpa audit/notifikasi (dicatat sebagai pemindahan).
+     *
+     * @throws DomainException ROOM_CLOSED | ROOM_CONFLICT | SCHEDULE_UNCERTAIN
+     */
+    public function createForReschedule(User $keti, ClassGroup $classGroup, Room $lockedRoom, CarbonImmutable $start, CarbonImmutable $end, string $idempotencyKey): Reservation
+    {
+        if (! $lockedRoom->is_active || ! $lockedRoom->is_bookable) {
+            throw new DomainException('ROOM_CLOSED', 'Ruangan ini sedang tidak dapat dipesan.');
+        }
+
+        $this->assertRoomFree($lockedRoom, $start, $end);
+
+        return $this->persist($keti, $classGroup, $lockedRoom, $start, $end, self::REPLACEMENT_PURPOSE, null, $idempotencyKey);
+    }
+
+    /**
+     * Simpan reservasi berstatus Dipesan beserta blok ruangnya.
+     */
+    private function persist(User $keti, ClassGroup $classGroup, Room $room, CarbonImmutable $start, CarbonImmutable $end, string $purpose, ?int $participants, string $idempotencyKey): Reservation
+    {
+        $reservation = Reservation::create([
+            'room_id' => $room->id,
+            'class_group_id' => $classGroup->id,
+            'created_by' => $keti->id,
+            'start_at' => $start,
+            'end_at' => $end,
+            'participants' => $participants,
+            'purpose' => $purpose,
+            'status' => ReservationStatus::Booked,
+            'idempotency_key' => $idempotencyKey,
+        ]);
+
+        RoomBlock::create([
+            'room_id' => $room->id,
+            'start_at' => $start,
+            'end_at' => $end,
+            'source_type' => RoomBlockSource::Reservation,
+            'source_id' => $reservation->id,
+            'is_active' => true,
+        ]);
+
+        AvailabilityCache::bust();
+
+        return $reservation;
     }
 
     /**
@@ -431,7 +464,7 @@ class ReservationService
     /**
      * Satu kelas tidak boleh memegang dua reservasi aktif yang waktunya beririsan, walau di ruang berbeda.
      */
-    private function assertClassFree(
+    public function assertClassFree(
         ClassGroup $classGroup,
         CarbonImmutable $start,
         CarbonImmutable $end,

@@ -1,12 +1,16 @@
 <?php
 
+use App\Enums\SessionMode;
 use App\Enums\SessionPhase;
 use App\Enums\TeachingRole;
 use App\Models\Academic\ClassGroup;
 use App\Models\Academic\SessionReschedule;
 use App\Models\Lecturer\Lecturer;
 use App\Models\Room\Room;
+use App\Models\Scheduling\ScheduleSession;
 use App\Models\User\User;
+use App\Services\Room\ReservationService;
+use App\Support\Wita;
 use Carbon\CarbonImmutable;
 
 beforeEach(function () {
@@ -98,4 +102,85 @@ test('pelanggaran aturan kembali ke halaman Pindahkan dengan pesan error', funct
 test('pertemuan yang tidak ada 404 dan Keti kelas lain 403', function () {
     $this->actingAs($this->keti)->get(reschedulePage(['tanggal' => '2026-11-10']))->assertNotFound();
     $this->actingAs(User::factory()->approvedKeti()->create())->get(reschedulePage())->assertForbidden();
+});
+
+function myClassUrl(string $date): string
+{
+    return route('keti.my-class', ['tanggal' => $date]);
+}
+
+function rescheduleUrl(ScheduleSession $session, string $date): string
+{
+    return route('keti.meetings.reschedule', ['sesi' => $session->id, 'tanggal' => $date]);
+}
+
+test('My Class menampilkan status pertemuan mengikuti jam', function () {
+    $morning = meetingSession([$this->classC], ['title' => 'Kuliah Pagi', 'day_of_week' => 3, 'start_minute' => 450, 'end_minute' => 600]);
+    $afternoon = meetingSession([$this->classC], ['title' => 'Kuliah Siang', 'day_of_week' => 3, 'start_minute' => 780, 'end_minute' => 880]);
+    $online = meetingSession([$this->classC], ['title' => 'Kuliah Daring', 'day_of_week' => 3, 'start_minute' => 900, 'end_minute' => 960, 'mode' => SessionMode::Online, 'room_id' => null]);
+
+    $this->actingAs($this->keti)->get(myClassUrl('2026-11-04'))->assertOk()
+        ->assertSee('Selesai')
+        ->assertSee('Akan datang')
+        ->assertSee('Online')
+        ->assertSee(rescheduleUrl($afternoon, '2026-11-04'))
+        ->assertDontSee(rescheduleUrl($morning, '2026-11-04'))
+        ->assertDontSee(rescheduleUrl($online, '2026-11-04'));
+
+    $this->travelTo(CarbonImmutable::parse('2026-11-04 13:30'));
+
+    $this->actingAs($this->keti)->get(myClassUrl('2026-11-04'))->assertOk()
+        ->assertSee('Sedang berlangsung')
+        ->assertDontSee(rescheduleUrl($afternoon, '2026-11-04'));
+});
+
+test('pertemuan yang dipindah tampil sebagai Dipindahkan dan penggantinya tampil di tanggal tujuan', function () {
+    $this->actingAs($this->keti)->post(route('keti.meetings.reschedule.store'), movePayload());
+    $start = CarbonImmutable::parse('2026-11-10 10:00');
+
+    $this->actingAs($this->keti)->get(myClassUrl('2026-11-09'))->assertOk()
+        ->assertSee('Dipindahkan')
+        ->assertSee('ke '.Wita::dayName($start).', '.Wita::longDate($start).' • '.Wita::clock($start, false).' • AE 209')
+        ->assertSee('Lihat pengganti')
+        ->assertDontSee(rescheduleUrl($this->session, '2026-11-09'));
+
+    $this->actingAs($this->keti)->get(myClassUrl('2026-11-10'))->assertOk()
+        ->assertSee('Kuliah Pengganti')
+        ->assertSee('Pemrograman Web');
+});
+
+test('halaman reservasi pengganti menampilkan jadwal asal, dosen, dan aksi pemindahan', function () {
+    $this->actingAs($this->keti)->post(route('keti.meetings.reschedule.store'), movePayload());
+    $reschedule = SessionReschedule::query()->sole();
+
+    $this->actingAs($this->keti)->get(route('keti.reservations.show', $reschedule->reservation_id))->assertOk()
+        ->assertSee('Pertemuan berhasil dipindahkan')
+        ->assertSee('Pemrograman Web')
+        ->assertSee('Dosen: Sari Dewi (mitra)')
+        ->assertSee('Batalkan pemindahan')
+        ->assertSee('Pindahkan lagi');
+});
+
+test('reservasi biasa tetap memakai tombol Batalkan', function () {
+    $reservation = app(ReservationService::class)->create($this->keti, $this->ae209, CarbonImmutable::parse('2026-11-05 10:00'), CarbonImmutable::parse('2026-11-05 11:00'), 'Rapat', null, (string) str()->uuid());
+
+    $this->actingAs($this->keti)->get(route('keti.reservations.show', $reservation))->assertOk()
+        ->assertSee('Batalkan')
+        ->assertDontSee('Batalkan pemindahan')
+        ->assertDontSee('Pindahkan lagi');
+});
+
+test('Keti kelas gabungan lain boleh melihat pengganti tetapi tidak mengelolanya', function () {
+    $classA = ClassGroup::factory()->create(['name' => 'Tekom A']);
+    $ketiA = User::factory()->approvedKeti($classA)->create();
+    $joint = meetingSession([$this->classC, $classA], ['title' => 'Statistika', 'day_of_week' => 3, 'start_minute' => 780, 'end_minute' => 880, 'room_id' => $this->ae107->id], $this->team);
+    $this->actingAs($this->keti)->post(route('keti.meetings.reschedule.store'), movePayload(['session_id' => $joint->id, 'original_date' => '2026-11-11', 'start_at' => '2026-11-12 13:00']));
+    $reservationId = SessionReschedule::query()->sole()->reservation_id;
+
+    $this->actingAs($ketiA)->get(route('keti.reservations.show', $reservationId))->assertOk()
+        ->assertSee('Statistika')
+        ->assertDontSee(route('keti.reservations.start', $reservationId))
+        ->assertDontSee(route('keti.meetings.reschedule', ['sesi' => $joint->id, 'tanggal' => '2026-11-11', 'pengganti' => $reservationId]));
+    $this->actingAs($ketiA)->post(route('keti.reservations.start', $reservationId))->assertForbidden();
+    $this->actingAs($ketiA)->get(myClassUrl('2026-11-12'))->assertOk()->assertSee('Kuliah Pengganti');
 });

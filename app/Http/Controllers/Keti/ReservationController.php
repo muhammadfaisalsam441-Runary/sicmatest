@@ -111,7 +111,7 @@ class ReservationController extends Controller
     public function show(Request $request, Reservation $reservation): View
     {
         Gate::authorize('view', $reservation);
-        $reservation->load(['room.building', 'classGroup', 'creator']);
+        $reservation->load(['room.building', 'classGroup', 'creator', 'sessionReschedule.lecturers', 'sessionReschedule.originalRoom']);
 
         return view('keti.reservations.show', [
             'reservation' => $reservation,

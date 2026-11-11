@@ -18,6 +18,11 @@
     if ($academicBookingBlocked && $status === ReservationStatus::Booked) {
         $subtitle = 'Pilih kembali hari kuliah yang sesuai.';
     }
+    // Pengganti pertemuan kuliah yang dipindah Keti.
+    $reschedule = $reservation->sessionReschedule;
+    if ($reschedule && $status === ReservationStatus::Booked) {
+        [$title, $subtitle] = ['Pertemuan berhasil dipindahkan', 'Kuliah pengganti siap digunakan.'];
+    }
 @endphp
 
 @section('title', $title)
@@ -26,6 +31,12 @@
     <div class="flex flex-col gap-6"
          @if ($status->isActive()) x-data="statusPolling({ url: @js(route('keti.reservations.status', $reservation)), interval: {{ (int) config('sicma.polling_seconds') * 1000 }}, version: {{ $reservation->lock_version }}, status: @js($status->value) })" @endif>
         <x-page-header :title="$title" :subtitle="$subtitle" />
+        @if ($reschedule)
+            <x-info-box :title="'Kuliah Pengganti: '.$reschedule->session_title">
+                <p>Dipindah dari {{ Wita::dayName($reschedule->original_start_at) }}, {{ Wita::longDate($reschedule->original_start_at) }} • {{ Wita::range($reschedule->original_start_at, $reschedule->original_end_at) }} • {{ $reschedule->originalRoom->name }}</p>
+                <p>Dosen: {{ $reschedule->lecturers->map(fn ($lecturer) => $lecturer->name.' ('.Str::lower(\App\Enums\TeachingRole::from($lecturer->pivot->role)->label()).')')->implode(', ') }}</p>
+            </x-info-box>
+        @endif
         @if ($academicBookingBlocked && $status->isActive())
             <x-info-box title="Reservasi perkuliahan di luar hari kuliah">
                 <p>Kuliah Pengganti dan Praktikum Tambahan hanya Senin–Jumat. Reservasi ini tidak bisa dimulai atau diperpanjang. Batalkan pesanan yang belum digunakan, lalu pesan ulang pada hari kuliah.</p>
@@ -72,7 +83,10 @@
                                     <x-button type="submit" class="w-full">Mulai gunakan</x-button>
                                 </form>
                             @endunless
-                            <x-button variant="danger-outline" x-data x-on:click="$dispatch('open-modal', 'batal-pesanan')">Batalkan</x-button>
+                            <x-button variant="danger-outline" x-data x-on:click="$dispatch('open-modal', 'batal-pesanan')">{{ $reschedule ? 'Batalkan pemindahan' : 'Batalkan' }}</x-button>
+                            @if ($reschedule && $reschedule->schedule_session_id)
+                                <x-button variant="secondary" class="col-span-2" :href="route('keti.meetings.reschedule', ['sesi' => $reschedule->schedule_session_id, 'tanggal' => $reschedule->original_start_at->toDateString(), 'pengganti' => $reservation->id])">Pindahkan lagi</x-button>
+                            @endif
                         @elseif ($status === ReservationStatus::InUse && $canManage)
                             <form method="POST" action="{{ route('keti.reservations.finish', $reservation) }}">
                                 @csrf
@@ -136,7 +150,12 @@
 @endsection
 
 @push('dialogs')
-    @if ($status === ReservationStatus::Booked)
+    @if ($status === ReservationStatus::Booked && $reschedule)
+        <x-confirm-dialog name="batal-pesanan" title="Batalkan pemindahan {{ $reschedule->session_title }}?"
+                          message="Pertemuan kembali ke {{ Wita::date($reschedule->original_start_at) }}, {{ Wita::range($reschedule->original_start_at, $reschedule->original_end_at) }} di {{ $reschedule->originalRoom->name }}."
+                          :action="route('keti.reservations.cancel', $reservation)" icon="circle-alert" reason="Alasan (opsional)"
+                          confirm="Batalkan pemindahan" cancel="Kembali" />
+    @elseif ($status === ReservationStatus::Booked)
         <x-confirm-dialog name="batal-pesanan" title="Batalkan pesanan {{ $room->name }}?"
                           message="{{ Wita::date($reservation->start_at) }}, {{ Wita::range($reservation->start_at, $reservation->end_at) }}. Slot terbuka lagi untuk kelas lain."
                           :action="route('keti.reservations.cancel', $reservation)" icon="circle-alert" reason="Alasan (opsional)"

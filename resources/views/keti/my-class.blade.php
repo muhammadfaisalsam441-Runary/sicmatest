@@ -30,34 +30,69 @@
             @endforeach
         </nav>
 
-        @if ($sessions->isEmpty())
+        @if ($meetings->isEmpty() && $replacements->isEmpty())
             <x-empty-state title="Belum ada jadwal" message="Tidak ada jadwal kelas pada tanggal yang dipilih." icon="calendar">
                 <x-button variant="soft" :href="route('keti.search')">Cari ruangan kosong</x-button>
             </x-empty-state>
         @else
             <div class="flex items-center justify-between">
-                <h2 class="text-xl font-semibold">{{ $sessions->count() }} jadwal</h2>
+                <h2 class="text-xl font-semibold">{{ $meetings->count() + $replacements->count() }} jadwal</h2>
                 <span class="text-xs text-muted">Jadwal kelas • Hari yang dipilih</span>
             </div>
             <div class="grid grid-cols-2 gap-4">
-                @foreach ($sessions as $session)
-                    <x-card class="flex flex-col gap-3">
+                @foreach ($meetings as $meeting)
+                    @php
+                        $session = $meeting['session'];
+                        [$badge, $variant] = match ($meeting['status']) {
+                            'online' => ['Online', 'primary'],
+                            'moved' => ['Dipindahkan', 'neutral'],
+                            'finished' => ['Selesai', 'neutral'],
+                            'ongoing' => ['Sedang berlangsung', 'success'],
+                            default => ['Akan datang', 'primary'],
+                        };
+                        $replacement = $meeting['reschedule']?->reservation;
+                    @endphp
+                    <x-card :class="'flex flex-col gap-3'.(in_array($meeting['status'], ['moved', 'finished'], true) ? ' opacity-70' : '')">
                         <div class="flex items-start justify-between">
                             <div class="flex flex-col gap-1">
                                 <h3 class="text-xl font-medium">{{ $session->room?->name ?? 'Kuliah online' }}</h3>
                                 <p class="text-sm font-semibold text-primary">{{ $session->title }}</p>
                             </div>
-                            <x-status-badge variant="primary">{{ $session->mode->value === 'online' ? 'Online' : 'Terjadwal' }}</x-status-badge>
+                            <x-status-badge :variant="$variant">{{ $badge }}</x-status-badge>
                         </div>
                         <p class="text-sm text-ink">{{ Wita::minutes($session->start_minute) }}–{{ Wita::minutes($session->end_minute) }} WITA</p>
+                        @if ($replacement)
+                            <p class="text-sm font-medium text-ink">ke {{ Wita::dayName($replacement->start_at) }}, {{ Wita::longDate($replacement->start_at) }} • {{ Wita::clock($replacement->start_at, false) }} • {{ $replacement->room->name }}</p>
+                        @endif
                         <p class="text-xs text-muted">{{ $session->room ? ($session->room->building?->name ?? 'Gedung belum didata').' • Lantai '.($session->room->floor ?? '—') : 'Tanpa ruang fisik' }}</p>
                         <p class="text-xs text-muted">Pengajar: {{ $session->lecturers->pluck('name')->implode(', ') ?: 'Perlu verifikasi' }}</p>
                         @if ($session->participants->count() > 1)
                             <p class="text-xs text-muted">Kelas gabungan: {{ $session->participants->pluck('name')->implode(' + ') }}</p>
                         @endif
-                        @if ($session->room)
-                            <x-button variant="soft" :href="route('keti.rooms.show', $session->room)" class="self-end">Detail ruangan</x-button>
-                        @endif
+                        <div class="flex justify-end gap-2">
+                            @if ($replacement)
+                                <x-button variant="soft" :href="route('keti.reservations.show', $replacement)">Lihat pengganti</x-button>
+                            @elseif ($meeting['status'] === 'upcoming' && $session->blocksRoom())
+                                <x-button variant="secondary" :href="route('keti.meetings.reschedule', ['sesi' => $session->id, 'tanggal' => $date->toDateString()])">Pindahkan</x-button>
+                            @endif
+                            @if ($session->room && ! $replacement)
+                                <x-button variant="soft" :href="route('keti.rooms.show', $session->room)">Detail ruangan</x-button>
+                            @endif
+                        </div>
+                    </x-card>
+                @endforeach
+                @foreach ($replacements as $reservation)
+                    <x-card class="flex flex-col gap-3">
+                        <div class="flex items-start justify-between">
+                            <div class="flex flex-col gap-1">
+                                <h3 class="text-xl font-medium">{{ $reservation->room->name }}</h3>
+                                <p class="text-sm font-semibold text-primary">Kuliah Pengganti • {{ $reservation->sessionReschedule->session_title }}</p>
+                            </div>
+                            <x-status-badge :variant="$reservation->status->badgeVariant()">{{ $reservation->status->label() }}</x-status-badge>
+                        </div>
+                        <p class="text-sm text-ink">{{ Wita::range($reservation->start_at, $reservation->end_at) }}</p>
+                        <p class="text-xs text-muted">Dipindah dari {{ Wita::dayName($reservation->sessionReschedule->original_start_at) }}, {{ Wita::longDate($reservation->sessionReschedule->original_start_at) }} • {{ Wita::clock($reservation->sessionReschedule->original_start_at, false) }}</p>
+                        <x-button variant="soft" :href="route('keti.reservations.show', $reservation)" class="self-end">Lihat pengganti</x-button>
                     </x-card>
                 @endforeach
             </div>

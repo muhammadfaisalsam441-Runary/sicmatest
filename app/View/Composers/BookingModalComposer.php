@@ -27,7 +27,6 @@ class BookingModalComposer
         $last = $classGroup === null ? null : $this->reservations->lastPurpose($classGroup);
         $default = match (true) {
             $last !== null && in_array($last, $allowed, true) => $last,
-            in_array('Kuliah Pengganti', $allowed, true) => 'Kuliah Pengganti',
             default => $allowed[0] ?? null,
         };
 

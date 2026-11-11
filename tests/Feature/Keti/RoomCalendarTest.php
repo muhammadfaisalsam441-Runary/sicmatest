@@ -114,7 +114,7 @@ class RoomCalendarTest extends TestCase
 
         $this->postJson(route('keti.reservations.store'), [
             'room_id' => $room->id, 'start_at' => '2026-11-05 09:10', 'duration' => 60,
-            'purpose' => 'Kuliah pengganti', 'participants' => 20, 'idempotency_key' => $details->viewData('idempotencyKey'),
+            'purpose' => 'Diskusi / Kerja Kelompok', 'participants' => 20, 'idempotency_key' => $details->viewData('idempotencyKey'),
         ])->assertCreated();
         $this->assertDatabaseHas('reservations', [
             'room_id' => $room->id, 'start_at' => '2026-11-05 09:10:00', 'end_at' => '2026-11-05 10:10:00',
@@ -217,7 +217,7 @@ class RoomCalendarTest extends TestCase
             ->assertViewHas('participants', 25)->assertViewHas('duration', 90);
 
         $payload = ['room_id' => $room->id, 'start_at' => '2026-11-05 13:10', 'duration' => 90,
-            'purpose' => 'Kuliah pengganti', 'participants' => 25, 'idempotency_key' => $details->viewData('idempotencyKey')];
+            'purpose' => 'Diskusi / Kerja Kelompok', 'participants' => 25, 'idempotency_key' => $details->viewData('idempotencyKey')];
         $this->post(route('keti.reservations.store'), $payload)->assertRedirect();
         $reservation = Reservation::query()->sole();
         $this->assertSame('2026-11-05 13:10', $reservation->start_at->format('Y-m-d H:i'));
@@ -329,17 +329,17 @@ class RoomCalendarTest extends TestCase
         ]))->assertOk()->assertSee('10:00–13:20 WITA')
             ->assertSee('select name="purpose"', false)->assertDontSee('input name="purpose"', false)
             ->assertDontSee('name="participants"', false);
-        foreach (['Kuliah Pengganti', 'Diskusi / Kerja Kelompok', 'Praktikum Tambahan', 'Seminar / Ujian', 'Kegiatan Organisasi / Himpunan', 'Lainnya'] as $purpose) {
+        foreach (['Diskusi / Kerja Kelompok', 'Praktikum Tambahan', 'Seminar / Ujian', 'Kegiatan Organisasi / Himpunan', 'Lainnya'] as $purpose) {
             $details->assertSee('<option value="'.$purpose.'"', false);
         }
 
         $this->postJson(route('keti.reservations.store'), [
             'room_id' => $room->id, 'start_at' => '2026-11-05 10:00', 'duration' => 200,
-            'purpose' => 'Kuliah Pengganti', 'idempotency_key' => $details->viewData('idempotencyKey'),
+            'purpose' => 'Praktikum Tambahan', 'idempotency_key' => $details->viewData('idempotencyKey'),
         ])->assertCreated();
         $reservation = Reservation::query()->sole();
         $this->assertNull($reservation->participants);
-        $this->assertSame('Kuliah Pengganti', $reservation->purpose);
+        $this->assertSame('Praktikum Tambahan', $reservation->purpose);
         $this->assertSame('13:20', $reservation->end_at->format('H:i'));
         $this->assertSame('13:20', $reservation->block->end_at->format('H:i'));
     }

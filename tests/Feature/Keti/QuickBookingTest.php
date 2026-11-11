@@ -65,7 +65,7 @@ test('pencarian akhir pekan menonaktifkan kegiatan akademik di modal', function 
 
     $content = $this->actingAs($this->keti)->get(route('keti.search', ['tanggal' => '2026-11-07', 'mulai' => '10:00']))->assertOk()->getContent();
 
-    expect($content)->toMatch('/<option value="Kuliah Pengganti"[^>]*disabled/')
+    expect($content)->toMatch('/<option value="Praktikum Tambahan"[^>]*disabled/')
         ->and($content)->toMatch('/<option value="Diskusi \/ Kerja Kelompok"[^>]*selected/');
 });
 
@@ -78,7 +78,7 @@ test('pemesanan gagal menyarankan ruang lain yang kosong di jam yang sama', func
 
     $this->actingAs($this->keti)->post(route('keti.reservations.store'), [
         'room_id' => $taken->id, 'start_at' => '2026-11-04 10:00', 'duration' => 100,
-        'purpose' => 'Kuliah Pengganti', 'idempotency_key' => (string) str()->uuid(),
+        'purpose' => 'Diskusi / Kerja Kelompok', 'idempotency_key' => (string) str()->uuid(),
     ])->assertRedirect(route('keti.reservations.failed'));
 
     $response = $this->get(route('keti.reservations.failed'))->assertOk()
@@ -111,4 +111,24 @@ test('setiap pembukaan modal memakai idempotency key baru dari browser', functio
     $this->actingAs($this->keti)->get(route('keti.search'))->assertOk()
         ->assertSee('x-bind:value="key"', false)
         ->assertSee('bookingModal(', false);
+});
+
+test('booking biasa menolak kegiatan Kuliah Pengganti', function (string $purpose) {
+    $room = Room::factory()->create();
+
+    $this->actingAs($this->keti)->post(route('keti.reservations.store'), [
+        'room_id' => $room->id, 'start_at' => '2026-11-04 13:00', 'duration' => 100,
+        'purpose' => $purpose, 'idempotency_key' => (string) str()->uuid(),
+    ])->assertSessionHasErrors(['purpose' => 'Untuk mengganti jadwal kuliah, gunakan Pindahkan di My Class.']);
+
+    expect(Reservation::query()->count())->toBe(0);
+})->with(['Kuliah Pengganti', ' kuliah  pengganti ']);
+
+test('modal booking tidak lagi menawarkan Kuliah Pengganti', function () {
+    Room::factory()->create();
+
+    $content = $this->actingAs($this->keti)->get(route('keti.search'))->assertOk()->getContent();
+
+    expect($content)->not->toContain('<option value="Kuliah Pengganti"')
+        ->and($content)->toMatch('/<option value="Diskusi \/ Kerja Kelompok"[^>]*selected/');
 });

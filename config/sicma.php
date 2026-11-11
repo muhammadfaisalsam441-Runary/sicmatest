@@ -33,7 +33,9 @@ return [
             200 => '4 SKS (200 menit)',
         ],
         // Pilihan "Kegiatan" saat memesan ruang (sesuai desain Pesan ruang).
-        'purposes' => ['Kuliah Pengganti', 'Diskusi / Kerja Kelompok', 'Praktikum Tambahan', 'Seminar / Ujian', 'Kegiatan Organisasi / Himpunan', 'Lainnya'],
+        // "Kuliah Pengganti" tidak dipesan di sini: pertemuan kuliah dipindah lewat My Class → Pindahkan.
+        'purposes' => ['Diskusi / Kerja Kelompok', 'Praktikum Tambahan', 'Seminar / Ujian', 'Kegiatan Organisasi / Himpunan', 'Lainnya'],
+        // Tetap memuat "Kuliah Pengganti" agar reservasi pengganti dan data lama mengikuti aturan hari kuliah.
         'academic_purposes' => ['Kuliah Pengganti', 'Praktikum Tambahan'],
         'max_days_ahead' => 7, // BELUM DITETAPKAN
         'max_active_per_class' => 3, // BELUM DITETAPKAN

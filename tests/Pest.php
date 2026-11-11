@@ -3,6 +3,7 @@
 use App\Enums\RoomBlockSource;
 use App\Enums\SessionPhase;
 use App\Enums\TeachingRole;
+use App\Exceptions\DomainException;
 use App\Models\Academic\ClassGroup;
 use App\Models\Academic\CourseOffering;
 use App\Models\Academic\Period;
@@ -82,6 +83,22 @@ function meetingSession(array $classGroups, array $attributes = [], array $team 
     app(ScheduleBlockBuilder::class)->rebuild($version->fresh());
 
     return $session->fresh(['participants', 'lecturers', 'courseOffering']);
+}
+
+/**
+ * Jalankan $callback dan pastikan DomainException dengan kode tersebut dilempar; kembalikan exception-nya.
+ */
+function expectDomainCode(Closure $callback, string $code): DomainException
+{
+    try {
+        $callback();
+    } catch (DomainException $exception) {
+        expect($exception->errorCode)->toBe($code, $exception->getMessage());
+
+        return $exception;
+    }
+
+    test()->fail("DomainException {$code} tidak dilempar.");
 }
 
 /**

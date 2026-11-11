@@ -5,6 +5,7 @@ namespace App\Models\Reservation;
 use App\Enums\ReservationStatus;
 use App\Enums\RoomBlockSource;
 use App\Models\Academic\ClassGroup;
+use App\Models\Academic\SessionReschedule;
 use App\Models\Room\Room;
 use App\Models\Room\RoomBlock;
 use App\Models\User\User;
@@ -18,7 +19,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 /**
  * Reservasi ruang oleh Keti atas nama kelas. Riwayat tidak pernah dihapus (B12).
  */
-#[Fillable(['room_id', 'class_group_id', 'created_by', 'start_at', 'end_at', 'participants', 'purpose', 'status', 'actual_start_at', 'actual_end_at', 'cancelled_at', 'cancelled_by', 'cancel_reason', 'idempotency_key', 'lock_version'])]
+#[Fillable(['room_id', 'class_group_id', 'created_by', 'start_at', 'end_at', 'participants', 'purpose', 'session_reschedule_id', 'status', 'actual_start_at', 'actual_end_at', 'cancelled_at', 'cancelled_by', 'cancel_reason', 'idempotency_key', 'lock_version'])]
 class Reservation extends Model
 {
     /** @use HasFactory<ReservationFactory> */
@@ -73,6 +74,16 @@ class Reservation extends Model
     public function canceller(): BelongsTo
     {
         return $this->belongsTo(User::class, 'cancelled_by');
+    }
+
+    /**
+     * Pemindahan pertemuan kuliah yang diwakili reservasi ini (hanya untuk "Kuliah Pengganti").
+     *
+     * @return BelongsTo<SessionReschedule, $this>
+     */
+    public function sessionReschedule(): BelongsTo
+    {
+        return $this->belongsTo(SessionReschedule::class);
     }
 
     /**

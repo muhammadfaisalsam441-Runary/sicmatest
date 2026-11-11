@@ -7,6 +7,7 @@ use App\Models\Academic\ClassGroup;
 use App\Models\Academic\Course;
 use App\Models\Academic\CourseOffering;
 use App\Models\Academic\Period;
+use App\Models\Academic\SessionReschedule;
 use App\Models\Academic\TimeSlot;
 use App\Models\Lecturer\LeadershipTerm;
 use App\Models\Lecturer\Lecturer;
@@ -77,6 +78,7 @@ class AppServiceProvider extends ServiceProvider
                     'Reservation' => Reservation::class,
                     'ScheduleVersion' => ScheduleVersion::class,
                     'ScheduleSession' => ScheduleSession::class,
+                    'SessionReschedule' => SessionReschedule::class,
                     'ScheduleIssue' => ScheduleIssue::class,
                     'OptimizationJob' => OptimizationJob::class,
                     'Import' => Import::class,

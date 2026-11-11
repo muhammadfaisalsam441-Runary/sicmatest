@@ -97,7 +97,7 @@ dan dipakai oleh pembuat blok, My Class, dan pemeriksaan bentrok.
 |---|---|
 | `App\Services\Academic\MeetingRescheduleService` | `move()`, `moveAgain()`, `cancel()`; semua aturan & efek samping dalam transaksi |
 | `App\Services\Academic\MeetingLocator` | Menemukan pertemuan asli pada tanggal tertentu & status pindahnya; dosen bergiliran per fase |
-| `App\Services\Academic\LecturerAvailabilityChecker` | Bentrok jam mengajar dosen pada tanggal & jam tertentu + aturan pimpinan Kamis |
+| `App\Services\Academic\LecturerConflictChecker` | Bentrok jam mengajar dosen pada tanggal & jam tertentu + aturan pimpinan Kamis |
 | `App\Models\Academic\SessionReschedule` | Model + relasi `reservation`, `lecturers`, `session` |
 | `App\Http\Controllers\Keti\MeetingRescheduleController` | Halaman Pindahkan (GET) dan simpan (POST) |
 | `App\Http\Requests\Keti\MoveMeetingRequest` | Validasi masukan |
@@ -199,7 +199,9 @@ Ini jalan keluar ketika pembatalan ditolak `RESTORE_NOT_POSSIBLE`.
 
 - Hapus "Kuliah Pengganti" dari `sicma.reservation.purposes`; tetap di `academic_purposes` agar aturan
   hari kuliah berlaku pada data lama.
-- `StoreReservationRequest`: `purpose` wajib salah satu dari `sicma.reservation.purposes`.
+- `StoreReservationRequest`: menolak `purpose` "Kuliah Pengganti" (tanpa membedakan huruf/spasi) dengan pesan
+  "Untuk mengganti jadwal kuliah, gunakan Pindahkan di My Class." Kegiatan teks bebas lain tetap diterima
+  seperti sekarang.
 - `BookingModalComposer`: kegiatan bawaan tidak lagi "Kuliah Pengganti" (pakai kegiatan terakhir kelas bila
   masih tersedia, selain itu pilihan pertama yang diizinkan).
 - Reservasi lama berkegiatan "Kuliah Pengganti" tidak diubah.
@@ -219,7 +221,8 @@ Badge kartu pertemuan mengikuti jam:
 | Online | Online | — |
 
 Pada tanggal tujuan, pertemuan pengganti tampil sebagai kartu "Kuliah Pengganti" dengan status
-reservasinya, juga untuk Keti kelas gabungan lain.
+reservasinya, juga untuk Keti kelas gabungan lain (dicari lewat
+`reservations.sessionReschedule.session.participants`).
 
 ### 6.2 Halaman Pindahkan pertemuan
 

@@ -370,6 +370,8 @@ class ScheduleValidator
         $sessions = $version->sessions->keyBy('id');
 
         return collect($this->blocks->occurrences($version))
+            // Pertemuan yang sudah dipindah Keti tidak menempati ruang aslinya.
+            ->filter(fn (array $occurrence): bool => $occurrence['is_active'])
             ->flatMap(function (array $occurrence) use ($reservationBlocks, $sessions): array {
                 $start = CarbonImmutable::parse($occurrence['start_at']);
                 $end = CarbonImmutable::parse($occurrence['end_at']);

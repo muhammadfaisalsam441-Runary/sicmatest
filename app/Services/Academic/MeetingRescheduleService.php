@@ -3,6 +3,7 @@
 namespace App\Services\Academic;
 
 use App\Enums\RescheduleStatus;
+use App\Enums\ReservationStatus;
 use App\Enums\RoomBlockSource;
 use App\Exceptions\DomainException;
 use App\Models\Academic\ClassGroup;
@@ -74,6 +75,155 @@ class MeetingRescheduleService
             return $this->findByKey($keti, $idempotencyKey)
                 ?? throw new DomainException('ROOM_CONFLICT', 'Ruangan sudah lebih dulu dipesan kelas lain untuk jam tersebut.');
         }
+    }
+
+    /**
+     * Pindahkan lagi pertemuan yang sudah dipindah: pengganti lama dibatalkan (status "replaced") dan pengganti baru
+     * dibuat untuk pertemuan asli yang sama. Jam asli boleh sudah lewat.
+     *
+     * @param  list<int>  $lecturerIds
+     *
+     * @throws DomainException
+     */
+    public function moveAgain(User $keti, Reservation $replacement, CarbonInterface $newStart, Room $room, array $lecturerIds, string $idempotencyKey): SessionReschedule
+    {
+        if ($existing = $this->findByKey($keti, $idempotencyKey)) {
+            return $existing;
+        }
+
+        $old = $replacement->sessionReschedule;
+        $meeting = $old === null ? null : $this->meetings->meetingsOn($old->original_start_at)
+            ->first(fn (Meeting $meeting): bool => $meeting->reschedule?->id === $old->id);
+
+        if ($meeting === null) {
+            throw new DomainException('MEETING_NOT_FOUND', 'Reservasi ini bukan pertemuan kuliah yang dipindah.');
+        }
+
+        $session = $meeting->session;
+        $newStart = $this->normalize($newStart);
+
+        return DB::transaction(function () use ($keti, $session, $old, $newStart, $room, $lecturerIds, $idempotencyKey): SessionReschedule {
+            $lockedRoom = Room::query()->whereKey($room->id)->lockForUpdate()->firstOrFail();
+            ClassGroup::query()->whereKey($session->participants->modelKeys())->orderBy('id')->lockForUpdate()->get();
+            $oldReservation = Reservation::query()->whereKey($old->reservation_id)->lockForUpdate()->firstOrFail();
+
+            if ($existing = $this->findByKey($keti, $idempotencyKey)) {
+                return $existing;
+            }
+
+            $old->refresh();
+            $this->assertReplaceable($oldReservation, $old);
+
+            // Pengganti lama dilepas lebih dulu agar slotnya boleh dipakai lagi oleh pengganti baru.
+            $this->releaseReplacement($oldReservation, $keti, null);
+            $old->forceFill(['status' => RescheduleStatus::Replaced, 'cancelled_at' => now(), 'cancelled_by' => $keti->id])->save();
+
+            return $this->createMove($keti, $session, $old->original_start_at, $newStart, $lockedRoom, $lecturerIds, $idempotencyKey, $old);
+        }, attempts: 3);
+    }
+
+    /**
+     * Batalkan pemindahan: reservasi pengganti dibatalkan dan pertemuan kembali ke jam & ruang aslinya.
+     *
+     * @throws DomainException DATA_INCOMPLETE | INVALID_STATUS_TRANSITION | RESTORE_NOT_POSSIBLE
+     */
+    public function cancel(Reservation $reservation, User $actor, ?string $reason = null): Reservation
+    {
+        if ($actor->isAdmin() && blank($reason)) {
+            throw new DomainException('DATA_INCOMPLETE', 'Alasan pembatalan wajib diisi oleh admin.');
+        }
+
+        $reschedule = $reservation->sessionReschedule
+            ?? throw new DomainException('MEETING_NOT_FOUND', 'Reservasi ini bukan pertemuan kuliah yang dipindah.');
+
+        return DB::transaction(function () use ($reservation, $reschedule, $actor, $reason): Reservation {
+            // Lock ruang asli lalu reservasi pengganti sebelum membaca apa pun.
+            $originalRoom = Room::query()->whereKey($reschedule->original_room_id)->lockForUpdate()->firstOrFail();
+            $locked = Reservation::query()->whereKey($reservation->id)->lockForUpdate()->firstOrFail();
+            $reschedule->refresh();
+
+            if ($reschedule->status === RescheduleStatus::Cancelled) {
+                return $locked;
+            }
+
+            $this->assertReplaceable($locked, $reschedule);
+
+            $start = CarbonImmutable::instance($reschedule->original_start_at);
+            $end = CarbonImmutable::instance($reschedule->original_end_at);
+
+            if ($start->lessThanOrEqualTo(CarbonImmutable::now())) {
+                throw new DomainException('RESTORE_NOT_POSSIBLE', 'Jam asli pertemuan sudah lewat sehingga tidak bisa dikembalikan. Gunakan Pindahkan lagi untuk memilih slot lain.');
+            }
+
+            if ($this->availability->blocksFor([$originalRoom->id], $start, $end, lock: true)->get($originalRoom->id, collect())->isNotEmpty()) {
+                throw new DomainException('RESTORE_NOT_POSSIBLE', "Ruangan asli {$originalRoom->name} sudah dipakai pada jam itu. Gunakan Pindahkan lagi untuk memilih slot lain.");
+            }
+
+            $this->releaseReplacement($locked, $actor, $reason);
+            $reschedule->forceFill(['status' => RescheduleStatus::Cancelled, 'cancelled_at' => now(), 'cancelled_by' => $actor->id])->save();
+            $this->originalBlocks($reschedule)->update(['is_active' => true]);
+            AvailabilityCache::bust();
+
+            $this->audit->log('meeting.reschedule_cancelled', $reschedule, ['status' => RescheduleStatus::Active->value], ['status' => RescheduleStatus::Cancelled->value], $reason);
+
+            $summary = "{$reschedule->session_title} kembali ke {$originalRoom->name}, ".Wita::dayName($start).', '.Wita::date($start).' '.Wita::range($start, $end).'.';
+            $classIds = array_map('intval', array_filter(explode(',', $reschedule->participant_key)));
+
+            if ($actor->id !== $locked->created_by) {
+                $this->notifications->notify($locked->creator, 'meeting.reschedule_cancelled', 'Pemindahan pertemuan dibatalkan', $summary.($reason ? ' Alasan: '.$reason : ''), ['reservation_id' => $locked->id]);
+            }
+
+            if (! $actor->isAdmin()) {
+                $this->notifications->notify($this->notifications->admins(), 'meeting.reschedule_cancelled', "Pemindahan dibatalkan: {$reschedule->session_title}", $summary, ['reservation_id' => $locked->id]);
+            }
+
+            $this->notifications->notify(
+                $this->notifications->ketisOf($classIds)->reject(fn (User $user): bool => in_array($user->id, [$actor->id, $locked->created_by], true)),
+                'meeting.reschedule_cancelled',
+                'Pemindahan pertemuan dibatalkan',
+                $summary,
+                ['reservation_id' => $locked->id],
+            );
+
+            return $locked->fresh(['block']);
+        });
+    }
+
+    private function assertReplaceable(Reservation $reservation, SessionReschedule $reschedule): void
+    {
+        if ($reschedule->status !== RescheduleStatus::Active || $reservation->status !== ReservationStatus::Booked) {
+            throw new DomainException('INVALID_STATUS_TRANSITION', 'Pemindahan hanya bisa diubah selama pertemuan pengganti belum dimulai.');
+        }
+    }
+
+    /**
+     * Batalkan reservasi pengganti dan lepas blok ruangnya.
+     */
+    private function releaseReplacement(Reservation $reservation, User $actor, ?string $reason): void
+    {
+        $reservation->forceFill([
+            'status' => ReservationStatus::Cancelled,
+            'cancelled_at' => now(),
+            'cancelled_by' => $actor->id,
+            'cancel_reason' => $reason,
+            'lock_version' => $reservation->lock_version + 1,
+        ])->save();
+
+        $reservation->block()->update(['is_active' => false]);
+    }
+
+    /**
+     * Blok jadwal pertemuan asli pada versi resmi yang berlaku di tanggal itu (tetap ditemukan setelah jadwal ditetapkan ulang).
+     */
+    private function originalBlocks(SessionReschedule $reschedule)
+    {
+        $version = $this->schedules->officialVersionOn($reschedule->original_start_at);
+
+        return RoomBlock::query()
+            ->where('source_type', RoomBlockSource::Schedule)
+            ->where('schedule_version_id', $version?->id)
+            ->where('room_id', $reschedule->original_room_id)
+            ->where('start_at', $reschedule->original_start_at);
     }
 
     /**

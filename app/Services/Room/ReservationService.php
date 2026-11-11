@@ -10,6 +10,7 @@ use App\Models\Reservation\Reservation;
 use App\Models\Room\Room;
 use App\Models\Room\RoomBlock;
 use App\Models\User\User;
+use App\Services\Academic\MeetingRescheduleService;
 use App\Services\Account\AuditLogger;
 use App\Services\Account\NotificationService;
 use App\Support\AvailabilityCache;
@@ -267,6 +268,11 @@ class ReservationService
     {
         if ($actor->isAdmin() && blank($reason)) {
             throw new DomainException('DATA_INCOMPLETE', 'Alasan pembatalan wajib diisi oleh admin.');
+        }
+
+        // Pengganti pertemuan kuliah yang dipindah: batal berarti kembali ke jam asli.
+        if ($reservation->session_reschedule_id !== null) {
+            return app(MeetingRescheduleService::class)->cancel($reservation, $actor, $reason);
         }
 
         return DB::transaction(function () use ($reservation, $actor, $reason): Reservation {

@@ -17,6 +17,7 @@ use App\Models\User\AppNotification;
 use App\Models\User\AuditLog;
 use App\Models\User\User;
 use App\Services\Academic\MeetingRescheduleService;
+use App\Services\Room\ReservationService;
 use Carbon\CarbonImmutable;
 
 beforeEach(function () {
@@ -201,4 +202,109 @@ test('kirim ulang dengan kunci idempotensi yang sama tidak menggandakan pemindah
 
     expect($second->id)->toBe($first->id);
     expectNothingMoved(1);
+});
+
+function originalBlock(): RoomBlock
+{
+    return RoomBlock::query()->where('source_type', RoomBlockSource::Schedule)->where('source_id', test()->session->id)
+        ->where('start_at', '2026-11-09 07:30:00')->sole();
+}
+
+test('Keti membatalkan pemindahan: pertemuan kembali ke jam asli', function () {
+    $reschedule = moveMeeting();
+
+    $cancelled = $this->service->cancel($reschedule->reservation, $this->keti);
+
+    expect($cancelled->status)->toBe(ReservationStatus::Cancelled)
+        ->and($cancelled->block->is_active)->toBeFalse()
+        ->and($reschedule->fresh()->status)->toBe(RescheduleStatus::Cancelled)
+        ->and($reschedule->fresh()->cancelled_by)->toBe($this->keti->id)
+        ->and(originalBlock()->is_active)->toBeTrue()
+        ->and(AuditLog::query()->where('action', 'meeting.reschedule_cancelled')->exists())->toBeTrue()
+        ->and(AppNotification::query()->whereBelongsTo($this->admin)->where('type', 'meeting.reschedule_cancelled')->exists())->toBeTrue();
+});
+
+test('pembatalan lewat ReservationService juga mengembalikan pertemuan ke jam asli', function () {
+    $reschedule = moveMeeting();
+
+    app(ReservationService::class)->cancel($reschedule->reservation, $this->keti);
+
+    expect($reschedule->fresh()->status)->toBe(RescheduleStatus::Cancelled)
+        ->and(originalBlock()->is_active)->toBeTrue();
+});
+
+test('admin wajib memberi alasan dan Keti pemindah diberi tahu', function () {
+    $reschedule = moveMeeting();
+
+    expectDomainCode(fn () => app(ReservationService::class)->cancel($reschedule->reservation, $this->admin), 'DATA_INCOMPLETE');
+
+    app(ReservationService::class)->cancel($reschedule->reservation, $this->admin, 'Ruang dipakai rapat jurusan');
+
+    expect(originalBlock()->is_active)->toBeTrue()
+        ->and(AppNotification::query()->whereBelongsTo($this->keti)->where('type', 'meeting.reschedule_cancelled')->exists())->toBeTrue();
+});
+
+test('pemindahan yang penggantinya sudah dipakai tidak bisa dibatalkan', function () {
+    $reschedule = moveMeeting(['newStart' => CarbonImmutable::parse('2026-11-04 13:00')]);
+    $this->travelTo(CarbonImmutable::parse('2026-11-04 13:05'));
+    app(ReservationService::class)->start($reschedule->reservation, $this->keti);
+
+    expectDomainCode(fn () => $this->service->cancel($reschedule->reservation->fresh(), $this->keti), 'INVALID_STATUS_TRANSITION');
+    expect($reschedule->fresh()->status)->toBe(RescheduleStatus::Active);
+});
+
+test('pembatalan ditolak bila ruang asli sudah dipesan kelas lain', function () {
+    $reschedule = moveMeeting();
+    app(ReservationService::class)->create(User::factory()->approvedKeti()->create(), $this->ae107, CarbonImmutable::parse('2026-11-09 07:30'), CarbonImmutable::parse('2026-11-09 09:10'), 'Rapat', null, (string) str()->uuid());
+
+    expectDomainCode(fn () => $this->service->cancel($reschedule->reservation, $this->keti), 'RESTORE_NOT_POSSIBLE');
+
+    expect($reschedule->fresh()->status)->toBe(RescheduleStatus::Active)
+        ->and($reschedule->reservation->fresh()->status)->toBe(ReservationStatus::Booked)
+        ->and(originalBlock()->is_active)->toBeFalse();
+});
+
+test('pembatalan ditolak bila jam asli sudah lewat', function () {
+    $reschedule = moveMeeting(['newStart' => CarbonImmutable::parse('2026-11-11 10:00')]);
+    $this->travelTo(CarbonImmutable::parse('2026-11-09 08:00'));
+
+    expectDomainCode(fn () => $this->service->cancel($reschedule->reservation, $this->keti), 'RESTORE_NOT_POSSIBLE');
+});
+
+test('Pindahkan lagi mengganti pengganti lama walau jam asli sudah lewat', function () {
+    $old = moveMeeting(['newStart' => CarbonImmutable::parse('2026-11-11 10:00')]);
+    $this->travelTo(CarbonImmutable::parse('2026-11-09 08:00'));
+
+    $new = $this->service->moveAgain($this->keti, $old->reservation, CarbonImmutable::parse('2026-11-12 13:00'), $this->ae209, [$this->partner->id], (string) str()->uuid());
+
+    expect($old->fresh()->status)->toBe(RescheduleStatus::Replaced)
+        ->and($old->reservation->fresh()->status)->toBe(ReservationStatus::Cancelled)
+        ->and($new->status)->toBe(RescheduleStatus::Active)
+        ->and($new->original_start_at->format('Y-m-d H:i'))->toBe('2026-11-09 07:30')
+        ->and($new->reservation->start_at->format('Y-m-d H:i'))->toBe('2026-11-12 13:00')
+        ->and(originalBlock()->is_active)->toBeFalse();
+});
+
+test('Pindahkan lagi boleh memakai slot yang beririsan dengan pengganti lama', function () {
+    $old = moveMeeting();
+
+    $new = $this->service->moveAgain($this->keti, $old->reservation, CarbonImmutable::parse('2026-11-10 11:00'), $this->ae209, [$this->partner->id], (string) str()->uuid());
+
+    expect($new->reservation->start_at->format('H:i'))->toBe('11:00');
+});
+
+test('Pindahkan lagi untuk reservasi biasa ditolak', function () {
+    $reservation = app(ReservationService::class)->create($this->keti, $this->ae209, CarbonImmutable::parse('2026-11-05 10:00'), CarbonImmutable::parse('2026-11-05 11:00'), 'Rapat', null, (string) str()->uuid());
+
+    expectDomainCode(fn () => $this->service->moveAgain($this->keti, $reservation, CarbonImmutable::parse('2026-11-12 13:00'), $this->ae209, [$this->partner->id], (string) str()->uuid()), 'MEETING_NOT_FOUND');
+});
+
+test('reservasi lama berkegiatan Kuliah Pengganti tanpa pemindahan dibatalkan lewat alur biasa', function () {
+    $legacy = app(ReservationService::class)->create($this->keti, $this->ae209, CarbonImmutable::parse('2026-11-05 10:00'), CarbonImmutable::parse('2026-11-05 11:00'), 'Kuliah Pengganti', null, (string) str()->uuid());
+
+    $cancelled = app(ReservationService::class)->cancel($legacy, $this->keti);
+
+    expect($cancelled->status)->toBe(ReservationStatus::Cancelled)
+        ->and($cancelled->block->is_active)->toBeFalse()
+        ->and(SessionReschedule::query()->count())->toBe(0);
 });

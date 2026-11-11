@@ -227,11 +227,25 @@ class MeetingRescheduleService
     }
 
     /**
-     * Aturan 1–11 lalu simpan. $replacing = pemindahan aktif yang sedang diganti (Pindahkan lagi).
+     * Aturan pemindahan selain ruang (aturan 1–7, 9–11), tanpa menyimpan. Dipakai halaman Pindahkan untuk
+     * memberi tahu bentrok kelas/dosen sebelum Keti memilih ruang.
      *
      * @param  list<int>  $lecturerIds
+     *
+     * @throws DomainException
      */
-    private function createMove(User $keti, ScheduleSession $session, CarbonInterface $originalDate, CarbonImmutable $newStart, Room $lockedRoom, array $lecturerIds, string $idempotencyKey, ?SessionReschedule $replacing = null): SessionReschedule
+    public function check(User $keti, ScheduleSession $session, CarbonInterface $originalDate, CarbonInterface $newStart, array $lecturerIds, ?SessionReschedule $replacing = null): Meeting
+    {
+        $session->loadMissing(['participants', 'lecturers']);
+
+        return $this->validateMove($keti, $session, $originalDate, $this->normalize($newStart), $lecturerIds, $replacing)['meeting'];
+    }
+
+    /**
+     * @param  list<int>  $lecturerIds
+     * @return array{classGroup: ClassGroup, meeting: Meeting, end: CarbonImmutable, lecturers: Collection<int, Lecturer>}
+     */
+    private function validateMove(User $keti, ScheduleSession $session, CarbonInterface $originalDate, CarbonImmutable $newStart, array $lecturerIds, ?SessionReschedule $replacing): array
     {
         $classGroup = $this->assertParticipant($keti, $session);
 
@@ -251,6 +265,18 @@ class MeetingRescheduleService
         $lecturers = $this->assertLecturers($session, $lecturerIds);
         $this->assertClassesFree($meeting, $newStart, $newEnd, $replacing);
         $this->lecturers->assertFree($lecturers, $newStart, $newEnd, $meeting, $replacing?->id);
+
+        return ['classGroup' => $classGroup, 'meeting' => $meeting, 'end' => $newEnd, 'lecturers' => $lecturers];
+    }
+
+    /**
+     * Aturan 1–11 lalu simpan. $replacing = pemindahan aktif yang sedang diganti (Pindahkan lagi).
+     *
+     * @param  list<int>  $lecturerIds
+     */
+    private function createMove(User $keti, ScheduleSession $session, CarbonInterface $originalDate, CarbonImmutable $newStart, Room $lockedRoom, array $lecturerIds, string $idempotencyKey, ?SessionReschedule $replacing = null): SessionReschedule
+    {
+        ['classGroup' => $classGroup, 'meeting' => $meeting, 'end' => $newEnd, 'lecturers' => $lecturers] = $this->validateMove($keti, $session, $originalDate, $newStart, $lecturerIds, $replacing);
 
         $reservation = $this->reservations->createForReschedule($keti, $classGroup, $lockedRoom, $newStart, $newEnd, $idempotencyKey);
 

@@ -477,8 +477,17 @@ class ReservationService
         ?int $ignoreReservationId = null,
         string $hint = 'Batalkan pesanan itu atau pilih jam lain.',
     ): void {
+        $id = (string) $classGroup->id;
+
         $clash = Reservation::query()
-            ->whereBelongsTo($classGroup)
+            // Milik kelas ini, atau pengganti kuliah gabungan yang diikuti kelas ini walau dipesan Keti kelas lain.
+            ->where(fn ($query) => $query
+                ->whereBelongsTo($classGroup)
+                ->orWhereHas('sessionReschedule', fn ($reschedule) => $reschedule->active()->where(fn ($key) => $key
+                    ->where('participant_key', $id)
+                    ->orWhere('participant_key', 'like', $id.',%')
+                    ->orWhere('participant_key', 'like', '%,'.$id)
+                    ->orWhere('participant_key', 'like', '%,'.$id.',%'))))
             ->whereIn('status', [ReservationStatus::Booked, ReservationStatus::InUse])
             ->where('start_at', '<', $end)
             ->where('end_at', '>', $start)

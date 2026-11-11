@@ -22,8 +22,8 @@ class MoveMeetingRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'session_id' => ['required', 'integer', Rule::exists('schedule_sessions', 'id')],
-            'original_date' => ['required', 'date_format:Y-m-d'],
+            'session_id' => ['required_without:replaces_reservation_id', 'nullable', 'integer'],
+            'original_date' => ['required_without:replaces_reservation_id', 'nullable', 'date_format:Y-m-d'],
             'replaces_reservation_id' => ['nullable', 'integer', Rule::exists('reservations', 'id')],
             'start_at' => ['required', 'date_format:Y-m-d H:i'],
             'room_id' => ['required', 'integer', Rule::exists('rooms', 'id')->whereNull('deleted_at')],

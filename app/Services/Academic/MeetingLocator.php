@@ -84,6 +84,16 @@ class MeetingLocator
             ->values();
     }
 
+    /**
+     * Pertemuan asli dari sebuah pemindahan aktif pada Jadwal resmi yang berlaku sekarang. Tetap ditemukan setelah
+     * jadwal ditetapkan ulang (ID sesi dan ruangnya boleh berubah).
+     */
+    public function findMoved(SessionReschedule $reschedule): ?Meeting
+    {
+        return $this->meetingsOn($reschedule->original_start_at)
+            ->first(fn (Meeting $meeting): bool => $meeting->reschedule?->id === $reschedule->id);
+    }
+
     public function activeRescheduleFor(ScheduleSession $session, CarbonInterface $start): ?SessionReschedule
     {
         return SessionReschedule::query()->active()

@@ -84,8 +84,8 @@
                                 </form>
                             @endunless
                             <x-button variant="danger-outline" x-data x-on:click="$dispatch('open-modal', 'batal-pesanan')">{{ $reschedule ? 'Batalkan pemindahan' : 'Batalkan' }}</x-button>
-                            @if ($reschedule && $reschedule->schedule_session_id)
-                                <x-button variant="secondary" class="col-span-2" :href="route('keti.meetings.reschedule', ['sesi' => $reschedule->schedule_session_id, 'tanggal' => $reschedule->original_start_at->toDateString(), 'pengganti' => $reservation->id])">Pindahkan lagi</x-button>
+                            @if ($reschedule)
+                                <x-button variant="secondary" class="col-span-2" :href="route('keti.meetings.reschedule', ['pengganti' => $reservation->id])">Pindahkan lagi</x-button>
                             @endif
                         @elseif ($status === ReservationStatus::InUse && $canManage)
                             <form method="POST" action="{{ route('keti.reservations.finish', $reservation) }}">

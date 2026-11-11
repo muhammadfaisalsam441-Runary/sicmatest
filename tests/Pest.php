@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\RoomBlockSource;
+use App\Enums\ScheduleSource;
 use App\Enums\SessionPhase;
 use App\Enums\TeachingRole;
 use App\Exceptions\DomainException;
@@ -13,7 +14,10 @@ use App\Models\Room\Room;
 use App\Models\Room\RoomBlock;
 use App\Models\Scheduling\ScheduleSession;
 use App\Models\Scheduling\ScheduleVersion;
+use App\Models\User\User;
 use App\Services\Scheduling\ScheduleBlockBuilder;
+use App\Services\Scheduling\ScheduleDraftService;
+use App\Services\Scheduling\SchedulePublisher;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Tests\TestCase;
@@ -83,6 +87,22 @@ function meetingSession(array $classGroups, array $attributes = [], array $team 
     app(ScheduleBlockBuilder::class)->rebuild($version->fresh());
 
     return $session->fresh(['participants', 'lecturers', 'courseOffering']);
+}
+
+/**
+ * Admin menetapkan ulang jadwal: draf disalin dari Jadwal resmi, $changeDraft boleh mengubah sesinya, lalu
+ * ditetapkan berlaku mulai hari ini. Mengembalikan versi resmi yang baru.
+ */
+function republishSchedule(?Closure $changeDraft = null): ScheduleVersion
+{
+    $official = officialVersion();
+    $draft = app(ScheduleDraftService::class)->create($official->period, ScheduleSource::Manual, $official);
+
+    if ($changeDraft !== null) {
+        $changeDraft($draft);
+    }
+
+    return app(SchedulePublisher::class)->publish($draft->fresh(), User::factory()->superAdmin()->create(), CarbonImmutable::today(), $draft->fresh()->lock_version);
 }
 
 /**

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Keti;
 
+use App\Enums\RescheduleStatus;
 use App\Enums\TeachingRole;
 use App\Exceptions\DomainException;
 use App\Http\Controllers\Controller;
@@ -31,8 +32,8 @@ class MeetingRescheduleController extends Controller
     public function create(Request $request, AvailabilityService $availability): View|RedirectResponse
     {
         $filters = $request->validate([
-            'sesi' => ['required', 'integer'],
-            'tanggal' => ['required', 'date_format:Y-m-d'],
+            'sesi' => ['required_without:pengganti', 'integer'],
+            'tanggal' => ['required_without:pengganti', 'date_format:Y-m-d'],
             'pengganti' => ['nullable', 'integer'],
             'ke_tanggal' => ['nullable', 'date_format:Y-m-d'],
             'jam' => ['nullable', 'regex:/^([01]\d|2[0-3]):[0-5]\d$/'],
@@ -41,16 +42,23 @@ class MeetingRescheduleController extends Controller
         ]);
 
         $user = $request->user();
-        $session = ScheduleSession::query()->with(['participants', 'lecturers', 'room.building', 'version.period'])->findOrFail($filters['sesi']);
-        $meeting = $this->meetings->find($session, CarbonImmutable::parse($filters['tanggal'])) ?? abort(404);
-        abort_unless($session->participants->contains('id', $user->activeClassGroup()?->id), 403);
-
         $replacing = null;
+
         if (isset($filters['pengganti'])) {
-            abort_unless($meeting->reschedule?->reservation_id === (int) $filters['pengganti'], 404);
-            $replacing = $meeting->reschedule;
-        } elseif ($meeting->isMoved()) {
-            return redirect()->route('keti.reservations.show', $meeting->reschedule->reservation_id);
+            // Pindahkan lagi: pertemuan dicari dari pemindahannya agar tetap ketemu setelah jadwal ditetapkan ulang.
+            $replacement = Reservation::query()->with('sessionReschedule')->findOrFail($filters['pengganti']);
+            abort_unless($user->can('manage', $replacement), 403);
+            $replacing = $replacement->sessionReschedule?->status === RescheduleStatus::Active ? $replacement->sessionReschedule : null;
+            $meeting = ($replacing ? $this->meetings->findMoved($replacing) : null) ?? abort(404);
+            $session = $meeting->session->loadMissing('room.building');
+        } else {
+            $session = ScheduleSession::query()->with(['participants', 'lecturers', 'room.building', 'version.period'])->findOrFail($filters['sesi']);
+            $meeting = $this->meetings->find($session, CarbonImmutable::parse($filters['tanggal'])) ?? abort(404);
+            abort_unless($session->participants->contains('id', $user->activeClassGroup()?->id), 403);
+
+            if ($meeting->isMoved()) {
+                return redirect()->route('keti.reservations.show', $meeting->reschedule->reservation_id);
+            }
         }
 
         $rotation = $this->meetings->rotationLecturerIds($session, $meeting->start);
@@ -110,13 +118,12 @@ class MeetingRescheduleController extends Controller
                 return response()->json($exception->toArray(), 409);
             }
 
-            return redirect()->route('keti.meetings.reschedule', array_filter([
-                'sesi' => $data['session_id'],
-                'tanggal' => $data['original_date'],
-                'pengganti' => $data['replaces_reservation_id'] ?? null,
-                'ke_tanggal' => $start->toDateString(),
-                'jam' => $start->format('H:i'),
-            ]))->with('reschedule_error', ['code' => $exception->errorCode, 'message' => $exception->getMessage()]);
+            $target = isset($data['replaces_reservation_id'])
+                ? ['pengganti' => $data['replaces_reservation_id']]
+                : ['sesi' => $data['session_id'], 'tanggal' => $data['original_date']];
+
+            return redirect()->route('keti.meetings.reschedule', [...$target, 'ke_tanggal' => $start->toDateString(), 'jam' => $start->format('H:i')])
+                ->with('reschedule_error', ['code' => $exception->errorCode, 'message' => $exception->getMessage()]);
         }
 
         if ($request->expectsJson()) {

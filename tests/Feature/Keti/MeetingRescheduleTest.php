@@ -184,3 +184,30 @@ test('Keti kelas gabungan lain boleh melihat pengganti tetapi tidak mengelolanya
     $this->actingAs($ketiA)->post(route('keti.reservations.start', $reservationId))->assertForbidden();
     $this->actingAs($ketiA)->get(myClassUrl('2026-11-12'))->assertOk()->assertSee('Kuliah Pengganti');
 });
+
+test('Keti kelas gabungan lain tidak bisa membuka atau mengirim Pindahkan lagi untuk pengganti kelas lain', function () {
+    $classA = ClassGroup::factory()->create(['name' => 'Tekom A']);
+    $ketiA = User::factory()->approvedKeti($classA)->create();
+    $joint = meetingSession([$this->classC, $classA], ['title' => 'Statistika', 'day_of_week' => 3, 'start_minute' => 780, 'end_minute' => 880, 'room_id' => $this->ae107->id], $this->team);
+    $this->actingAs($this->keti)->post(route('keti.meetings.reschedule.store'), movePayload(['session_id' => $joint->id, 'original_date' => '2026-11-11', 'start_at' => '2026-11-12 13:00']));
+    $reservationId = SessionReschedule::query()->sole()->reservation_id;
+
+    $this->actingAs($ketiA)->get(route('keti.meetings.reschedule', ['pengganti' => $reservationId]))->assertForbidden();
+    $this->actingAs($ketiA)->postJson(route('keti.meetings.reschedule.store'), movePayload(['session_id' => $joint->id, 'original_date' => '2026-11-11', 'replaces_reservation_id' => $reservationId, 'start_at' => '2026-11-12 08:00']))
+        ->assertConflict()->assertJsonPath('code', 'NOT_CLASS_REPRESENTATIVE');
+});
+
+test('Pindahkan lagi tetap bisa dibuka dan dikirim setelah admin menetapkan ulang jadwal', function () {
+    $this->actingAs($this->keti)->post(route('keti.meetings.reschedule.store'), movePayload());
+    $reservationId = SessionReschedule::query()->sole()->reservation_id;
+    republishSchedule();
+
+    $this->actingAs($this->keti)->get(route('keti.reservations.show', $reservationId))->assertOk()
+        ->assertSee(route('keti.meetings.reschedule', ['pengganti' => $reservationId]));
+    $this->actingAs($this->keti)->get(route('keti.meetings.reschedule', ['pengganti' => $reservationId, 'ke_tanggal' => '2026-11-12', 'jam' => '13:00']))->assertOk()
+        ->assertSee('Pindahkan ke sini');
+    $this->actingAs($this->keti)->post(route('keti.meetings.reschedule.store'), movePayload(['replaces_reservation_id' => $reservationId, 'start_at' => '2026-11-12 13:00']))
+        ->assertRedirect();
+
+    expect(SessionReschedule::query()->where('status', 'active')->sole()->reservation->start_at->format('Y-m-d H:i'))->toBe('2026-11-12 13:00');
+});

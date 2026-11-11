@@ -13,6 +13,7 @@ use App\Models\Lecturer\Lecturer;
 use App\Models\Reservation\Reservation;
 use App\Models\Room\Room;
 use App\Models\Room\RoomBlock;
+use App\Models\Scheduling\ScheduleSession;
 use App\Models\User\AppNotification;
 use App\Models\User\AuditLog;
 use App\Models\User\User;
@@ -307,4 +308,79 @@ test('reservasi lama berkegiatan Kuliah Pengganti tanpa pemindahan dibatalkan le
     expect($cancelled->status)->toBe(ReservationStatus::Cancelled)
         ->and($cancelled->block->is_active)->toBeFalse()
         ->and(SessionReschedule::query()->count())->toBe(0);
+});
+
+/*
+| Temuan review akhir.
+*/
+
+/**
+ * Sesi gabungan Statistika (Tekom C + Tekom A), Rabu 13:00–14:40, beserta Keti Tekom A.
+ *
+ * @return array{0: ScheduleSession, 1: User, 2: ClassGroup}
+ */
+function jointStatistics(): array
+{
+    $classA = ClassGroup::factory()->create(['name' => 'Tekom A']);
+    $ketiA = User::factory()->approvedKeti($classA)->create();
+    $joint = meetingSession([test()->classC, $classA], ['title' => 'Statistika', 'day_of_week' => 3, 'start_minute' => 780, 'end_minute' => 880, 'room_id' => test()->ae107->id], test()->team);
+
+    return [$joint, $ketiA, $classA];
+}
+
+test('pengganti kelas gabungan memblokir kelas peserta lain', function () {
+    [$joint, $ketiA, $classA] = jointStatistics();
+    moveMeeting(['session' => $joint, 'originalDate' => CarbonImmutable::parse('2026-11-11'), 'newStart' => CarbonImmutable::parse('2026-11-10 13:00')]);
+    $onlyA = meetingSession([$classA], ['title' => 'Basis Data', 'day_of_week' => 4, 'start_minute' => 780, 'end_minute' => 880, 'room_id' => Room::factory()->create()->id], [[Lecturer::factory()->create(), TeachingRole::Lead, SessionPhase::Full]]);
+
+    expectDomainCode(fn () => moveMeeting(['keti' => $ketiA, 'session' => $onlyA->fresh(['participants', 'lecturers']), 'originalDate' => CarbonImmutable::parse('2026-11-12'), 'newStart' => CarbonImmutable::parse('2026-11-10 13:00'), 'room' => Room::factory()->create(), 'lecturerIds' => [$onlyA->lecturers->first()->id]]), 'CLASS_TIME_CONFLICT');
+    expectDomainCode(fn () => app(ReservationService::class)->create($ketiA, Room::factory()->create(), CarbonImmutable::parse('2026-11-10 13:30'), CarbonImmutable::parse('2026-11-10 14:30'), 'Rapat', null, (string) str()->uuid()), 'CLASS_TIME_CONFLICT');
+});
+
+test('Keti kelas gabungan lain tidak bisa memindahkan lagi pengganti milik kelas lain', function () {
+    [$joint, $ketiA] = jointStatistics();
+    $reschedule = moveMeeting(['session' => $joint, 'originalDate' => CarbonImmutable::parse('2026-11-11'), 'newStart' => CarbonImmutable::parse('2026-11-10 13:00')]);
+
+    expectDomainCode(fn () => $this->service->moveAgain($ketiA, $reschedule->reservation, CarbonImmutable::parse('2026-11-12 13:00'), $this->ae209, [$this->partner->id], (string) str()->uuid()), 'NOT_CLASS_REPRESENTATIVE');
+
+    expect($reschedule->fresh()->status)->toBe(RescheduleStatus::Active)
+        ->and($reschedule->reservation->fresh()->status)->toBe(ReservationStatus::Booked);
+});
+
+test('batal pemindahan setelah jadwal ditetapkan ulang dengan ruang baru mengaktifkan blok ruang baru', function () {
+    $reschedule = moveMeeting();
+    $ae300 = Room::factory()->create(['name' => 'AE 300']);
+    $version = republishSchedule(fn ($draft) => $draft->sessions()->where('course_offering_id', $this->session->course_offering_id)->update(['room_id' => $ae300->id]));
+
+    $this->service->cancel($reschedule->reservation, $this->keti);
+
+    $restored = RoomBlock::query()->whereBelongsTo($version, 'scheduleVersion')->where('source_type', RoomBlockSource::Schedule)
+        ->where('start_at', '2026-11-09 07:30:00')->sole();
+    expect($restored->room_id)->toBe($ae300->id)
+        ->and($restored->is_active)->toBeTrue()
+        ->and($reschedule->fresh()->status)->toBe(RescheduleStatus::Cancelled);
+});
+
+test('admin tetap bisa membatalkan pengganti walau jam asli sudah lewat', function () {
+    $reschedule = moveMeeting(['newStart' => CarbonImmutable::parse('2026-11-11 10:00')]);
+    $this->travelTo(CarbonImmutable::parse('2026-11-09 08:00'));
+
+    app(ReservationService::class)->cancel($reschedule->reservation, $this->admin, 'Dosen berhalangan');
+
+    expect($reschedule->reservation->fresh()->status)->toBe(ReservationStatus::Cancelled)
+        ->and($reschedule->reservation->fresh()->block->is_active)->toBeFalse()
+        ->and(originalBlock()->is_active)->toBeFalse()
+        ->and(AppNotification::query()->whereBelongsTo($this->keti)->where('type', 'meeting.reschedule_cancelled')->exists())->toBeTrue();
+});
+
+test('pertemuan tidak dikembalikan bila dosennya sudah mengajar pertemuan pindahan lain di jam asli', function () {
+    $reschedule = moveMeeting();
+    $classX = ClassGroup::factory()->create(['name' => 'Tekom X']);
+    $other = meetingSession([$classX], ['title' => 'Jaringan', 'day_of_week' => 2, 'start_minute' => 780, 'end_minute' => 930, 'room_id' => Room::factory()->create()->id], $this->team);
+    moveMeeting(['keti' => User::factory()->approvedKeti($classX)->create(), 'session' => $other, 'originalDate' => CarbonImmutable::parse('2026-11-10'), 'newStart' => CarbonImmutable::parse('2026-11-09 07:30'), 'room' => Room::factory()->create()]);
+
+    $exception = expectDomainCode(fn () => $this->service->cancel($reschedule->reservation, $this->keti), 'RESTORE_NOT_POSSIBLE');
+
+    expect($exception->getMessage())->toContain('Sari Dewi')
+        ->and($reschedule->fresh()->status)->toBe(RescheduleStatus::Active);
 });

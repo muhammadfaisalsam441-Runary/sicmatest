@@ -64,6 +64,7 @@ class MeetingRescheduleService
                 // Lock dulu sebelum membaca apa pun (REPEATABLE READ): ruang tujuan, lalu kelas peserta urut ID.
                 $lockedRoom = Room::query()->whereKey($room->id)->lockForUpdate()->firstOrFail();
                 ClassGroup::query()->whereKey($session->participants->modelKeys())->orderBy('id')->lockForUpdate()->get();
+                $this->lockLecturers($lecturerIds);
 
                 if ($existing = $this->findByKey($keti, $idempotencyKey)) {
                     return $existing;
@@ -92,8 +93,7 @@ class MeetingRescheduleService
         }
 
         $old = $replacement->sessionReschedule;
-        $meeting = $old === null ? null : $this->meetings->meetingsOn($old->original_start_at)
-            ->first(fn (Meeting $meeting): bool => $meeting->reschedule?->id === $old->id);
+        $meeting = $old === null ? null : $this->meetings->findMoved($old);
 
         if ($meeting === null) {
             throw new DomainException('MEETING_NOT_FOUND', 'Reservasi ini bukan pertemuan kuliah yang dipindah.');
@@ -105,10 +105,16 @@ class MeetingRescheduleService
         return DB::transaction(function () use ($keti, $session, $old, $newStart, $room, $lecturerIds, $idempotencyKey): SessionReschedule {
             $lockedRoom = Room::query()->whereKey($room->id)->lockForUpdate()->firstOrFail();
             ClassGroup::query()->whereKey($session->participants->modelKeys())->orderBy('id')->lockForUpdate()->get();
+            $this->lockLecturers($lecturerIds);
             $oldReservation = Reservation::query()->whereKey($old->reservation_id)->lockForUpdate()->firstOrFail();
 
             if ($existing = $this->findByKey($keti, $idempotencyKey)) {
                 return $existing;
+            }
+
+            // Hanya Keti kelas yang memindahkan (pemilik reservasi pengganti) yang boleh memindahkannya lagi.
+            if (! $keti->can('manage', $oldReservation)) {
+                throw new DomainException('NOT_CLASS_REPRESENTATIVE', 'Hanya Keti kelas yang memindahkan pertemuan ini yang dapat memindahkannya lagi.');
             }
 
             $old->refresh();
@@ -136,9 +142,12 @@ class MeetingRescheduleService
         $reschedule = $reservation->sessionReschedule
             ?? throw new DomainException('MEETING_NOT_FOUND', 'Reservasi ini bukan pertemuan kuliah yang dipindah.');
 
-        return DB::transaction(function () use ($reservation, $reschedule, $actor, $reason): Reservation {
+        // Pertemuan asli pada jadwal yang berlaku sekarang: ruang dan ID sesinya bisa berubah setelah jadwal ditetapkan ulang.
+        $meeting = $this->meetings->findMoved($reschedule);
+
+        return DB::transaction(function () use ($reservation, $reschedule, $meeting, $actor, $reason): Reservation {
             // Lock ruang asli lalu reservasi pengganti sebelum membaca apa pun.
-            $originalRoom = Room::query()->whereKey($reschedule->original_room_id)->lockForUpdate()->firstOrFail();
+            $originalRoom = Room::query()->whereKey($meeting?->session->room_id ?? $reschedule->original_room_id)->lockForUpdate()->first();
             $locked = Reservation::query()->whereKey($reservation->id)->lockForUpdate()->firstOrFail();
             $reschedule->refresh();
 
@@ -150,24 +159,24 @@ class MeetingRescheduleService
 
             $start = CarbonImmutable::instance($reschedule->original_start_at);
             $end = CarbonImmutable::instance($reschedule->original_end_at);
+            $classIds = array_map('intval', array_filter(explode(',', $reschedule->participant_key)));
 
-            if ($start->lessThanOrEqualTo(CarbonImmutable::now())) {
-                throw new DomainException('RESTORE_NOT_POSSIBLE', 'Jam asli pertemuan sudah lewat sehingga tidak bisa dikembalikan. Gunakan Pindahkan lagi untuk memilih slot lain.');
-            }
+            if ($blocker = $this->restoreBlocker($reschedule, $meeting, $originalRoom, $start, $end)) {
+                if (! $actor->isAdmin()) {
+                    throw new DomainException('RESTORE_NOT_POSSIBLE', $blocker.' Gunakan Pindahkan lagi untuk memilih slot lain.');
+                }
 
-            if ($this->availability->blocksFor([$originalRoom->id], $start, $end, lock: true)->get($originalRoom->id, collect())->isNotEmpty()) {
-                throw new DomainException('RESTORE_NOT_POSSIBLE', "Ruangan asli {$originalRoom->name} sudah dipakai pada jam itu. Gunakan Pindahkan lagi untuk memilih slot lain.");
+                return $this->dropReplacement($locked, $reschedule, $actor, $reason, $blocker, $classIds);
             }
 
             $this->releaseReplacement($locked, $actor, $reason);
             $reschedule->forceFill(['status' => RescheduleStatus::Cancelled, 'cancelled_at' => now(), 'cancelled_by' => $actor->id])->save();
-            $this->originalBlocks($reschedule)->update(['is_active' => true]);
+            $this->scheduleBlock($meeting->session, $meeting->start)->update(['is_active' => true]);
             AvailabilityCache::bust();
 
             $this->audit->log('meeting.reschedule_cancelled', $reschedule, ['status' => RescheduleStatus::Active->value], ['status' => RescheduleStatus::Cancelled->value], $reason);
 
             $summary = "{$reschedule->session_title} kembali ke {$originalRoom->name}, ".Wita::dayName($start).', '.Wita::date($start).' '.Wita::range($start, $end).'.';
-            $classIds = array_map('intval', array_filter(explode(',', $reschedule->participant_key)));
 
             if ($actor->id !== $locked->created_by) {
                 $this->notifications->notify($locked->creator, 'meeting.reschedule_cancelled', 'Pemindahan pertemuan dibatalkan', $summary.($reason ? ' Alasan: '.$reason : ''), ['reservation_id' => $locked->id]);
@@ -213,17 +222,72 @@ class MeetingRescheduleService
     }
 
     /**
-     * Blok jadwal pertemuan asli pada versi resmi yang berlaku di tanggal itu (tetap ditemukan setelah jadwal ditetapkan ulang).
+     * Alasan pertemuan tidak bisa kembali ke jam asli, atau null bila bisa: jadwal asli masih ada, jamnya belum lewat,
+     * ruangnya kosong, kelas peserta dan dosen terpilih tidak bentrok di jam itu.
      */
-    private function originalBlocks(SessionReschedule $reschedule)
+    private function restoreBlocker(SessionReschedule $reschedule, ?Meeting $meeting, ?Room $room, CarbonImmutable $start, CarbonImmutable $end): ?string
     {
-        $version = $this->schedules->officialVersionOn($reschedule->original_start_at);
+        if ($meeting === null || $room === null || ! $this->scheduleBlock($meeting->session, $meeting->start)->exists()) {
+            return 'Pertemuan asli tidak lagi ada di jadwal resmi.';
+        }
 
-        return RoomBlock::query()
-            ->where('source_type', RoomBlockSource::Schedule)
-            ->where('schedule_version_id', $version?->id)
-            ->where('room_id', $reschedule->original_room_id)
-            ->where('start_at', $reschedule->original_start_at);
+        if ($start->lessThanOrEqualTo(CarbonImmutable::now())) {
+            return 'Jam asli pertemuan sudah lewat sehingga tidak bisa dikembalikan.';
+        }
+
+        if ($this->availability->blocksFor([$room->id], $start, $end, lock: true)->get($room->id, collect())->isNotEmpty()) {
+            return "Ruangan asli {$room->name} sudah dipakai pada jam itu.";
+        }
+
+        try {
+            $this->assertClassesFree($meeting, $start, $end, $reschedule);
+            $this->lecturers->assertFree($reschedule->lecturers()->with('leadershipTerms')->get(), $start, $end, $meeting, $reschedule->id);
+        } catch (DomainException $exception) {
+            return 'Tidak bisa kembali ke jam asli: '.$exception->getMessage();
+        }
+
+        return null;
+    }
+
+    /**
+     * Admin membatalkan pengganti saat pertemuan tidak bisa dikembalikan: ruang pengganti dilepas, pertemuan asli tetap
+     * tidak menempati ruang (pemindahan tetap tercatat aktif agar jadwal yang ditetapkan ulang tidak mengaktifkannya lagi).
+     *
+     * @param  list<int>  $classIds
+     */
+    private function dropReplacement(Reservation $reservation, SessionReschedule $reschedule, User $admin, ?string $reason, string $blocker, array $classIds): Reservation
+    {
+        $this->releaseReplacement($reservation, $admin, $reason);
+        AvailabilityCache::bust();
+
+        $this->audit->log('meeting.replacement_dropped', $reschedule, null, ['reservation_id' => $reservation->id, 'blocker' => $blocker], $reason);
+
+        $body = "Kuliah pengganti {$reschedule->session_title} ".Wita::date($reservation->start_at).' '.Wita::range($reservation->start_at, $reservation->end_at)
+            ." dibatalkan admin. Pertemuan asli tidak dikembalikan: {$blocker} Alasan: {$reason}";
+
+        $this->notifications->notify(
+            $this->notifications->ketisOf($classIds)->push($reservation->creator)->unique('id'),
+            'meeting.reschedule_cancelled',
+            'Kuliah pengganti dibatalkan admin',
+            $body,
+            ['reservation_id' => $reservation->id],
+        );
+
+        return $reservation->fresh(['block']);
+    }
+
+    /**
+     * Kunci dosen terpilih (urut ID) agar dua pemindahan bersamaan tidak memakai dosen yang sama di jam yang sama.
+     *
+     * @param  list<int>  $lecturerIds
+     */
+    private function lockLecturers(array $lecturerIds): void
+    {
+        $ids = array_values(array_unique(array_map('intval', $lecturerIds)));
+
+        if ($ids !== []) {
+            Lecturer::query()->whereKey($ids)->orderBy('id')->lockForUpdate()->get();
+        }
     }
 
     /**

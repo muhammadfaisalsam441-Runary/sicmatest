@@ -6,6 +6,7 @@ use App\Enums\RoomBlockSource;
 use App\Enums\RoomType;
 use App\Models\Academic\ClassGroup;
 use App\Models\Reservation\Reservation;
+use App\Models\Room\Building;
 use App\Models\Room\Room;
 use App\Models\Room\RoomBlock;
 use App\Models\User\AppNotification;
@@ -186,17 +187,20 @@ test('admin dapat memperbarui banyak ruang sekaligus lewat edit massal di tabel'
     $this->actingAs($this->admin)
         ->from(route('admin.rooms.index'))
         ->put(route('admin.rooms.bulk-update'), [
+            // Format sama dengan formulir #bulkRoomForm di admin/rooms/index: id di dalam baris, gedung berupa nama.
             'rooms' => [
-                $room1->id => [
+                [
+                    'id' => $room1->id,
                     'name' => 'R101',
-                    'building_id' => $buildingB->id,
+                    'building' => $buildingB->name,
                     'floor' => 2,
                     'type' => RoomType::Classroom->value,
                     'capacity' => 45,
                 ],
-                $room2->id => [
+                [
+                    'id' => $room2->id,
                     'name' => 'Lab Jaringan Baru',
-                    'building_id' => $buildingB->id,
+                    'building' => $buildingB->name,
                     'floor' => 3,
                     'type' => RoomType::Lab->value,
                     'capacity' => 36,
@@ -204,7 +208,7 @@ test('admin dapat memperbarui banyak ruang sekaligus lewat edit massal di tabel'
             ],
         ])
         ->assertRedirect(route('admin.rooms.index'))
-        ->assertSessionHas('toast.title', 'Data 2 ruang diperbarui');
+        ->assertSessionHas('toast.title', 'Berhasil menyimpan 2 ruang');
 
     $room1->refresh();
     $room2->refresh();

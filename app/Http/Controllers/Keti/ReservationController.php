@@ -69,16 +69,18 @@ class ReservationController extends Controller
     public function failed(AvailabilityService $availability): View
     {
         $request = session('reservation_request');
+        $error = session('reservation_error', ['code' => 'UNKNOWN', 'message' => 'Ketersediaan ruang belum dapat dikonfirmasi. Pilih ruangan berstatus Tersedia atau coba lagi.']);
         $alternatives = [];
         $start = null;
         $duration = null;
 
         // Saran ruang lain yang kosong sepanjang durasi yang sama (status dihitung ulang, bukan dari cache).
+        // Tidak ditawarkan bila kelasnya sendiri sudah punya pesanan di jam itu: ruang mana pun akan ditolak.
         if (is_array($request)) {
             $start = CarbonImmutable::parse($request['start_at']);
             $duration = (int) $request['duration'];
 
-            if ($start->greaterThanOrEqualTo(CarbonImmutable::now()->subMinutes(5))) {
+            if ($error['code'] !== 'CLASS_TIME_CONFLICT' && $start->greaterThanOrEqualTo(CarbonImmutable::now()->subMinutes(5))) {
                 try {
                     $alternatives = $availability->search(new SearchCriteria(start: $start, durationMinutes: $duration, status: 'available'))
                         ->reject(fn ($result): bool => $result->room->id === (int) $request['room_id'])
@@ -98,7 +100,7 @@ class ReservationController extends Controller
         }
 
         return view('keti.reservations.failed', [
-            'error' => session('reservation_error', ['code' => 'UNKNOWN', 'message' => 'Ketersediaan ruang belum dapat dikonfirmasi. Pilih ruangan berstatus Tersedia atau coba lagi.']),
+            'error' => $error,
             'alternatives' => $alternatives,
             'start' => $start,
             'duration' => $duration,

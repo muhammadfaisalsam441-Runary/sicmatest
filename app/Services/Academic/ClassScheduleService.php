@@ -65,14 +65,14 @@ class ClassScheduleService
             ->values();
     }
 
-    private function hasClassesOn(Period $period, CarbonImmutable $date): bool
+    public function hasClassesOn(Period $period, CarbonImmutable $date): bool
     {
         return $period->start_date !== null && $period->end_date !== null
             && $date->betweenIncluded($period->start_date, $period->end_date)
             && ! $period->calendarExceptions->contains(fn ($exception): bool => $exception->date->isSameDay($date));
     }
 
-    private function phaseCovers(ScheduleSession $session, CarbonImmutable $date, Period $period): bool
+    public function phaseCovers(ScheduleSession $session, CarbonImmutable $date, Period $period): bool
     {
         return match ($session->phase) {
             SessionPhase::Full => true,

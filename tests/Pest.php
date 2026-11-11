@@ -70,7 +70,7 @@ function meetingSession(array $classGroups, array $attributes = [], array $team 
         'schedule_version_id' => $version->id,
         'course_offering_id' => $offeringId,
     ]);
-    $session->participants()->attach(collect($classGroups)->modelKeys());
+    $session->participants()->attach(collect($classGroups)->pluck('id')->all());
 
     foreach ($team as [$lecturer, $role, $phase]) {
         if ($offeringId !== null) {

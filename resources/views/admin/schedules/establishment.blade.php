@@ -14,8 +14,8 @@
                 @csrf
                 <input type="hidden" name="lock_version" value="{{ $candidate->lock_version }}">
                 <x-field label="Berlaku mulai" name="effective_from">
-                    <x-input type="date" name="effective_from" :value="max(now()->toDateString(), $candidate->effective_from->toDateString())"
-                             :min="max(now()->toDateString(), $candidate->period->start_date->toDateString())" :max="$candidate->period->end_date->toDateString()" x-bind:readonly="confirming" required />
+                    <x-input type="date" name="effective_from" :value="max(now()->toDateString(), $candidate->effective_from?->toDateString() ?? now()->toDateString())"
+                             :min="max(now()->toDateString(), $candidate->period?->start_date?->toDateString() ?? now()->toDateString())" :max="$candidate->period?->end_date?->toDateString()" x-bind:readonly="confirming" required />
                 </x-field>
                 <x-field label="Catatan revisi (opsional)" name="note"><x-input name="note" maxlength="255" x-bind:readonly="confirming" placeholder="Catatan penetapan jadwal" /></x-field>
                 <p class="text-sm text-muted">Sistem memeriksa ulang data terbaru dan reservasi sebelum menyimpan. Perubahan serentak atau masalah wajib akan menghentikan penetapan.</p>

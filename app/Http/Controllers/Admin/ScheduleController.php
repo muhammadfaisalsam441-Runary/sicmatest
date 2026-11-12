@@ -14,6 +14,7 @@ use App\Services\Scheduling\ScheduleValidator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -52,8 +53,8 @@ class ScheduleController extends Controller
             ->orderBy('study_program')
             ->pluck('study_program', 'study_program')
             ->map(fn (string $name): string => match ($name) {
-                'Pendidikan Teknik Informatika dan Komputer' => 'PTIK (Pend. Teknik Informatika dan Komputer)',
-                'Teknik Komputer' => 'TEKOM (Teknik Komputer)',
+                'PTIK', 'Pendidikan Teknik Informatika dan Komputer' => 'PTIK (Pend. Teknik Informatika dan Komputer)',
+                'TEKOM', 'Teknik Komputer' => 'TEKOM (Teknik Komputer)',
                 default => $name,
             })
             ->all();
@@ -131,16 +132,29 @@ class ScheduleController extends Controller
     }
 
     /**
-     * Unduh templat impor jadwal (CSV, dapat dibuka di Excel).
+     * Unduh templat impor jadwal (Excel .xlsx default dengan styling & sheet referensi, atau CSV).
      */
-    public function template(ScheduleImportService $imports): StreamedResponse
+    public function template(Request $request, ScheduleImportService $imports): StreamedResponse
     {
+        if ($request->query('format') === 'csv') {
+            return response()->streamDownload(function () use ($imports): void {
+                $handle = fopen('php://output', 'w');
+                // Output UTF-8 BOM agar Excel dapat membuka file CSV dengan benar
+                fwrite($handle, "\xEF\xBB\xBF");
+                foreach ($imports->templateRows() as $row) {
+                    fputcsv($handle, $row, ';');
+                }
+                fclose($handle);
+            }, 'templat-jadwal-sicma.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
+        }
+
         return response()->streamDownload(function () use ($imports): void {
-            $handle = fopen('php://output', 'w');
-            foreach ($imports->templateRows() as $row) {
-                fputcsv($handle, $row);
-            }
-            fclose($handle);
-        }, 'templat-jadwal-sicma.csv', ['Content-Type' => 'text/csv']);
+            $spreadsheet = $imports->templateSpreadsheet();
+            $writer = new Xlsx($spreadsheet);
+            $writer->save('php://output');
+            $spreadsheet->disconnectWorksheets();
+        }, 'templat-jadwal-sicma.xlsx', [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ]);
     }
 }

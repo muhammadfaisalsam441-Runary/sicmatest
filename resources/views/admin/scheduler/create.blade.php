@@ -164,7 +164,7 @@
                                                 @click="prodiFilter = @js($prodiName)"
                                                 :class="prodiFilter === @js($prodiName) ? 'bg-primary text-white font-semibold' : 'bg-surface text-muted border border-border hover:bg-page hover:text-ink'"
                                                 class="rounded-control px-2.5 py-1 text-xs transition cursor-pointer whitespace-nowrap">
-                                            {{ $prodiName === 'Pendidikan Teknik Informatika dan Komputer' ? 'PTIK' : ($prodiName === 'Teknik Komputer' ? 'TEKOM' : $prodiName) }}
+                                            {{ in_array($prodiName, ['PTIK', 'Pendidikan Teknik Informatika dan Komputer'], true) ? 'PTIK' : (in_array($prodiName, ['TEKOM', 'Teknik Komputer'], true) ? 'TEKOM' : $prodiName) }}
                                         </button>
                                     @endforeach
                                 </div>

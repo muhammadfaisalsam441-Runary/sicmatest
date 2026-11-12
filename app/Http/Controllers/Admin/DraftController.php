@@ -190,6 +190,19 @@ class DraftController extends Controller
 
     public function validateDraft(ScheduleVersion $version, ScheduleValidator $validator): RedirectResponse
     {
+        $today = now()->startOfDay();
+        $effectiveFrom = $version->effective_from
+            ? CarbonImmutable::parse($version->effective_from->toDateString())->max($today)
+            : $today;
+
+        if ($version->period?->start_date) {
+            $effectiveFrom = $effectiveFrom->max(CarbonImmutable::parse($version->period->start_date->toDateString()));
+        }
+
+        if ($version->effective_from?->toDateString() !== $effectiveFrom->toDateString()) {
+            $version->update(['effective_from' => $effectiveFrom->toDateString()]);
+        }
+
         $issues = $validator->validate($version);
         $blocking = $issues->where('severity.value', 'error')->count();
 

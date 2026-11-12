@@ -113,8 +113,8 @@
                     <label class="mb-1 block text-xs font-medium text-muted">Program Studi</label>
                     <select name="prodi" @change="$el.form.requestSubmit()" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
                         <option value="">Semua Program Studi</option>
-                        @foreach ($studyPrograms as $sp)
-                            <option value="{{ $sp }}" @selected($prodi === $sp)>{{ $sp }}</option>
+                        @foreach ($studyPrograms as $val => $label)
+                            <option value="{{ $val }}" @selected($prodi === $val)>{{ $label }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -219,8 +219,8 @@
                                 {{-- Kelas (Kompak) --}}
                                 @php
                                     $prodiAbbr = match ($offering->classGroup->study_program) {
-                                        'Pendidikan Teknik Informatika dan Komputer' => 'PTIK',
-                                        'Teknik Komputer' => 'TEKOM',
+                                        'PTIK', 'Pendidikan Teknik Informatika dan Komputer' => 'PTIK',
+                                        'TEKOM', 'Teknik Komputer' => 'TEKOM',
                                         default => $offering->classGroup->study_program ?? 'JTIK',
                                     };
                                     $hasCohortInName = $offering->classGroup->cohort_year && str_contains($offering->classGroup->name, (string) $offering->classGroup->cohort_year);

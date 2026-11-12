@@ -35,8 +35,8 @@ Route::middleware('auth')->group(function (): void {
     Route::post('/verifikasi-email', [EmailVerificationController::class, 'verify'])->middleware('throttle:10,1')->name('verification.verify');
     Route::post('/verifikasi-email/kirim-ulang', [EmailVerificationController::class, 'resend'])->middleware('throttle:6,1')->name('verification.send');
     Route::get('/verifikasi-email/ubah', [EmailVerificationController::class, 'editEmail'])->name('verification.email.edit');
-    Route::put('/verifikasi-email/ubah', [EmailVerificationController::class, 'updateEmail'])->name('verification.email.update');
+    Route::put('/verifikasi-email/ubah', [EmailVerificationController::class, 'updateEmail'])->middleware('throttle:6,1')->name('verification.email.update');
     Route::get('/pengajuan', [ApplicationStatusController::class, 'show'])->name('keti.application');
-    Route::put('/pengajuan', [ApplicationStatusController::class, 'resubmit'])->name('keti.application.resubmit');
+    Route::put('/pengajuan', [ApplicationStatusController::class, 'resubmit'])->middleware('throttle:6,1')->name('keti.application.resubmit');
     Route::post('/keluar', [LoginController::class, 'destroy'])->name('logout');
 });

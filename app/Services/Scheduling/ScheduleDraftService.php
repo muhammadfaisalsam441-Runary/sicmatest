@@ -8,7 +8,9 @@ use App\Enums\ScheduleVersionStatus;
 use App\Enums\SessionMode;
 use App\Enums\SessionPhase;
 use App\Exceptions\DomainException;
+use App\Models\Academic\CourseOffering;
 use App\Models\Academic\Period;
+use App\Models\Lecturer\TeachingAssignment;
 use App\Models\Room\Room;
 use App\Models\Room\RoomBlock;
 use App\Models\Scheduling\ScheduleSession;
@@ -237,6 +239,81 @@ class ScheduleDraftService
         }
 
         return $occupied;
+    }
+
+    /**
+     * Sinkronkan dosen dan fase pada sesi draf yang terhubung ke penawaran mata kuliah tertentu.
+     *
+     * @param  iterable<int|string>  $offeringIds
+     */
+    public function syncOfferings(Period $period, iterable $offeringIds): void
+    {
+        $ids = collect($offeringIds)->filter()->unique()->values()->all();
+        if (empty($ids)) {
+            return;
+        }
+
+        $drafts = $period->scheduleVersions()
+            ->whereIn('status', [ScheduleVersionStatus::Draft, ScheduleVersionStatus::Ready])
+            ->get();
+
+        if ($drafts->isEmpty()) {
+            return;
+        }
+
+        $offerings = CourseOffering::query()
+            ->whereIn('id', $ids)
+            ->with('teachingAssignments')
+            ->get()
+            ->keyBy('id');
+
+        if ($offerings->isEmpty()) {
+            return;
+        }
+
+        foreach ($drafts as $draft) {
+            $sessions = $draft->sessions()
+                ->whereIn('course_offering_id', $offerings->modelKeys())
+                ->get();
+
+            if ($sessions->isEmpty()) {
+                continue;
+            }
+
+            $sessionsByOffering = $sessions->groupBy('course_offering_id');
+
+            foreach ($sessionsByOffering as $offeringId => $offeringSessions) {
+                $offering = $offerings->get($offeringId);
+                if (! $offering) {
+                    continue;
+                }
+
+                $assignments = $offering->teachingAssignments;
+
+                foreach ($offeringSessions as $session) {
+                    if ($assignments->isNotEmpty()) {
+                        $uniquePhases = $assignments->pluck('phase')->unique();
+                        if ($uniquePhases->count() === 1) {
+                            $session->phase = $uniquePhases->first();
+                        } elseif ($offeringSessions->count() === 1) {
+                            $session->phase = SessionPhase::Full;
+                        }
+                        $session->save();
+                    }
+
+                    $team = $assignments->filter(fn (TeachingAssignment $assignment): bool => $session->phase === SessionPhase::Full
+                        || $assignment->phase === SessionPhase::Full
+                        || $session->phase === $assignment->phase
+                    );
+
+                    $session->lecturers()->sync($team->mapWithKeys(fn (TeachingAssignment $assignment): array => [
+                        $assignment->lecturer_id => ['role' => $assignment->role->value],
+                    ])->all());
+                }
+            }
+
+            $this->validator->validate($draft);
+        }
     }
 
     private function assertDraft(ScheduleVersion $version): void

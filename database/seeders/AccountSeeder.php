@@ -22,26 +22,27 @@ class AccountSeeder extends Seeder
     {
         $password = Hash::make('password');
 
-        User::create([
-            'name' => 'Koordinator Jadwal JTIK',
-            'email' => 'superadmin@sicma.test',
-            'password' => $password,
-            'role' => UserRole::SuperAdmin,
-            'can_publish' => true,
-        ])->markEmailAsVerified();
+        User::firstOrCreate(
+            ['email' => 'superadmin@sicma.test'],
+            [
+                'name' => 'Koordinator Jadwal JTIK',
+                'password' => $password,
+                'role' => UserRole::SuperAdmin,
+                'can_publish' => true,
+                'email_verified_at' => now(),
+            ]
+        );
 
-        $admin = User::create([
-            'name' => 'Admin JTIK',
-            'email' => 'admin@sicma.test',
-            'password' => $password,
-            'role' => UserRole::Admin,
-            'can_publish' => false,
-        ]);
-        $admin->markEmailAsVerified();
-
-        if (! config('sicma.public_portal.show_sim_label')) {
-            return;
-        }
+        $admin = User::firstOrCreate(
+            ['email' => 'admin@sicma.test'],
+            [
+                'name' => 'Admin JTIK',
+                'password' => $password,
+                'role' => UserRole::Admin,
+                'can_publish' => false,
+                'email_verified_at' => now(),
+            ]
+        );
 
         $periodStart = Period::query()->active()->value('start_date');
 
@@ -55,32 +56,42 @@ class AccountSeeder extends Seeder
         ];
 
         foreach ($ketis as [$name, $nim, $email, $classCode, $status, $note]) {
-            $keti = User::create([
-                'name' => $name,
-                'nim' => $nim,
-                'email' => $email,
-                'password' => $password,
-                'role' => UserRole::Keti,
-            ]);
-            $keti->markEmailAsVerified();
+            $keti = User::firstOrCreate(
+                ['email' => $email],
+                [
+                    'name' => $name,
+                    'nim' => $nim,
+                    'password' => $password,
+                    'role' => UserRole::Keti,
+                    'email_verified_at' => now(),
+                ]
+            );
 
-            $classGroup = ClassGroup::query()->where('code', $classCode)->firstOrFail();
+            $classGroup = ClassGroup::query()->where('code', $classCode)->first();
+            if (! $classGroup) {
+                continue;
+            }
+
             $isReviewed = $status !== KetiApplicationStatus::Pending;
 
-            $keti->ketiApplications()->create([
-                'class_group_id' => $classGroup->id,
-                'status' => $status,
-                'review_note' => $note,
-                'reviewed_by' => $isReviewed ? $admin->id : null,
-                'reviewed_at' => $isReviewed ? now()->subDays(3) : null,
-            ]);
+            $keti->ketiApplications()->firstOrCreate(
+                ['class_group_id' => $classGroup->id],
+                [
+                    'status' => $status,
+                    'review_note' => $note,
+                    'reviewed_by' => $isReviewed ? $admin->id : null,
+                    'reviewed_at' => $isReviewed ? now()->subDays(3) : null,
+                ]
+            );
 
             if ($status === KetiApplicationStatus::Approved) {
-                $keti->classRepresentatives()->create([
-                    'class_group_id' => $classGroup->id,
-                    'valid_from' => $periodStart,
-                    'valid_to' => null,
-                ]);
+                $keti->classRepresentatives()->firstOrCreate(
+                    ['class_group_id' => $classGroup->id],
+                    [
+                        'valid_from' => $periodStart,
+                        'valid_to' => null,
+                    ]
+                );
             }
         }
     }

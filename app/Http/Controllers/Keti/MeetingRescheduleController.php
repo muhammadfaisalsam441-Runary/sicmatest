@@ -41,8 +41,35 @@ class MeetingRescheduleController extends Controller
         ]);
 
         $user = $request->user();
+        $date = CarbonImmutable::parse($filters['tanggal']);
         $session = ScheduleSession::query()->with(['participants', 'lecturers', 'room.building', 'version.period'])->findOrFail($filters['sesi']);
-        $meeting = $this->meetings->find($session, CarbonImmutable::parse($filters['tanggal'])) ?? abort(404);
+        $meeting = $this->meetings->find($session, $date);
+
+        if ($meeting === null) {
+            // Jika jadwal resmi telah diperbarui (schedule_version baru), cari sesi padanannya di versi resmi saat ini
+            $meeting = $this->meetings->meetingsOn($date)->first(function (Meeting $m) use ($session, $filters): bool {
+                if (isset($filters['pengganti']) && $m->reschedule?->reservation_id === (int) $filters['pengganti']) {
+                    return true;
+                }
+                if ($session->course_offering_id !== null && $m->session->course_offering_id === $session->course_offering_id) {
+                    return true;
+                }
+
+                return $m->session->title === $session->title
+                    && $m->session->day_of_week === $session->day_of_week
+                    && $m->session->start_minute === $session->start_minute
+                    && $m->session->participants->pluck('id')->sort()->values()->all() === $session->participants->pluck('id')->sort()->values()->all();
+            });
+
+            if ($meeting !== null) {
+                $session = $meeting->session;
+            }
+        }
+
+        if ($meeting === null) {
+            abort(404);
+        }
+
         abort_unless($session->participants->contains('id', $user->activeClassGroup()?->id), 403);
 
         $replacing = null;
@@ -56,10 +83,13 @@ class MeetingRescheduleController extends Controller
         $rotation = $this->meetings->rotationLecturerIds($session, $meeting->start);
         $selected = collect($filters['dosen'] ?? $this->meetings->defaultLecturerIds($session, $meeting->start)->all())->map(fn ($id): int => (int) $id);
         $duration = (int) $meeting->start->diffInMinutes($meeting->end);
-        $start = isset($filters['ke_tanggal'], $filters['jam']) ? CarbonImmutable::parse($filters['ke_tanggal'].' '.$filters['jam']) : null;
+        $start = isset($filters['ke_tanggal'], $filters['jam']) && filled($filters['jam'])
+            ? CarbonImmutable::parse($filters['ke_tanggal'].' '.$filters['jam'])
+            : null;
 
         $conflict = session('reschedule_error');
         $rooms = [];
+        $recommendations = collect();
 
         if ($start !== null && $conflict === null) {
             try {
@@ -72,6 +102,17 @@ class MeetingRescheduleController extends Controller
             } catch (DomainException $exception) {
                 $conflict = ['code' => $exception->errorCode, 'message' => $exception->getMessage()];
             }
+        }
+
+        $targetDate = isset($filters['ke_tanggal']) && filled($filters['ke_tanggal'])
+            ? CarbonImmutable::parse($filters['ke_tanggal'])
+            : null;
+
+        if ($targetDate !== null && ! ($start !== null && $conflict === null)) {
+            $manualJam = isset($filters['jam']) && filled($filters['jam'])
+                ? (int) substr($filters['jam'], 0, 2) * 60 + (int) substr($filters['jam'], 3, 2)
+                : null;
+            $recommendations = $this->reschedules->recommendations($user, $session, $meeting->start, $targetDate, $selected->all(), $replacing, $manualJam);
         }
 
         return view('keti.meetings.reschedule', [
@@ -87,9 +128,11 @@ class MeetingRescheduleController extends Controller
             'selectedLecturerIds' => $selected->all(),
             'duration' => $duration,
             'start' => $start,
+            'targetDate' => $targetDate,
             'filters' => $filters,
             'conflict' => $conflict,
             'rooms' => $rooms,
+            'recommendations' => $recommendations,
             'idempotencyKey' => (string) Str::uuid(),
         ]);
     }
@@ -116,6 +159,7 @@ class MeetingRescheduleController extends Controller
                 'pengganti' => $data['replaces_reservation_id'] ?? null,
                 'ke_tanggal' => $start->toDateString(),
                 'jam' => $start->format('H:i'),
+                'dosen' => $lecturerIds,
             ]))->with('reschedule_error', ['code' => $exception->errorCode, 'message' => $exception->getMessage()]);
         }
 

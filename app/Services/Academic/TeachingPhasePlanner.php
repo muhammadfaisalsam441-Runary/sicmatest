@@ -8,12 +8,13 @@ use App\Models\Academic\CourseOffering;
 use App\Models\Academic\Period;
 use App\Models\Lecturer\TeachingAssignment;
 use App\Services\Account\AuditLogger;
+use App\Services\Scheduling\ScheduleDraftService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class TeachingPhasePlanner
 {
-    public function __construct(private AuditLogger $audit, private TeachingLoadService $loads) {}
+    public function __construct(private AuditLogger $audit, private TeachingLoadService $loads, private ScheduleDraftService $drafts) {}
 
     /**
      * @return array{rows: list<array<string, mixed>>, unchanged: list<array<string, mixed>>, skipped: list<array{label: string, reason: string}>, already_set: int, fingerprint: string}
@@ -104,6 +105,9 @@ class TeachingPhasePlanner
                 $assignment->update(['phase' => SessionPhase::from($change['after'])]);
                 $this->audit->log('teaching_assignment.phase_planned', $assignment, ['phase' => $change['before']], ['phase' => $change['after']]);
             }
+
+            $offeringIds = $assignments->pluck('course_offering_id')->unique()->all();
+            $this->drafts->syncOfferings($period, $offeringIds);
 
             return count($plan['rows']);
         }, attempts: 3);

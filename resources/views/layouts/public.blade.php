@@ -1,3 +1,4 @@
+@use('App\Support\HomeRoute')
 @use('App\Support\Nav')
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
@@ -22,7 +23,7 @@
                 </nav>
 
                 @auth
-                    <x-button :href="auth()->user()->isAdmin() ? Nav::url('admin.dashboard') : Nav::url('keti.search')">Buka SICMA</x-button>
+                    <x-button :href="HomeRoute::for(auth()->user())">Buka SICMA</x-button>
                 @else
                     <x-button :href="Nav::url('login')" class="w-28">Masuk</x-button>
                 @endauth

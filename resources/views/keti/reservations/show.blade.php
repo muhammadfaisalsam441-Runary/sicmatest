@@ -78,12 +78,18 @@
                     <div class="grid grid-cols-2 gap-3">
                         @if ($status === ReservationStatus::Booked && $canManage)
                             @unless ($academicBookingBlocked)
-                                <form method="POST" action="{{ route('keti.reservations.start', $reservation) }}">
-                                    @csrf
-                                    <x-button type="submit" class="w-full">Mulai gunakan</x-button>
-                                </form>
+                                @if ($canCheckIn ?? false)
+                                    <form method="POST" action="{{ route('keti.reservations.start', $reservation) }}">
+                                        @csrf
+                                        <x-button type="submit" class="w-full">Mulai gunakan</x-button>
+                                    </form>
+                                @else
+                                    <x-button disabled class="w-full" title="Jendela check-in belum dibuka atau sudah lewat">Mulai gunakan</x-button>
+                                @endif
                             @endunless
-                            <x-button variant="danger-outline" x-data x-on:click="$dispatch('open-modal', 'batal-pesanan')">{{ $reschedule ? 'Batalkan pemindahan' : 'Batalkan' }}</x-button>
+                            @if (! $reschedule || ! $reschedule->original_start_at->isPast())
+                                <x-button variant="danger-outline" x-data x-on:click="$dispatch('open-modal', 'batal-pesanan')">{{ $reschedule ? 'Batalkan pemindahan' : 'Batalkan' }}</x-button>
+                            @endif
                             @if ($reschedule && $reschedule->schedule_session_id)
                                 <x-button variant="secondary" class="col-span-2" :href="route('keti.meetings.reschedule', ['sesi' => $reschedule->schedule_session_id, 'tanggal' => $reschedule->original_start_at->toDateString(), 'pengganti' => $reservation->id])">Pindahkan lagi</x-button>
                             @endif
@@ -108,7 +114,7 @@
                     @elseif ($status === ReservationStatus::Booked)
                         <h2 class="text-xl font-semibold">Sudah berada di ruangan?</h2>
                         <p class="text-sm text-ink">Tekan Mulai gunakan untuk mencatat awal pemakaian. Batalkan jika ruangan tidak jadi dipakai.</p>
-                        <p class="text-xs text-muted">Mulai gunakan dapat ditekan mulai {{ Wita::clock($reservation->start_at->copy()->subMinutes((int) config('sicma.reservation.checkin_open_minutes_before'))) }}.</p>
+                        <p class="text-xs text-muted">Mulai gunakan dapat ditekan antara {{ Wita::clock($checkInOpensAt ?? $reservation->start_at->copy()->subMinutes((int) config('sicma.reservation.checkin_open_minutes_before')), false) }}–{{ Wita::clock($checkInClosesAt ?? $reservation->start_at->copy()->addMinutes((int) config('sicma.reservation.checkin_grace_minutes'))) }}.</p>
                     @elseif ($status === ReservationStatus::InUse)
                         <h2 class="text-xl font-semibold">Sisa waktu penggunaan</h2>
                         <p class="text-3xl font-semibold">{{ Wita::duration($remaining) }}</p>

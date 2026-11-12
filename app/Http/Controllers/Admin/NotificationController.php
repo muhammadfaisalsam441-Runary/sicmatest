@@ -55,6 +55,8 @@ class NotificationController extends Controller
         $notification->update(['read_at' => $notification->read_at ?? now()]);
 
         return match (true) {
+            isset($notification->data['optimization_job_id']) => to_route('admin.scheduler.show', $notification->data['optimization_job_id']),
+            isset($notification->data['schedule_version_id']) => to_route('admin.drafts.show', $notification->data['schedule_version_id']),
             isset($notification->data['reservation_id']) => to_route('admin.reservations.index'),
             isset($notification->data['keti_application_id']) => to_route('admin.keti-accounts.index'),
             default => back(),

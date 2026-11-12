@@ -18,16 +18,17 @@
                 </button>
             </div>
 
-            <form method="POST" action="{{ route('keti.reservations.store') }}" class="flex flex-col gap-4" x-on:submit="submitting = true">
+            <form method="POST" action="{{ route('keti.reservations.store') }}" class="flex flex-col gap-4" x-on:submit="submitting = true" x-on:sicma:form-error.window="submitting = false" x-on:sicma:form-complete.window="submitting = false">
                 @csrf
                 <input type="hidden" name="room_id" value="{{ $initial['roomId'] ?? '' }}" x-bind:value="room ? room.roomId : ''">
                 <input type="hidden" name="start_at" value="{{ $initial['startAt'] ?? '' }}" x-bind:value="room ? room.startAt : ''">
                 <input type="hidden" name="duration" value="{{ $initial['duration'] ?? '' }}" x-bind:value="room ? room.duration : ''">
+                <input type="hidden" name="participants" value="{{ $initial['participants'] ?? '' }}" x-bind:value="room && room.participants ? room.participants : ''">
                 <input type="hidden" name="idempotency_key" value="{{ $idempotencyKey ?? '' }}" x-bind:value="key">
 
                 <x-info-box :title="'Kelas '.($bookingClassGroup?->name ?? '—')">
                     <p class="font-semibold text-ink" x-text="room ? room.dateLabel + ' • ' + room.rangeLabel : ''">{{ isset($initial) ? $initial['dateLabel'].' • '.$initial['rangeLabel'] : '' }}</p>
-                    <p class="text-xs text-muted" x-text="room ? room.durationLabel + ' • ' + (room.capacity ? 'Kapasitas ' + room.capacity + ' kursi' : 'Kapasitas belum didata') : ''"></p>
+                    <p class="text-xs text-muted" x-text="room ? room.durationLabel + ' • ' + (room.capacity ? 'Kapasitas ' + room.capacity + ' kursi' : 'Kapasitas belum didata') + (room.participants ? ' • ' + room.participants + ' orang' : '') : ''"></p>
                 </x-info-box>
 
                 <x-field label="Kegiatan" name="purpose">

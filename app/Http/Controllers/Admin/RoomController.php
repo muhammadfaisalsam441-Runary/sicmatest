@@ -45,8 +45,10 @@ class RoomController extends Controller
             default => null,
         };
 
+        $now = now();
+
         $query = Room::query()
-            ->with(['building', 'facilities', 'closures' => fn ($q) => $q->where('end_at', '>', now())])
+            ->with(['building', 'facilities', 'closures' => fn ($q) => $q->where('start_at', '<=', $now)->where('end_at', '>', $now)])
             ->when($keyword !== '', fn (Builder $query) => $query->where(fn (Builder $query) => $query
                 ->where('name', 'like', "%{$keyword}%")
                 ->orWhere('code', 'like', "%{$keyword}%")
@@ -54,7 +56,7 @@ class RoomController extends Controller
                 ->orWhereHas('facilities', fn (Builder $query) => $query->where('name', 'like', "%{$keyword}%"))
             ))
             ->when($filter === 'verifikasi', fn (Builder $query) => $query->where(fn (Builder $q) => $q->whereNull('capacity')->orWhereNull('building_id')))
-            ->when($filter === 'ditutup', fn (Builder $query) => $query->whereHas('closures', fn ($q) => $q->where('end_at', '>', now())))
+            ->when($filter === 'ditutup', fn (Builder $query) => $query->whereHas('closures', fn ($q) => $q->where('start_at', '<=', $now)->where('end_at', '>', $now)))
             ->when($type !== null, fn (Builder $query) => $query->where('type', $type))
             ->when($buildingFilter !== '', function (Builder $query) use ($buildingFilter) {
                 if ($buildingFilter === 'belum_didata') {
@@ -69,7 +71,8 @@ class RoomController extends Controller
 
         $activeClosures = RoomClosure::query()
             ->with('room')
-            ->where('end_at', '>', now())
+            ->where('start_at', '<=', $now)
+            ->where('end_at', '>', $now)
             ->orderBy('start_at')
             ->get();
 

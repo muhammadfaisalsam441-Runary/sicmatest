@@ -50,8 +50,11 @@
             <div class="flex flex-col gap-6">
                 <x-card class="flex flex-col gap-3">
                     <h2 class="font-semibold">Belum punya templat?</h2>
-                    <p class="text-sm text-muted">Dosen lebih dari satu dipisah titik koma: pengampu lebih dulu, lalu mitra. Tulis "Hubungi Dosen" bila jam belum ditentukan.</p>
-                    <x-button variant="soft" icon="download" :href="route('admin.schedules.template')">Unduh templat</x-button>
+                    <p class="text-sm text-muted">Templat Excel resmi memuat format kolom lengkap (WITA, SKS, Dosen Pengampu & Mitra), contoh data, serta lembar daftar ruang dan kelas terdaftar.</p>
+                    <div class="flex items-center gap-2">
+                        <x-button variant="soft" icon="download" :href="route('admin.schedules.template')">Unduh templat (.xlsx)</x-button>
+                        <a href="{{ route('admin.schedules.template', ['format' => 'csv']) }}" class="text-xs text-muted hover:text-primary transition underline">Versi CSV</a>
+                    </div>
                 </x-card>
                 <x-card class="flex flex-col gap-2">
                     <h2 class="font-semibold">Impor terakhir</h2>

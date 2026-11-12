@@ -32,6 +32,7 @@ Thumbs.db
 # File sementara dan hasil ekspor
 /tmp/
 /output/
+/database/backups/
 
 # Dokumen referensi di root proyek
 /*.pdf

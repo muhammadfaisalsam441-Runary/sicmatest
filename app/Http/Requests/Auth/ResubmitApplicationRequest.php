@@ -24,6 +24,14 @@ class ResubmitApplicationRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'name' => ['sometimes', 'required', 'string', 'max:255'],
+            'nim' => [
+                'sometimes',
+                'required',
+                'string',
+                'max:20',
+                Rule::unique('users', 'nim')->ignore($this->user()?->id),
+            ],
             'class_group_id' => ['required', Rule::exists('class_groups', 'id')->where('is_active', true)->whereNull('deleted_at')],
         ];
     }

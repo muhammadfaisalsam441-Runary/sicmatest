@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Enums\CalendarExceptionType;
+use App\Enums\ScheduleVersionStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\CalendarExceptionRequest;
 use App\Http\Requests\Admin\ClassGroupRequest;
@@ -16,6 +17,7 @@ use App\Models\Academic\Course;
 use App\Models\Academic\CourseOffering;
 use App\Models\Academic\Period;
 use App\Services\Account\AuditLogger;
+use App\Services\Scheduling\ScheduleBlockBuilder;
 use App\Support\AvailabilityCache;
 use Carbon\CarbonPeriod;
 use Illuminate\Http\RedirectResponse;
@@ -137,16 +139,30 @@ class AcademicController extends Controller
             $added += (int) $exception->wasRecentlyCreated;
         }
 
+        $official = $period->scheduleVersions()->where('status', ScheduleVersionStatus::Official)->first();
+        if ($official) {
+            app(ScheduleBlockBuilder::class)->rebuild($official);
+        }
+
         $this->audit->log('calendar_exception.created', $period, null, $request->validated());
         AvailabilityCache::bust();
 
-        return back()->with('toast', ['type' => 'success', 'title' => "{$added} tanggal ditambahkan", 'message' => 'Jadwal resmi yang sudah ditetapkan tidak berubah sampai kalender ditetapkan ulang lewat draf.']);
+        return back()->with('toast', ['type' => 'success', 'title' => "{$added} tanggal ditambahkan", 'message' => 'Jadwal resmi pada tanggal libur telah disinkronkan.']);
     }
 
     public function destroyException(CalendarException $exception): RedirectResponse
     {
+        $period = $exception->period;
         $this->audit->log('calendar_exception.deleted', $exception, $exception->only(['date', 'type', 'note']));
         $exception->delete();
+
+        if ($period) {
+            $official = $period->scheduleVersions()->where('status', ScheduleVersionStatus::Official)->first();
+            if ($official) {
+                app(ScheduleBlockBuilder::class)->rebuild($official);
+            }
+        }
+        AvailabilityCache::bust();
 
         return back()->with('toast', ['type' => 'success', 'title' => 'Hari libur dihapus']);
     }

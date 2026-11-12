@@ -31,8 +31,14 @@
                 <form x-show="editing" x-cloak method="POST" action="{{ route('keti.application.resubmit') }}" class="flex flex-col gap-4">
                     @csrf
                     @method('PUT')
+                    <x-field label="Nama lengkap" name="name">
+                        <x-input name="name" :value="old('name', auth()->user()->name)" required maxlength="255" />
+                    </x-field>
+                    <x-field label="NIM" name="nim">
+                        <x-input name="nim" :value="old('nim', auth()->user()->nim)" required maxlength="20" />
+                    </x-field>
                     <x-field label="Kelas yang diwakili" name="class_group_id">
-                        <x-select name="class_group_id" :options="$classGroups" :value="$application->class_group_id" required />
+                        <x-select name="class_group_id" :options="$classGroups" :value="old('class_group_id', $application->class_group_id)" required />
                     </x-field>
                     <x-button type="submit" class="w-full">Ajukan ulang</x-button>
                 </form>

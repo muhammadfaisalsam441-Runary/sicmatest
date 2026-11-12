@@ -272,8 +272,9 @@ class AvailabilityService
 
         if ($start->lessThan($open) || $end->greaterThan($close)) {
             $reopen = $start->lessThan($open) ? $open : $open->addDay();
+            $next = $start->lessThan($open) ? $blocks->first(fn (RoomBlock $block): bool => $block->start_at->greaterThanOrEqualTo($start)) : null;
 
-            return $result(RoomStatus::Closed, null, $reopen, 'Di luar jam operasional ('.Wita::clock($open, false).'–'.Wita::clock($close).')');
+            return $result(RoomStatus::Closed, null, $reopen, 'Di luar jam operasional ('.Wita::clock($open, false).'–'.Wita::clock($close).')', null, $next);
         }
 
         $overlapping = $blocks->filter(fn (RoomBlock $block): bool => $block->start_at->lessThan($end) && $block->end_at->greaterThan($start));

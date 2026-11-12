@@ -17,6 +17,7 @@ use App\Services\Academic\TeachingAllocationService;
 use App\Services\Academic\TeachingLoadService;
 use App\Services\Academic\TeachingPhasePlanner;
 use App\Services\Account\AuditLogger;
+use App\Services\Scheduling\ScheduleDraftService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -27,7 +28,7 @@ use Illuminate\View\View;
  */
 class TeachingAssignmentController extends Controller
 {
-    public function __construct(private AuditLogger $audit) {}
+    public function __construct(private AuditLogger $audit, private ScheduleDraftService $drafts) {}
 
     public function index(Request $request, TeachingLoadService $loads, LecturerService $lecturerService): View
     {
@@ -41,7 +42,7 @@ class TeachingAssignmentController extends Controller
             $perPage = 25;
         }
 
-        $periodYear = $period ? (int) $period->start_date->format('Y') : 2026;
+        $periodYear = (int) ($period?->start_date?->format('Y') ?? 2026);
         $isGanjil = $period ? ! str_contains(strtolower($period->name), 'genap') : true;
 
         $cohorts = ClassGroup::query()
@@ -88,7 +89,15 @@ class TeachingAssignmentController extends Controller
         }
 
         if ($prodi !== '') {
-            $query->whereHas('classGroup', fn ($gq) => $gq->where('study_program', $prodi));
+            $query->whereHas('classGroup', function ($gq) use ($prodi) {
+                if (in_array($prodi, ['PTIK', 'Pendidikan Teknik Informatika dan Komputer'], true)) {
+                    $gq->whereIn('study_program', ['PTIK', 'Pendidikan Teknik Informatika dan Komputer']);
+                } elseif (in_array($prodi, ['TEKOM', 'Teknik Komputer'], true)) {
+                    $gq->whereIn('study_program', ['TEKOM', 'Teknik Komputer']);
+                } else {
+                    $gq->where('study_program', $prodi)->orWhere('study_program', 'like', "%{$prodi}%");
+                }
+            });
         }
 
         if ($semester !== '') {
@@ -168,11 +177,29 @@ class TeachingAssignmentController extends Controller
         $lecturerOptionsByOffering = collect($instructorIdsByOffering)
             ->map(fn (array $ids): array => $lecturerOptionsById->only($ids)->values()->all());
 
-        $studyPrograms = ClassGroup::query()->whereNotNull('study_program')->distinct()->orderBy('study_program')->pluck('study_program');
+        $studyPrograms = ClassGroup::query()->whereNotNull('study_program')
+            ->distinct()
+            ->orderBy('study_program')
+            ->pluck('study_program')
+            ->mapWithKeys(fn (string $name): array => [
+                $name => match ($name) {
+                    'PTIK', 'Pendidikan Teknik Informatika dan Komputer' => 'PTIK (Pend. Teknik Informatika dan Komputer)',
+                    'TEKOM', 'Teknik Komputer' => 'TEKOM (Teknik Komputer)',
+                    default => $name,
+                },
+            ]);
 
         $baseCountQuery = CourseOffering::query()
             ->when($period, fn ($q) => $q->whereBelongsTo($period))
-            ->when($prodi !== '', fn ($q) => $q->whereHas('classGroup', fn ($gq) => $gq->where('study_program', $prodi)))
+            ->when($prodi !== '', fn ($q) => $q->whereHas('classGroup', function ($gq) use ($prodi) {
+                if (in_array($prodi, ['PTIK', 'Pendidikan Teknik Informatika dan Komputer'], true)) {
+                    $gq->whereIn('study_program', ['PTIK', 'Pendidikan Teknik Informatika dan Komputer']);
+                } elseif (in_array($prodi, ['TEKOM', 'Teknik Komputer'], true)) {
+                    $gq->whereIn('study_program', ['TEKOM', 'Teknik Komputer']);
+                } else {
+                    $gq->where('study_program', $prodi)->orWhere('study_program', 'like', "%{$prodi}%");
+                }
+            }))
             ->when($semester !== '', function ($q) use ($semesterOptions, $semester, $periodYear, $isGanjil) {
                 $matchedOpt = $semesterOptions->firstWhere('value', $semester);
                 if ($matchedOpt) {
@@ -276,12 +303,22 @@ class TeachingAssignmentController extends Controller
                 ]);
                 $this->audit->log('teaching_assignment.updated', $existingLead, $before, $validated);
 
+                $period = Period::query()->active()->first();
+                if ($period) {
+                    $this->drafts->syncOfferings($period, [$validated['course_offering_id']]);
+                }
+
                 return back()->with('toast', ['type' => 'success', 'title' => 'Dosen pengampu utama berhasil diperbarui']);
             }
         }
 
         $assignment = TeachingAssignment::create($validated);
         $this->audit->log('teaching_assignment.created', $assignment, null, $validated);
+
+        $period = Period::query()->active()->first();
+        if ($period) {
+            $this->drafts->syncOfferings($period, [$validated['course_offering_id']]);
+        }
 
         return back()->with('toast', ['type' => 'success', 'title' => 'Pengajar ditambahkan ke tim']);
     }
@@ -329,6 +366,11 @@ class TeachingAssignmentController extends Controller
         $assignment->update($validated);
 
         $this->audit->log('teaching_assignment.updated', $assignment, $before, $validated);
+
+        $period = Period::query()->active()->first();
+        if ($period) {
+            $this->drafts->syncOfferings($period, [$assignment->course_offering_id]);
+        }
 
         return back()->with('toast', ['type' => 'success', 'title' => 'Penugasan mengajar berhasil diperbarui']);
     }
@@ -398,6 +440,11 @@ class TeachingAssignmentController extends Controller
             }
         }
 
+        $period = Period::query()->active()->first();
+        if ($period && $assignedCount > 0) {
+            $this->drafts->syncOfferings($period, $validated['offering_ids']);
+        }
+
         return back()->with('toast', [
             'type' => 'success',
             'title' => "{$assignedCount} kelas berhasil ditugaskan ke {$lecturer->name}",
@@ -418,8 +465,14 @@ class TeachingAssignmentController extends Controller
             return back()->with('error', 'Penugasan terkunci. Buka kunci dulu sebelum menghapus.');
         }
 
+        $offeringId = $assignment->course_offering_id;
         $this->audit->log('teaching_assignment.deleted', $assignment, $assignment->only(['course_offering_id', 'lecturer_id', 'role', 'phase']));
         $assignment->delete();
+
+        $period = Period::query()->active()->first();
+        if ($period) {
+            $this->drafts->syncOfferings($period, [$offeringId]);
+        }
 
         return back()->with('toast', ['type' => 'success', 'title' => 'Pengajar dihapus dari tim']);
     }

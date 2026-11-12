@@ -18,6 +18,7 @@ use App\Services\Scheduling\ScheduleImportService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 beforeEach(function () {
     Storage::fake('local');
@@ -149,7 +150,22 @@ test('alur impor lewat halaman admin sampai draf', function () {
     $this->get(route('admin.imports.show', $import))->assertOk()->assertSee('Periksa hasil impor');
     $this->post(route('admin.imports.commit', $import))->assertRedirect(route('admin.drafts.show', $import->fresh()->schedule_version_id));
 
-    $this->get(route('admin.schedules.template'))->assertDownload('templat-jadwal-sicma.csv');
+    $this->get(route('admin.schedules.template'))->assertDownload('templat-jadwal-sicma.xlsx');
+    $this->get(route('admin.schedules.template', ['format' => 'csv']))->assertDownload('templat-jadwal-sicma.csv');
+});
+
+test('templat excel memuat format kolom lengkap dan dapat dibaca oleh parser impor', function () {
+    $service = app(ScheduleImportService::class);
+    $spreadsheet = $service->templateSpreadsheet();
+    $tempFile = tempnam(sys_get_temp_dir(), 'tpl_test_');
+    $writer = new Xlsx($spreadsheet);
+    $writer->save($tempFile);
+
+    $rows = $service->readRows($tempFile, 'xlsx');
+    unlink($tempFile);
+
+    expect($rows)->not->toBeEmpty()
+        ->and($rows[0]['raw'])->toHaveKeys(['class', 'day', 'time', 'room', 'course_code', 'course_name', 'sks', 'lecturers', 'phase']);
 });
 
 test('file PDF ditolak dengan pesan yang jelas', function () {
@@ -172,4 +188,27 @@ test('baris kelas berbeda di hari, jam, ruang, dan mata kuliah yang sama menjadi
         ->and($session->lecturers()->count())->toBe(1)
         ->and($draft->issues()->where('code', 'ROOM_CONFLICT')->exists())->toBeFalse()
         ->and($draft->issues()->where('code', 'LECTURER_CONFLICT')->exists())->toBeFalse();
+});
+
+test('file yang diunggah ulang diperiksa ulang jika status sebelumnya checked dan memiliki baris error', function () {
+    $service = app(ScheduleImportService::class);
+
+    // Upload file dengan kelas yang belum ada di database
+    $fileContent = [['Kelas Baru Belum Ada', 'TKM2301', 'Pemrograman Web', 'Senin', '07.30-10.00', 'AE 107', 'Rina Kartika', '']];
+    $file1 = scheduleCsv($fileContent);
+    $import = $service->store($file1, $this->period, $this->admin);
+
+    expect($import->status->value)->toBe('checked')
+        ->and($import->summary['errors'])->toBe(1);
+
+    // Sekarang tambahkan kelas baru ke master data
+    ClassGroup::factory()->create(['name' => 'Kelas Baru Belum Ada', 'code' => 'KBB']);
+
+    // Unggah ulang file dengan isi yang sama persis
+    $file2 = scheduleCsv($fileContent);
+    $rechecked = $service->store($file2, $this->period, $this->admin);
+
+    expect($rechecked->id)->toBe($import->id)
+        ->and($rechecked->summary['errors'])->toBe(0)
+        ->and($rechecked->rows()->where('status', ImportRowStatus::Error)->count())->toBe(0);
 });

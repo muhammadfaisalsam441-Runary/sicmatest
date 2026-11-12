@@ -29,6 +29,7 @@
 @section('content')
     <div class="flex flex-col gap-6" x-data="{ loading: false }">
         <x-page-header title="Cari Ruangan" subtitle="Temukan ruangan kosong yang sesuai untuk kelasmu." />
+        @include('keti.partials.search-tabs', ['active' => 'cari-ruangan'])
 
         {{-- Satu bilah pencarian: semua kriteria utama tanpa pindah tab. --}}
         <form id="pencarian" method="GET" action="{{ route('keti.search') }}" role="search"
@@ -58,8 +59,6 @@
             </x-field>
             <x-button type="submit" class="col-span-2" icon="search">Cari</x-button>
         </form>
-
-        @include('keti.partials.search-tabs', ['active' => 'sekarang'])
 
         <div x-show="loading" x-cloak>
             <x-loading-state message="Memuat data ruangan…" />
@@ -91,8 +90,8 @@
                     @foreach ($rooms as $room)
                         <x-room-card size="large" :name="$room['name']" :badge="$room['badge']" :location="$room['location']" :capacity="$room['capacity']"
                                      :facilities="$room['facilities']" :time-label="$room['time_label']" :time="$room['time']" :remaining="$room['remaining']"
-                                     :href="route('keti.rooms.show', ['room' => $room['id'], 'mulai' => $isNow ? null : $start->format('Y-m-d H:i'), 'durasi' => $duration])"
-                                     :booking="BookingPayload::make($room['id'], $room['name'], $room['location'], $room['capacity'], $start, $duration)" />
+                                     :href="route('keti.rooms.show', array_filter(['room' => $room['id'], 'mulai' => $isNow ? null : $start->format('Y-m-d H:i'), 'durasi' => $duration, 'orang' => $filters['orang'] ?? null]))"
+                                     :booking="BookingPayload::make($room['id'], $room['name'], $room['location'], $room['capacity'], $start, $duration, isset($filters['orang']) && filled($filters['orang']) ? (int) $filters['orang'] : null)" />
                     @endforeach
                 </div>
             @endif

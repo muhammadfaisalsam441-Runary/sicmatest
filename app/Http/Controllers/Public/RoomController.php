@@ -27,7 +27,7 @@ class RoomController extends Controller
             default => null,
         };
 
-        $buildings = Building::query()->withCount('rooms')->orderBy('name')->get();
+        $buildings = Building::query()->withCount(['rooms' => fn ($query) => $query->where('is_active', true)])->orderBy('name')->get();
         $selectedBuilding = is_numeric($building) ? $buildings->firstWhere('id', (int) $building) : null;
         $buildingFilter = $building === 'lainnya' ? 'none' : $selectedBuilding?->id;
         $now = CarbonImmutable::now()->startOfMinute();

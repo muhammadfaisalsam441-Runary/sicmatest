@@ -28,7 +28,12 @@
                 <h2 class="text-lg font-semibold">Riwayat pemakaian ruang</h2>
                 <x-data-table :headers="['Pengguna', 'Ruangan', 'Kegiatan / kelas', 'Waktu', 'Status']" class="border-0">
                     @foreach ($reservations as $item)
-                        <tr>
+                        @php
+                            $canView = $item->class_group_id === $classGroup->id || ($item->sessionReschedule && in_array((string) $classGroup->id, explode(',', $item->sessionReschedule->participant_key), true));
+                            $detailUrl = $canView ? route('keti.reservations.show', $item) : null;
+                        @endphp
+                        <tr @class(['hover:bg-subtle/50 transition-colors', 'cursor-pointer' => $detailUrl !== null])
+                            @if ($detailUrl) onclick="window.location='{{ $detailUrl }}'" @endif>
                             <td class="px-5 py-3">
                                 @if (config('sicma.privacy.show_booker_name_to_keti') || $item->class_group_id === $classGroup->id)
                                     {{ $item->creator->name }}
@@ -36,7 +41,13 @@
                                     Keti {{ $item->classGroup->name }}
                                 @endif
                             </td>
-                            <td class="px-5 py-3 font-medium">{{ $item->room->name }}</td>
+                            <td class="px-5 py-3 font-medium">
+                                @if ($detailUrl)
+                                    <a href="{{ $detailUrl }}" class="hover:text-primary hover:underline">{{ $item->room->name }}</a>
+                                @else
+                                    {{ $item->room->name }}
+                                @endif
+                            </td>
                             <td class="px-5 py-3">{{ $item->purpose }} • {{ $item->classGroup->name }}</td>
                             <td class="px-5 py-3">
                                 @if ($item->status->value === 'in_use')

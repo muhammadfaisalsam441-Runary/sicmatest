@@ -52,7 +52,12 @@ class ReservationController extends Controller
 
             return redirect()->route('keti.reservations.failed')
                 ->with('reservation_error', ['code' => $exception->errorCode, 'message' => $exception->getMessage()])
-                ->with('reservation_request', ['room_id' => (int) $data['room_id'], 'start_at' => $start->format('Y-m-d H:i'), 'duration' => (int) $data['duration']]);
+                ->with('reservation_request', [
+                    'room_id' => (int) $data['room_id'],
+                    'start_at' => $start->format('Y-m-d H:i'),
+                    'duration' => (int) $data['duration'],
+                    'participants' => isset($data['participants']) ? (int) $data['participants'] : null,
+                ]);
         }
 
         if ($request->expectsJson()) {
@@ -89,7 +94,7 @@ class ReservationController extends Controller
                             'name' => $result->room->name,
                             'location' => $result->locationLabel(),
                             'until' => $result->freeUntil,
-                            'booking' => BookingPayload::make($result->room->id, $result->room->name, $result->locationLabel(), $result->room->capacity, $start, $duration),
+                            'booking' => BookingPayload::make($result->room->id, $result->room->name, $result->locationLabel(), $result->room->capacity, $start, $duration, isset($request['participants']) ? (int) $request['participants'] : null),
                         ])
                         ->values()
                         ->all();
@@ -113,12 +118,20 @@ class ReservationController extends Controller
         Gate::authorize('view', $reservation);
         $reservation->load(['room.building', 'classGroup', 'creator', 'sessionReschedule.lecturers', 'sessionReschedule.originalRoom']);
 
+        $now = CarbonImmutable::now();
+        $opensAt = CarbonImmutable::instance($reservation->start_at)->subMinutes((int) config('sicma.reservation.checkin_open_minutes_before'));
+        $closesAt = CarbonImmutable::instance($reservation->start_at)->addMinutes((int) config('sicma.reservation.checkin_grace_minutes'));
+        $canCheckIn = $now->greaterThanOrEqualTo($opensAt) && $now->lessThanOrEqualTo($closesAt) && $now->lessThan($reservation->end_at);
+
         return view('keti.reservations.show', [
             'reservation' => $reservation,
             'recent' => $reservation->status === ReservationStatus::Finished
                 ? Reservation::query()->whereBelongsTo($reservation->classGroup)->where('status', ReservationStatus::Finished)->with('room')->latest('actual_end_at')->limit(5)->get()
                 : collect(),
             'canManage' => $request->user()->can('manage', $reservation),
+            'canCheckIn' => $canCheckIn,
+            'checkInOpensAt' => $opensAt,
+            'checkInClosesAt' => $closesAt->min($reservation->end_at),
         ]);
     }
 

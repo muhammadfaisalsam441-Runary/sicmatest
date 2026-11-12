@@ -35,12 +35,15 @@ class ClosureController extends Controller
                 ])->all());
         }
 
-        $closures->create($room, $start, $end, $request->validated('reason'), $request->user());
+        $cancelImpacted = $request->boolean('cancel_impacted');
+        $closures->create($room, $start, $end, $request->validated('reason'), $request->user(), $cancelImpacted);
 
         return to_route('admin.rooms.index')->with('toast', [
             'type' => 'success',
             'title' => "Ruang {$room->name} ditutup",
-            'message' => $impact->isEmpty() ? 'Tidak ada reservasi yang terdampak.' : $impact->count().' kelas terdampak sudah diberi tahu. Reservasinya tidak dibatalkan otomatis.',
+            'message' => $impact->isEmpty()
+                ? 'Tidak ada reservasi yang terdampak.'
+                : ($cancelImpacted ? $impact->count().' reservasi terdampak telah dibatalkan otomatis.' : $impact->count().' kelas terdampak sudah diberi tahu. Reservasinya tidak dibatalkan otomatis.'),
         ]);
     }
 

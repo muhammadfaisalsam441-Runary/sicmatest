@@ -10,7 +10,7 @@
     $durationOptions = collect($sksOptions)
         ->when(! array_key_exists($duration, $sksOptions) && $duration >= config('sicma.reservation.min_minutes') && $duration <= config('sicma.reservation.max_minutes'), fn ($collection) => $collection->put($duration, Wita::duration($duration))->sortKeys())
         ->all();
-    $booking = BookingPayload::make($room->id, $room->name, $current->locationLabel(), $room->capacity, $start, $duration);
+    $booking = BookingPayload::make($room->id, $room->name, $current->locationLabel(), $room->capacity, $start, $duration, $participants);
 @endphp
 
 @section('content')

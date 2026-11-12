@@ -1,10 +1,13 @@
 <?php
 
+use App\Enums\RescheduleStatus;
 use App\Enums\RoomBlockSource;
 use App\Enums\SessionPhase;
 use App\Models\Academic\CalendarException;
 use App\Models\Academic\ClassGroup;
+use App\Models\Academic\CourseOffering;
 use App\Models\Academic\Period;
+use App\Models\Academic\SessionReschedule;
 use App\Models\Room\Room;
 use App\Models\Scheduling\ScheduleSession;
 use App\Models\Scheduling\ScheduleVersion;
@@ -117,4 +120,53 @@ test('membangun ulang mengganti blok lama tanpa menggandakan', function () {
     $builder->rebuild($version);
 
     expect($version->roomBlocks()->count())->toBe(4);
+});
+
+test('pertemuan yang dipindah Keti tetap nonaktif dan disinkronkan saat jam atau ruang sesi berubah di jadwal resmi baru', function () {
+    $period = septemberPeriod();
+    $roomA = Room::factory()->create(['name' => 'AE 107']);
+    $roomB = Room::factory()->create(['name' => 'AE 108']);
+    $offering = CourseOffering::factory()->for($period)->create();
+
+    // Sesi resmi versi 1: Senin 07:30 - 10:00 di AE 107
+    $version1 = ScheduleVersion::factory()->official()->for($period)->create(['effective_from' => '2026-09-01']);
+    $session1 = ScheduleSession::factory()->for($version1, 'version')->for($roomA)->create([
+        'course_offering_id' => $offering->id,
+        'day_of_week' => 1,
+        'start_minute' => 450,
+        'end_minute' => 600,
+    ]);
+
+    // Reschedule aktif untuk pertemuan 2026-09-07
+    $reschedule = SessionReschedule::factory()->create([
+        'schedule_session_id' => $session1->id,
+        'course_offering_id' => $offering->id,
+        'original_start_at' => '2026-09-07 07:30:00',
+        'original_end_at' => '2026-09-07 10:00:00',
+        'original_room_id' => $roomA->id,
+        'status' => RescheduleStatus::Active,
+    ]);
+
+    // Sesi resmi versi 2: Geser ke Selasa 10:00 - 12:30 di AE 108
+    $version2 = ScheduleVersion::factory()->official()->for($period)->create(['effective_from' => '2026-09-01']);
+    $session2 = ScheduleSession::factory()->for($version2, 'version')->for($roomB)->create([
+        'course_offering_id' => $offering->id,
+        'day_of_week' => 2,
+        'start_minute' => 600,
+        'end_minute' => 750,
+    ]);
+
+    $builder = app(ScheduleBlockBuilder::class);
+    $builder->rebuild($version2);
+
+    // Blok Selasa 2026-09-08 di AE 108 harus is_active = false
+    $block = $roomB->blocks()->whereDate('start_at', '2026-09-08')->first();
+    expect($block)->not->toBeNull()
+        ->and($block->is_active)->toBeFalse();
+
+    // Reschedule harus tersinkron ke start dan ruang baru di versi 2
+    $reschedule->refresh();
+    expect($reschedule->original_start_at->format('Y-m-d H:i'))->toBe('2026-09-08 10:00')
+        ->and($reschedule->original_room_id)->toBe($roomB->id)
+        ->and($reschedule->schedule_session_id)->toBe($session2->id);
 });

@@ -2,14 +2,18 @@
 
 use App\Enums\ReservationStatus;
 use App\Enums\RoomBlockSource;
+use App\Enums\SessionPhase;
+use App\Enums\TeachingRole;
 use App\Exceptions\DomainException;
 use App\Models\Academic\ClassGroup;
+use App\Models\Lecturer\Lecturer;
 use App\Models\Reservation\Reservation;
 use App\Models\Room\Room;
 use App\Models\Room\RoomBlock;
 use App\Models\User\AppNotification;
 use App\Models\User\AuditLog;
 use App\Models\User\User;
+use App\Services\Academic\MeetingRescheduleService;
 use App\Services\Room\ReservationService;
 use Carbon\CarbonImmutable;
 
@@ -244,4 +248,39 @@ test('admin wajib menulis alasan saat membatalkan dan Keti diberi tahu', functio
 
     expect($reservation->fresh()->cancel_reason)->toBe('Ruang dipakai kegiatan jurusan')
         ->and(AppNotification::query()->whereBelongsTo($keti)->where('type', 'reservation.cancelled')->exists())->toBeTrue();
+});
+
+test('reservasi tidak boleh diperpanjang jika batas waktu sudah lewat', function () {
+    $keti = User::factory()->approvedKeti()->create();
+    $room = Room::factory()->create();
+    $reservation = reserveFor($keti, $room, '2026-11-04 10:00', '2026-11-04 11:00');
+    $this->service->start($reservation, $keti);
+
+    $this->travelTo(CarbonImmutable::parse('2026-11-04 11:05'));
+    expectDomainError(fn () => $this->service->extend($reservation->fresh(), $keti), 'INVALID_TIME');
+});
+
+test('Keti tidak bisa memesan ruang saat kelasnya sedang ada jadwal kuliah resmi', function () {
+    $class = ClassGroup::factory()->create();
+    $keti = User::factory()->approvedKeti($class)->create();
+    $room = Room::factory()->create();
+    meetingSession([$class], ['title' => 'Struktur Data', 'day_of_week' => 3, 'start_minute' => 600, 'end_minute' => 700, 'room_id' => Room::factory()->create()->id]);
+
+    expectDomainError(fn () => reserveFor($keti, $room, '2026-11-04 10:00', '2026-11-04 11:40'), 'CLASS_TIME_CONFLICT');
+});
+
+test('kelas pasangan dalam kelas gabungan terikat jadwal pengganti di SessionReschedule', function () {
+    $classA = ClassGroup::factory()->create(['name' => 'Tekom A']);
+    $classB = ClassGroup::factory()->create(['name' => 'Tekom B']);
+    $ketiA = User::factory()->approvedKeti($classA)->create();
+    $ketiB = User::factory()->approvedKeti($classB)->create();
+    $room1 = Room::factory()->create();
+    $room2 = Room::factory()->create();
+
+    $lecturer = Lecturer::factory()->create();
+    $team = [[$lecturer, TeachingRole::Lead, SessionPhase::Full]];
+    $joint = meetingSession([$classA, $classB], ['title' => 'Jaringan Komputer', 'day_of_week' => 5, 'start_minute' => 450, 'end_minute' => 550, 'room_id' => $room1->id], $team);
+    app(MeetingRescheduleService::class)->move($ketiA, $joint, CarbonImmutable::parse('2026-11-06'), CarbonImmutable::parse('2026-11-05 10:00'), $room1, [$lecturer->id], (string) str()->uuid());
+
+    expectDomainError(fn () => reserveFor($ketiB, $room2, '2026-11-05 10:00', '2026-11-05 11:40'), 'CLASS_TIME_CONFLICT');
 });

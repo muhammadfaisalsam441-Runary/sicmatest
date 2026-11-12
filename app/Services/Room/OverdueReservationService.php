@@ -2,9 +2,14 @@
 
 namespace App\Services\Room;
 
+use App\Enums\RescheduleStatus;
 use App\Enums\ReservationStatus;
+use App\Enums\RoomBlockSource;
+use App\Models\Academic\SessionReschedule;
 use App\Models\Reservation\Reservation;
+use App\Models\Room\RoomBlock;
 use App\Models\User\AppNotification;
+use App\Services\Academic\ClassScheduleService;
 use App\Services\Account\AuditLogger;
 use App\Services\Account\NotificationService;
 use App\Support\AvailabilityCache;
@@ -111,6 +116,29 @@ class OverdueReservationService
             ])->save();
 
             $reservation->block()->update(['is_active' => false]);
+
+            if ($reservation->session_reschedule_id !== null) {
+                $reschedule = SessionReschedule::query()->find($reservation->session_reschedule_id);
+                if ($reschedule && $reschedule->status !== RescheduleStatus::Cancelled) {
+                    $reschedule->forceFill([
+                        'status' => RescheduleStatus::Cancelled,
+                        'cancelled_at' => now(),
+                    ])->save();
+
+                    if ($reschedule->original_start_at->isFuture()) {
+                        $version = app(ClassScheduleService::class)->officialVersionOn($reschedule->original_start_at);
+                        RoomBlock::query()
+                            ->where('source_type', RoomBlockSource::Schedule)
+                            ->when($version, fn ($q) => $q->where('schedule_version_id', $version->id))
+                            ->where('room_id', $reschedule->original_room_id)
+                            ->where('start_at', $reschedule->original_start_at)
+                            ->update(['is_active' => true]);
+                    }
+
+                    $this->audit->log('meeting.reschedule_cancelled', $reschedule, ['status' => RescheduleStatus::Active->value], ['status' => RescheduleStatus::Cancelled->value], 'Reservasi pengganti kedaluwarsa (otomatis)');
+                }
+            }
+
             AvailabilityCache::bust();
 
             $this->audit->log('reservation.expired', $reservation, ['status' => 'booked'], ['status' => 'cancelled'], 'Tidak dimulai (otomatis)');

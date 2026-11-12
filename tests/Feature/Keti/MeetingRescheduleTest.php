@@ -170,7 +170,7 @@ test('reservasi biasa tetap memakai tombol Batalkan', function () {
         ->assertDontSee('Pindahkan lagi');
 });
 
-test('Keti kelas gabungan lain boleh melihat pengganti tetapi tidak mengelolanya', function () {
+test('Keti kelas gabungan lain boleh melihat dan mengelola pengganti', function () {
     $classA = ClassGroup::factory()->create(['name' => 'Tekom A']);
     $ketiA = User::factory()->approvedKeti($classA)->create();
     $joint = meetingSession([$this->classC, $classA], ['title' => 'Statistika', 'day_of_week' => 3, 'start_minute' => 780, 'end_minute' => 880, 'room_id' => $this->ae107->id], $this->team);
@@ -179,8 +179,28 @@ test('Keti kelas gabungan lain boleh melihat pengganti tetapi tidak mengelolanya
 
     $this->actingAs($ketiA)->get(route('keti.reservations.show', $reservationId))->assertOk()
         ->assertSee('Statistika')
-        ->assertDontSee(route('keti.reservations.start', $reservationId))
-        ->assertDontSee(route('keti.meetings.reschedule', ['sesi' => $joint->id, 'tanggal' => '2026-11-11', 'pengganti' => $reservationId]));
-    $this->actingAs($ketiA)->post(route('keti.reservations.start', $reservationId))->assertForbidden();
+        ->assertSee(route('keti.meetings.reschedule', ['sesi' => $joint->id, 'tanggal' => '2026-11-11', 'pengganti' => $reservationId]));
     $this->actingAs($ketiA)->get(myClassUrl('2026-11-12'))->assertOk()->assertSee('Kuliah Pengganti');
+});
+
+test('memilih tanggal baru menampilkan rekomendasi slot waktu dan ruangan kosong yang cocok dengan durasi SKS', function () {
+    $this->actingAs($this->keti)->get(reschedulePage(['ke_tanggal' => '2026-11-10']))->assertOk()
+        ->assertSee('Rekomendasi Waktu dan Ruangan Kosong')
+        ->assertSee('ruangan kosong')
+        ->assertSee('Pindahkan ke sini')
+        ->assertSee('AE 107')
+        ->assertSee('AE 209');
+
+    // Slot yang bentrok dosen (Sari Dewi) pada hari Selasa jam 10.00-12.30 tidak boleh mematikan slot lain yang aman
+    meetingSession([ClassGroup::factory()->create()], ['title' => 'Basis Data', 'day_of_week' => 2, 'start_minute' => 600, 'end_minute' => 750, 'room_id' => Room::factory()->create()->id], $this->team);
+
+    $content = $this->actingAs($this->keti)->get(reschedulePage(['ke_tanggal' => '2026-11-10']))->assertOk()->getContent();
+    expect($content)->toContain('07:30')
+        ->and($content)->toContain('Pindahkan ke sini');
+});
+
+test('halaman menampilkan panduan saat tanggal pemindahan belum dipilih', function () {
+    $this->actingAs($this->keti)->get(reschedulePage())->assertOk()
+        ->assertSee('Pilih Tanggal Pemindahan')
+        ->assertDontSee('Pindahkan ke sini');
 });

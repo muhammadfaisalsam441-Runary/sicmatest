@@ -309,6 +309,28 @@ test('penutupan ruang yang berdampak meminta konfirmasi dan tidak membatalkan re
         ->and(app(AvailabilityService::class)->forRoom($room, now()->setTime(15, 0))->badge())->toBe('Tutup');
 });
 
+test('penutupan ruang dengan opsi batalkan reservasi otomatis membatalkan reservasi terdampak', function () {
+    $room = Room::factory()->create(['name' => 'AE 105']);
+    $keti = User::factory()->approvedKeti()->create();
+    $reservation = app(ReservationService::class)->create($keti, $room, now()->setTime(14, 0), now()->setTime(16, 0), 'Kelas pengganti', 20, 'key-closure-cancel');
+
+    $payload = [
+        'room_id' => $room->id,
+        'start_at' => now()->setTime(13, 0)->format('Y-m-d H:i'),
+        'end_at' => now()->setTime(17, 0)->format('Y-m-d H:i'),
+        'reason' => 'Perbaikan Listrik',
+        'confirm_impact' => 1,
+        'cancel_impacted' => 1,
+    ];
+
+    $this->actingAs($this->admin)
+        ->post(route('admin.closures.store'), $payload)
+        ->assertRedirect(route('admin.rooms.index'))
+        ->assertSessionHas('toast');
+
+    expect($reservation->fresh()->status)->toBe(ReservationStatus::Cancelled);
+});
+
 test('membuka kembali ruang menonaktifkan blok penutupan', function () {
     $room = Room::factory()->create();
     $this->actingAs($this->admin)->post(route('admin.closures.store'), ['room_id' => $room->id, 'start_at' => '2026-11-04 12:00', 'end_at' => '2026-11-04 16:00', 'reason' => 'Perawatan']);
@@ -317,6 +339,23 @@ test('membuka kembali ruang menonaktifkan blok penutupan', function () {
     $this->delete(route('admin.closures.destroy', $closure))->assertRedirect(route('admin.rooms.index'));
 
     expect(RoomBlock::query()->where('source_type', RoomBlockSource::Closure)->where('is_active', true)->exists())->toBeFalse();
+});
+
+test('penutupan ruang masa depan tidak dianggap tutup hari ini di daftar ruang admin', function () {
+    $room = Room::factory()->create(['name' => 'AE 109']);
+    // Penutupan minggu depan (hari ini 2026-11-04)
+    $this->actingAs($this->admin)->post(route('admin.closures.store'), [
+        'room_id' => $room->id,
+        'start_at' => '2026-11-11 08:00',
+        'end_at' => '2026-11-11 12:00',
+        'reason' => 'Renovasi Depan',
+    ]);
+
+    $response = $this->get(route('admin.rooms.index'));
+    $response->assertOk();
+
+    expect($response->viewData('closedRoomsCount'))->toBe(0)
+        ->and($response->viewData('closures')->contains('room_id', $room->id))->toBeFalse();
 });
 
 test('admin membatalkan reservasi wajib dengan alasan, slot terbuka, dan Keti diberi tahu', function () {
@@ -487,6 +526,31 @@ test('notifikasi admin bisa ditandai dibaca', function () {
     $this->post(route('admin.notifications.read-all'));
 
     expect($this->admin->appNotifications()->unread()->count())->toBe(0);
+});
+
+test('klik notifikasi admin redirect ke scheduler show jika ada optimization_job_id atau drafts show jika ada schedule_version_id', function () {
+    $notif1 = AppNotification::create([
+        'user_id' => $this->admin->id,
+        'type' => 'optimization.completed',
+        'title' => 'Optimasi selesai',
+        'body' => 'Jadwal berhasil disusun.',
+        'data' => ['optimization_job_id' => 99],
+    ]);
+
+    $this->actingAs($this->admin)
+        ->post(route('admin.notifications.read', $notif1))
+        ->assertRedirect(route('admin.scheduler.show', 99));
+
+    $notif2 = AppNotification::create([
+        'user_id' => $this->admin->id,
+        'type' => 'schedule.draft_created',
+        'title' => 'Draf baru dibuat',
+        'body' => 'Draf v2 berhasil dibuat.',
+        'data' => ['schedule_version_id' => 88],
+    ]);
+
+    $this->post(route('admin.notifications.read', $notif2))
+        ->assertRedirect(route('admin.drafts.show', 88));
 });
 
 /**

@@ -29,12 +29,14 @@ class EmailVerificationController extends Controller
     public function verify(VerifyEmailCodeRequest $request, KetiApplicationService $applications): RedirectResponse
     {
         try {
-            $this->verification->verify($request->user(), $request->validated('code'));
+            $verified = $this->verification->verify($request->user(), $request->validated('code'));
         } catch (DomainException $exception) {
             return back()->with('error', $exception->getMessage())->with('error_code', $exception->errorCode);
         }
 
-        $applications->announceToAdmins($request->user());
+        if ($verified) {
+            $applications->announceToAdmins($request->user());
+        }
 
         return redirect(HomeRoute::for($request->user()))
             ->with('toast', ['type' => 'success', 'title' => 'Email terverifikasi', 'message' => 'Pengajuanmu diteruskan ke admin.']);

@@ -29,6 +29,7 @@ class ClosureRequest extends FormRequest
             'end_at' => ['required', 'date', 'after:start_at'],
             'reason' => ['required', 'string', 'max:200'],
             'confirm_impact' => ['nullable', 'boolean'],
+            'cancel_impacted' => ['nullable', 'boolean'],
         ];
     }
 }

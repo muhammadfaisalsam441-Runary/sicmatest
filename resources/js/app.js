@@ -502,6 +502,15 @@ Alpine.data('bookingModal', (config = {}) => ({
     key: config.key || uuidV4(),
     purpose: config.purpose ?? '',
 
+    init() {
+        this.$el.addEventListener('sicma:form-error', () => {
+            this.submitting = false;
+        });
+        this.$el.addEventListener('sicma:form-complete', () => {
+            this.submitting = false;
+        });
+    },
+
     show(detail) {
         this.room = detail;
         this.key = uuidV4();

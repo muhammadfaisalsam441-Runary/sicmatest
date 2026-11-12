@@ -356,10 +356,14 @@ class ScheduleValidator
      */
     private function reservationConflicts(ScheduleVersion $version): Collection
     {
+        $effectiveFrom = $version->effective_from
+            ? CarbonImmutable::parse($version->effective_from->toDateString())->max(now()->startOfDay())
+            : now()->startOfDay();
+
         $reservationBlocks = RoomBlock::query()
             ->active()
             ->whereIn('source_type', [RoomBlockSource::Reservation, RoomBlockSource::Closure])
-            ->where('end_at', '>', $version->effective_from)
+            ->where('end_at', '>', $effectiveFrom)
             ->get()
             ->groupBy('room_id');
 

@@ -1,3 +1,4 @@
+@use('App\Support\HomeRoute')
 @use('App\Support\Nav')
 @extends('layouts.public')
 
@@ -24,18 +25,26 @@
 
         <form method="GET" action="{{ route('public.rooms') }}" class="flex items-center gap-3" role="search">
             @if ($status)<input type="hidden" name="status" value="{{ $status }}">@endif
-            @if ($building)<input type="hidden" name="gedung" value="{{ $building }}">@endif
             <label class="relative flex-1">
                 <span class="sr-only">Cari nama ruangan</span>
                 <i data-lucide="search" class="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-muted"></i>
                 <input type="search" name="q" value="{{ $keyword }}" placeholder="Cari nama ruangan"
                        class="w-full rounded-control border border-muted/60 bg-surface py-3 pr-4 pl-11 text-sm text-ink placeholder:text-muted focus:border-primary focus:ring-2 focus:ring-primary/15 focus:outline-none">
             </label>
-            <button type="button" x-data x-on:click="$dispatch('open-modal', 'pilih-gedung')"
-                    class="flex w-64 items-center justify-between rounded-control border border-muted/60 bg-surface px-4 py-3 text-sm text-ink hover:border-primary">
-                <span>{{ $buildingLabel }}</span>
-                <i data-lucide="chevron-down" class="size-4"></i>
-            </button>
+            <select name="gedung" onchange="this.form.requestSubmit()"
+                    class="w-64 rounded-control border border-muted/60 bg-surface px-4 py-3 text-sm text-ink hover:border-primary focus:border-primary focus:ring-2 focus:ring-primary/15 focus:outline-none">
+                <option value="">Semua gedung ({{ $summary['all'] }})</option>
+                @foreach ($buildings as $buildingOption)
+                    <option value="{{ $buildingOption->id }}" @selected((string) $building === (string) $buildingOption->id)>
+                        {{ $buildingOption->name }} ({{ $buildingOption->rooms_count }})
+                    </option>
+                @endforeach
+                @if ($roomsWithoutBuilding > 0)
+                    <option value="lainnya" @selected($building === 'lainnya')>
+                        Gedung belum didata ({{ $roomsWithoutBuilding }})
+                    </option>
+                @endif
+            </select>
             <x-button type="submit" variant="secondary" class="w-32">Perbarui</x-button>
         </form>
 
@@ -54,7 +63,6 @@
                 @endphp
                 <x-tabs :items="$tabs" />
             </div>
-            <button type="button" x-data x-on:click="$dispatch('open-modal', 'cari-ruangan')" class="text-sm font-semibold text-primary hover:underline">Contoh pencarian</button>
         </div>
 
         @if ($rooms === [])
@@ -76,39 +84,15 @@
             <p class="text-sm text-ink">Perlu memesan ruangan untuk kelasmu? Gunakan akun Keti yang terdaftar.
                 <button type="button" x-data x-on:click="$dispatch('open-modal', 'bantuan-akun-keti')" class="font-semibold text-primary hover:underline">Bantuan akun Keti</button>
             </p>
-            <x-button :href="Nav::url('login')" class="shrink-0 px-9">Masuk sebagai Keti untuk memesan</x-button>
+            @auth
+                <x-button :href="HomeRoute::for(auth()->user())" class="shrink-0 px-9">Buka SICMA</x-button>
+            @else
+                <x-button :href="Nav::url('login')" class="shrink-0 px-9">Masuk sebagai Keti untuk memesan</x-button>
+            @endauth
         </section>
     </div>
 @endsection
 
 @push('dialogs')
     @include('public.partials.dialogs')
-
-    <x-modal name="cari-ruangan" width="max-w-md">
-        <div class="flex flex-col gap-4">
-            <h2 class="text-xl font-semibold text-ink">Cari ruangan</h2>
-            <p class="text-sm text-muted">Pilih contoh kata pencarian cepat.</p>
-            <div class="flex flex-col gap-2">
-                <x-button variant="secondary" :href="route('public.rooms', ['q' => 'AE 107'])" class="justify-start">AE 107</x-button>
-                <x-button variant="secondary" :href="route('public.rooms', ['q' => 'AE 999'])" class="justify-start">AE 999 • Tanpa hasil</x-button>
-                <x-button variant="secondary" :href="route('public.rooms')" class="justify-start">Tampilkan semua ruangan</x-button>
-            </div>
-            <x-button variant="secondary" x-on:click="$dispatch('close-modal', 'cari-ruangan')" class="w-full">Batal</x-button>
-        </div>
-    </x-modal>
-
-    <x-modal name="pilih-gedung" width="max-w-md">
-        <div class="flex flex-col gap-4">
-            <h2 class="text-xl font-semibold text-ink">Pilih gedung</h2>
-            <p class="text-sm text-muted">Tampilkan ruangan berdasarkan lokasi gedung.</p>
-            <div class="flex flex-col gap-2">
-                <x-button variant="{{ $building === null ? 'soft' : 'secondary' }}" :href="route('public.rooms', array_filter(['q' => $keyword, 'status' => $status]))" class="justify-start">Semua gedung • {{ $summary['all'] }} ruang</x-button>
-                @foreach ($buildings as $buildingOption)
-                    <x-button variant="{{ (string) $building === (string) $buildingOption->id ? 'soft' : 'secondary' }}" :href="route('public.rooms', array_filter(['q' => $keyword, 'status' => $status, 'gedung' => $buildingOption->id]))" class="justify-start">{{ $buildingOption->name }} • {{ $buildingOption->rooms_count }} ruang</x-button>
-                @endforeach
-                <x-button variant="{{ $building === 'lainnya' ? 'soft' : 'secondary' }}" :href="route('public.rooms', array_filter(['q' => $keyword, 'status' => $status, 'gedung' => 'lainnya']))" class="justify-start">Gedung belum didata • {{ $roomsWithoutBuilding }} ruang</x-button>
-            </div>
-            <x-button variant="secondary" x-on:click="$dispatch('close-modal', 'pilih-gedung')" class="w-full">Batal</x-button>
-        </div>
-    </x-modal>
 @endpush

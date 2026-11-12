@@ -35,7 +35,13 @@ class ApplicationStatusController extends Controller
 
     public function resubmit(ResubmitApplicationRequest $request, KetiApplicationService $applications): RedirectResponse
     {
-        $applications->resubmit($request->user(), ClassGroup::query()->findOrFail($request->validated('class_group_id')));
+        $data = $request->validated();
+        $applications->resubmit(
+            $request->user(),
+            ClassGroup::query()->findOrFail($data['class_group_id']),
+            $data['name'] ?? null,
+            $data['nim'] ?? null,
+        );
 
         return redirect()->route('keti.application')
             ->with('toast', ['type' => 'success', 'title' => 'Pengajuan dikirim ulang', 'message' => 'Admin akan memeriksa pengajuanmu.']);

@@ -675,6 +675,13 @@
                         <input type="text" name="reason" x-model="closureReason" required placeholder="Contoh: Perawatan AC / Perbaikan proyektor / Renovasi" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
                     </div>
 
+                    <div>
+                        <label class="flex items-center gap-2 text-xs text-ink cursor-pointer font-medium select-none">
+                            <input type="checkbox" name="cancel_impacted" value="1" class="size-4 accent-danger rounded cursor-pointer">
+                            Batalkan juga reservasi terdampak secara otomatis jika ada
+                        </label>
+                    </div>
+
                     @if (session('closure_impact'))
                         <div class="flex flex-col gap-2 rounded-card bg-danger-soft p-4 text-xs">
                             <div class="flex items-center gap-1.5 font-semibold text-danger">
@@ -688,7 +695,11 @@
                                     </div>
                                 @endforeach
                             </div>
-                            <p class="text-[11px] text-muted mt-1">Reservasi tidak dibatalkan otomatis. Kelas terdampak akan diberi notifikasi.</p>
+                            <p class="text-[11px] text-muted mt-1">Kelas terdampak akan diberi notifikasi secara otomatis.</p>
+                            <label class="mt-1 flex items-center gap-2 text-ink cursor-pointer font-medium">
+                                <input type="checkbox" name="cancel_impacted" value="1" class="size-4 accent-danger rounded cursor-pointer">
+                                Batalkan juga reservasi yang terdampak di atas secara otomatis
+                            </label>
                             <label class="mt-1 flex items-center gap-2 text-ink cursor-pointer font-medium">
                                 <input type="checkbox" name="confirm_impact" value="1" class="size-4 accent-danger rounded cursor-pointer" required>
                                 Saya mengerti dan tetap menutup ruang

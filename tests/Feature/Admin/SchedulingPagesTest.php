@@ -4,6 +4,8 @@ use App\Enums\LecturerHomebase;
 use App\Enums\LecturerProfileStatus;
 use App\Enums\ScheduleVersionStatus;
 use App\Enums\SessionMode;
+use App\Enums\SessionPhase;
+use App\Enums\TeachingRole;
 use App\Models\Academic\ClassGroup;
 use App\Models\Academic\Course;
 use App\Models\Academic\CourseOffering;
@@ -17,6 +19,7 @@ use App\Models\Scheduling\ScheduleVersion;
 use App\Models\User\AuditLog;
 use App\Models\User\User;
 use App\Services\Academic\TeachingLoadService;
+use App\Services\Academic\TeachingPhasePlanner;
 use App\Services\Scheduling\ScheduleValidator;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\UploadedFile;
@@ -904,4 +907,92 @@ test('admin mengelola penawaran kuliah dengan filter dan batch delete', function
     ])->assertRedirect(route('admin.academic.index', ['tab' => 'penawaran']));
 
     expect(CourseOffering::query()->whereIn('id', [$offering1->id, $offering2->id])->count())->toBe(0);
+});
+
+test('perubahan penugasan mengajar di TeachingAssignmentController disinkronkan ke draf aktif', function () {
+    $course = Course::factory()->create(['name' => 'Jaringan Komputer', 'sks' => 3]);
+    $classGroup = ClassGroup::factory()->create(['name' => 'PTIK B 2024', 'study_program' => 'PTIK']);
+    $offering = CourseOffering::factory()->for($this->period)->for($course)->for($classGroup)->create();
+
+    $lecturerA = Lecturer::factory()->create(['name' => 'Dosen A']);
+    $lecturerB = Lecturer::factory()->create(['name' => 'Dosen B']);
+
+    // Buat draf jadwal aktif
+    $draft = ScheduleVersion::factory()->for($this->period)->create();
+    $session = ScheduleSession::factory()->for($draft, 'version')->create([
+        'course_offering_id' => $offering->id,
+        'phase' => SessionPhase::Full,
+    ]);
+
+    // 1. Store assignment (Lead)
+    $this->actingAs($this->admin)->post(route('admin.teaching.store'), [
+        'course_offering_id' => $offering->id,
+        'lecturer_id' => $lecturerA->id,
+        'role' => 'lead',
+        'phase' => 'before_uts',
+    ])->assertRedirect();
+
+    $session->refresh();
+    expect($session->phase)->toBe(SessionPhase::BeforeUts)
+        ->and($session->lecturers->pluck('id')->all())->toBe([$lecturerA->id]);
+
+    // 2. Batch store assignment (tambah Partner)
+    $this->post(route('admin.teaching.batch'), [
+        'offering_ids' => [$offering->id],
+        'lecturer_id' => $lecturerB->id,
+        'role' => 'partner',
+        'phase' => 'before_uts',
+    ])->assertRedirect();
+
+    $session->refresh();
+    expect($session->lecturers->pluck('id')->sort()->values()->all())
+        ->toBe(collect([$lecturerA->id, $lecturerB->id])->sort()->values()->all());
+
+    // 3. Update assignment
+    $leadAssignment = TeachingAssignment::query()->where('course_offering_id', $offering->id)->where('role', TeachingRole::Lead)->first();
+    $this->put(route('admin.teaching.update', $leadAssignment), [
+        'lecturer_id' => $lecturerA->id,
+        'role' => 'lead',
+        'phase' => 'full',
+    ])->assertRedirect();
+
+    $session->refresh();
+    // Mixed phase (full & before_uts) -> session becomes Full and both are attached
+    expect($session->phase)->toBe(SessionPhase::Full)
+        ->and($session->lecturers->pluck('id')->count())->toBe(2);
+
+    // 4. Destroy assignment
+    $this->delete(route('admin.teaching.destroy', $leadAssignment))->assertRedirect();
+
+    $session->refresh();
+    expect($session->lecturers->pluck('id')->all())->toBe([$lecturerB->id]);
+});
+
+test('penerapan fase di TeachingPhasePlanner apply disinkronkan ke draf aktif', function () {
+    $course = Course::factory()->create(['sks' => 2]);
+    $classGroup = ClassGroup::factory()->create(['study_program' => 'TEKOM']);
+    $offering = CourseOffering::factory()->for($this->period)->for($course)->for($classGroup)->create();
+
+    $lead = Lecturer::factory()->create();
+    $partner = Lecturer::factory()->create();
+
+    TeachingAssignment::factory()->for($offering, 'courseOffering')->for($lead)->create(['role' => 'lead', 'phase' => 'full']);
+    TeachingAssignment::factory()->for($offering, 'courseOffering')->for($partner)->create(['role' => 'partner', 'phase' => 'full']);
+
+    // Draf aktif
+    $draft = ScheduleVersion::factory()->for($this->period)->create();
+    $session = ScheduleSession::factory()->for($draft, 'version')->create([
+        'course_offering_id' => $offering->id,
+        'phase' => SessionPhase::Full,
+    ]);
+
+    $planner = app(TeachingPhasePlanner::class);
+    $plan = $planner->preview($this->period);
+
+    $this->actingAs($this->admin)->post(route('admin.teaching.phases.apply'), [
+        'fingerprint' => $plan['fingerprint'],
+    ])->assertRedirect();
+
+    $session->refresh();
+    expect($session->lecturers->pluck('id')->count())->toBe(2);
 });

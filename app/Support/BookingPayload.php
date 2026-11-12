@@ -12,9 +12,9 @@ use Carbon\CarbonInterface;
 final class BookingPayload
 {
     /**
-     * @return array{roomId: int, roomName: string, location: string|null, capacity: int|null, startAt: string, duration: int, dateLabel: string, rangeLabel: string, durationLabel: string}
+     * @return array{roomId: int, roomName: string, location: string|null, capacity: int|null, participants: int|null, startAt: string, duration: int, dateLabel: string, rangeLabel: string, durationLabel: string}
      */
-    public static function make(int $roomId, string $roomName, ?string $location, ?int $capacity, CarbonInterface $start, int $duration): array
+    public static function make(int $roomId, string $roomName, ?string $location, ?int $capacity, CarbonInterface $start, int $duration, ?int $participants = null): array
     {
         $start = CarbonImmutable::instance($start)->startOfMinute();
         $end = $start->addMinutes($duration);
@@ -24,6 +24,7 @@ final class BookingPayload
             'roomName' => $roomName,
             'location' => $location,
             'capacity' => $capacity,
+            'participants' => $participants,
             'startAt' => $start->format('Y-m-d H:i'),
             'duration' => $duration,
             'dateLabel' => Wita::longDate($start),

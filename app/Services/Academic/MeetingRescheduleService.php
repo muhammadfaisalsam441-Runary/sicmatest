@@ -18,7 +18,9 @@ use App\Services\Account\AuditLogger;
 use App\Services\Account\NotificationService;
 use App\Services\Room\AvailabilityService;
 use App\Services\Room\ReservationService;
+use App\Services\Room\SearchCriteria;
 use App\Support\AvailabilityCache;
+use App\Support\RoomCardPresenter;
 use App\Support\Wita;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -159,6 +161,17 @@ class MeetingRescheduleService
                 throw new DomainException('RESTORE_NOT_POSSIBLE', "Ruangan asli {$originalRoom->name} sudah dipakai pada jam itu. Gunakan Pindahkan lagi untuk memilih slot lain.");
             }
 
+            $session = $reschedule->session()->with(['participants', 'lecturers.leadershipTerms'])->firstOrFail();
+            ClassGroup::query()->whereKey($session->participants->modelKeys())->orderBy('id')->lockForUpdate()->get();
+            $meeting = $this->meetings->find($session, $start) ?? new Meeting($session, $start, $end, $reschedule);
+
+            try {
+                $this->assertClassesFree($meeting, $start, $end, replacing: null);
+                $this->lecturers->assertFree($session->lecturers, $start, $end, excludeMeeting: $meeting, ignoreRescheduleId: $reschedule->id);
+            } catch (DomainException $exception) {
+                throw new DomainException('RESTORE_NOT_POSSIBLE', $exception->getMessage(), $exception->context);
+            }
+
             $this->releaseReplacement($locked, $actor, $reason);
             $reschedule->forceFill(['status' => RescheduleStatus::Cancelled, 'cancelled_at' => now(), 'cancelled_by' => $actor->id])->save();
             $this->originalBlocks($reschedule)->update(['is_active' => true]);
@@ -239,6 +252,143 @@ class MeetingRescheduleService
         $session->loadMissing(['participants', 'lecturers']);
 
         return $this->validateMove($keti, $session, $originalDate, $this->normalize($newStart), $lecturerIds, $replacing)['meeting'];
+    }
+
+    /**
+     * Rekomendasi slot waktu dan ruangan kosong untuk memindahkan pertemuan kuliah pada tanggal target.
+     *
+     * Memindai setiap slot standar akademik (1 SKS = 50 menit):
+     * 1. Dosen pengajar bebas dari jadwal mengajar lain, reservasi lain, dan pembatasan hari pimpinan.
+     * 2. Kelas peserta bebas dari kuliah lain dan reservasi lain.
+     * 3. Sesuai jam operasional & bukan hari libur / istirahat salat Jumat.
+     * 4. Ruangan kosong dicari untuk setiap slot yang bebas bentrok.
+     *
+     * @param  list<int>  $lecturerIds
+     * @return Collection<int, array{slot: string, start: CarbonImmutable, end: CarbonImmutable, time_range: string, rooms: list<array>, rooms_count: int}>
+     */
+    public function recommendations(
+        User $keti,
+        ScheduleSession $session,
+        CarbonInterface $originalDate,
+        CarbonInterface $targetDate,
+        array $lecturerIds,
+        ?SessionReschedule $replacing = null,
+        ?int $manualStartMinute = null,
+    ): Collection {
+        $session->loadMissing(['participants', 'lecturers', 'version.period.timeSlots']);
+        $meeting = $this->meetings->find($session, $originalDate);
+
+        if ($meeting === null) {
+            return collect();
+        }
+
+        $duration = (int) $meeting->start->diffInMinutes($meeting->end);
+        if ($duration <= 0) {
+            $duration = 100;
+        }
+
+        $targetDay = CarbonImmutable::instance($targetDate)->setTimezone(config('app.timezone'))->startOfDay();
+        $period = $session->version->period;
+
+        if (! in_array($targetDay->dayOfWeekIso, config('sicma.scheduler.days', [1, 2, 3, 4, 5]), true)
+            || ! $this->schedules->hasClassesOn($period->loadMissing('calendarExceptions'), $targetDay)) {
+            return collect();
+        }
+
+        $timeSlots = $period->timeSlots->sortBy('start_minute')->values();
+        $defaultStarts = [450, 500, 555, 600, 605, 660, 710, 790, 840, 890, 940];
+
+        $candidateMinutes = $timeSlots->isNotEmpty()
+            ? $timeSlots->pluck('start_minute')->unique()->values()
+            : collect($defaultStarts);
+
+        if ($manualStartMinute !== null && ! $candidateMinutes->contains($manualStartMinute)) {
+            $candidateMinutes->push($manualStartMinute);
+        }
+
+        $candidateMinutes = $candidateMinutes->sort()->values();
+        $recommendations = collect();
+
+        foreach ($candidateMinutes as $startMinute) {
+            $candidateStart = $targetDay->addMinutes((int) $startMinute);
+            $candidateEnd = $candidateStart->addMinutes($duration);
+
+            try {
+                $this->check($keti, $session, $originalDate, $candidateStart, $lecturerIds, $replacing);
+            } catch (DomainException) {
+                continue;
+            }
+
+            $criteria = new SearchCriteria(
+                start: $candidateStart,
+                durationMinutes: $duration,
+                status: 'available',
+                sort: SearchCriteria::SORT_NAME,
+            );
+
+            $availableRooms = $this->availability->search($criteria)
+                ->map(RoomCardPresenter::card(...))
+                ->sortBy(fn (array $room): int => $room['id'] === $session->room_id ? 0 : 1)
+                ->values()
+                ->all();
+
+            if (empty($availableRooms)) {
+                continue;
+            }
+
+            $slotLabel = $this->formatSlotLabel($timeSlots, $candidateStart, $candidateEnd);
+
+            $recommendations->push([
+                'slot' => $slotLabel,
+                'start' => $candidateStart,
+                'end' => $candidateEnd,
+                'time_range' => Wita::range($candidateStart, $candidateEnd),
+                'rooms' => $availableRooms,
+                'rooms_count' => count($availableRooms),
+            ]);
+        }
+
+        return $recommendations;
+    }
+
+    private function formatSlotLabel(Collection $timeSlots, CarbonImmutable $start, CarbonImmutable $end): string
+    {
+        $startMinute = $start->hour * 60 + $start->minute;
+        $endMinute = $startMinute + (int) $start->diffInMinutes($end);
+
+        $slots = $timeSlots->isNotEmpty() ? $timeSlots : collect([
+            ['label' => 'I', 'start_minute' => 450, 'end_minute' => 500],
+            ['label' => 'II', 'start_minute' => 500, 'end_minute' => 550],
+            ['label' => 'III', 'start_minute' => 555, 'end_minute' => 605],
+            ['label' => 'IV', 'start_minute' => 605, 'end_minute' => 655],
+            ['label' => 'V', 'start_minute' => 660, 'end_minute' => 710],
+            ['label' => 'VI', 'start_minute' => 710, 'end_minute' => 760],
+            ['label' => 'VII', 'start_minute' => 790, 'end_minute' => 840],
+            ['label' => 'VIII', 'start_minute' => 840, 'end_minute' => 890],
+            ['label' => 'IX', 'start_minute' => 890, 'end_minute' => 940],
+            ['label' => 'X', 'start_minute' => 940, 'end_minute' => 995],
+            ['label' => 'XI', 'start_minute' => 995, 'end_minute' => 1050],
+        ]);
+
+        $overlapping = $slots->filter(function ($slot) use ($startMinute, $endMinute): bool {
+            $slotStart = is_array($slot) ? $slot['start_minute'] : $slot->start_minute;
+            $slotEnd = is_array($slot) ? $slot['end_minute'] : $slot->end_minute;
+
+            return $slotStart < $endMinute && $slotEnd > $startMinute;
+        })->values();
+
+        if ($overlapping->isNotEmpty()) {
+            $first = $overlapping->first();
+            $last = $overlapping->last();
+            $firstLabel = is_array($first) ? $first['label'] : $first->label;
+            $lastLabel = is_array($last) ? $last['label'] : $last->label;
+
+            $name = $firstLabel === $lastLabel ? "Slot {$firstLabel}" : "Slot {$firstLabel}–{$lastLabel}";
+
+            return "{$name} (".Wita::range($start, $end).')';
+        }
+
+        return Wita::range($start, $end);
     }
 
     /**

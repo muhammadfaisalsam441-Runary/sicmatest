@@ -62,12 +62,19 @@ class LecturerService
             ])->save();
 
             if (! empty($data['leadership_position'])) {
+                $lecturer->leadershipTerms()
+                    ->where('position', '!=', $data['leadership_position'])
+                    ->where(fn ($q) => $q->whereNull('valid_to')->orWhere('valid_to', '>=', now()->toDateString()))
+                    ->update(['valid_to' => now()->subDay()->toDateString()]);
+
                 $lecturer->leadershipTerms()->updateOrCreate(
                     ['position' => $data['leadership_position']],
                     ['valid_from' => $data['leadership_from'], 'valid_to' => $data['leadership_to'] ?? null],
                 );
             } elseif (array_key_exists('leadership_position', $data)) {
-                $lecturer->leadershipTerms()->delete();
+                $lecturer->leadershipTerms()
+                    ->where(fn ($q) => $q->whereNull('valid_to')->orWhere('valid_to', '>=', now()->toDateString()))
+                    ->update(['valid_to' => now()->subDay()->toDateString()]);
             }
 
             $period = Period::query()->active()->first();

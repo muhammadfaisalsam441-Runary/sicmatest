@@ -1,11 +1,16 @@
 <?php
 
+use App\Enums\RescheduleStatus;
 use App\Enums\ReservationStatus;
+use App\Enums\SessionPhase;
+use App\Enums\TeachingRole;
+use App\Models\Lecturer\Lecturer;
 use App\Models\Reservation\Reservation;
 use App\Models\Room\Room;
 use App\Models\Room\RoomBlock;
 use App\Models\User\AppNotification;
 use App\Models\User\User;
+use App\Services\Academic\MeetingRescheduleService;
 use App\Services\Room\ReservationService;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Scheduling\Schedule;
@@ -58,6 +63,35 @@ test('pembatalan otomatis hanya berjalan bila kebijakannya diaktifkan', function
 
     expect($reservation->fresh()->status)->toBe(ReservationStatus::Cancelled)
         ->and($reservation->block()->first()->is_active)->toBeFalse();
+});
+
+test('pembatalan otomatis pada reservasi pemindahan membatalkan SessionReschedule dan memulihkan blok asli jika belum lewat', function () {
+    config(['sicma.reservation.auto_expire_no_show' => true]);
+    $lecturer = Lecturer::factory()->create();
+    $team = [[$lecturer, TeachingRole::Lead, SessionPhase::Full]];
+    $session = meetingSession([$this->keti->activeClassGroup()], ['title' => 'Algoritma', 'day_of_week' => 5, 'start_minute' => 450, 'end_minute' => 550, 'room_id' => $this->room->id], $team);
+    $originalBlock = RoomBlock::query()->where('source_id', $session->id)->where('start_at', '2026-11-06 07:30:00')->first();
+
+    $newRoom = Room::factory()->create();
+    $reschedule = app(MeetingRescheduleService::class)->move(
+        $this->keti,
+        $session,
+        CarbonImmutable::parse('2026-11-06'),
+        CarbonImmutable::parse('2026-11-04 10:00'),
+        $newRoom,
+        [$lecturer->id],
+        (string) str()->uuid()
+    );
+
+    expect($originalBlock->fresh()->is_active)->toBeFalse();
+
+    $this->travelTo(CarbonImmutable::parse('2026-11-04 10:20'));
+
+    $this->artisan('sicma:flag-overdue')->assertSuccessful();
+
+    expect($reschedule->reservation->fresh()->status)->toBe(ReservationStatus::Cancelled)
+        ->and($reschedule->fresh()->status)->toBe(RescheduleStatus::Cancelled)
+        ->and($originalBlock->fresh()->is_active)->toBeTrue();
 });
 
 test('command penanda terjadwal setiap lima menit', function () {

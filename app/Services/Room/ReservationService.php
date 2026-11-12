@@ -2,6 +2,7 @@
 
 namespace App\Services\Room;
 
+use App\Enums\RescheduleStatus;
 use App\Enums\ReservationStatus;
 use App\Enums\RoomBlockSource;
 use App\Exceptions\DomainException;
@@ -10,6 +11,8 @@ use App\Models\Reservation\Reservation;
 use App\Models\Room\Room;
 use App\Models\Room\RoomBlock;
 use App\Models\User\User;
+use App\Services\Academic\Meeting;
+use App\Services\Academic\MeetingLocator;
 use App\Services\Academic\MeetingRescheduleService;
 use App\Services\Account\AuditLogger;
 use App\Services\Account\NotificationService;
@@ -38,6 +41,7 @@ class ReservationService
         private AvailabilityService $availability,
         private AuditLogger $audit,
         private NotificationService $notifications,
+        private MeetingLocator $meetings,
     ) {}
 
     /**
@@ -85,6 +89,19 @@ class ReservationService
                 $this->assertAcademicBookingDay($purpose, $start);
                 $this->assertValidRequest($lockedRoom, $start, $end, $participants, $classGroup->id);
                 $this->assertClassFree($classGroup, $start, $end);
+
+                $clashMeeting = $this->meetings->meetingsOn($start)->first(fn (Meeting $other): bool => $other->start->lessThan($end)
+                    && $other->end->greaterThan($start)
+                    && ! $other->isMoved()
+                    && $other->session->participants->contains('id', $classGroup->id));
+
+                if ($clashMeeting !== null) {
+                    throw new DomainException(
+                        'CLASS_TIME_CONFLICT',
+                        "Kelas {$classGroup->name} sedang kuliah {$clashMeeting->session->title} pukul ".Wita::range($clashMeeting->start, $clashMeeting->end).'. Pilih jam lain.'
+                    );
+                }
+
                 $this->assertRoomFree($lockedRoom, $start, $end);
 
                 $reservation = $this->persist($keti, $classGroup, $lockedRoom, $start, $end, $purpose, $participants, $idempotencyKey);
@@ -337,10 +354,15 @@ class ReservationService
                 throw new DomainException('INVALID_STATUS_TRANSITION', 'Hanya pemakaian yang sedang berlangsung yang bisa diperpanjang.');
             }
 
+            $currentEnd = CarbonImmutable::instance($reservation->end_at);
+
+            if ($currentEnd->lessThan(CarbonImmutable::now())) {
+                throw new DomainException('INVALID_TIME', 'Batas pemakaian sudah lewat sehingga tidak bisa diperpanjang.');
+            }
+
             $this->assertAcademicBookingDay($reservation->purpose, $reservation->start_at);
 
             $start = CarbonImmutable::instance($reservation->start_at);
-            $currentEnd = CarbonImmutable::instance($reservation->end_at);
             $newEnd = $currentEnd->addMinutes($minutes);
             $max = (int) config('sicma.reservation.max_minutes');
             [, $close] = $this->availability->operatingWindow($start);
@@ -478,12 +500,24 @@ class ReservationService
         string $hint = 'Batalkan pesanan itu atau pilih jam lain.',
     ): void {
         $clash = Reservation::query()
-            ->whereBelongsTo($classGroup)
+            ->where(function ($query) use ($classGroup) {
+                $query->whereBelongsTo($classGroup)
+                    ->orWhereHas('sessionReschedule', function ($q) use ($classGroup) {
+                        $q->where('status', RescheduleStatus::Active)
+                            ->where(function ($sub) use ($classGroup) {
+                                $id = (string) $classGroup->id;
+                                $sub->where('participant_key', $id)
+                                    ->orWhere('participant_key', 'like', "{$id},%")
+                                    ->orWhere('participant_key', 'like', "%,{$id},%")
+                                    ->orWhere('participant_key', 'like', "%,{$id}");
+                            });
+                    });
+            })
             ->whereIn('status', [ReservationStatus::Booked, ReservationStatus::InUse])
             ->where('start_at', '<', $end)
             ->where('end_at', '>', $start)
             ->when($ignoreReservationId !== null, fn ($query) => $query->whereKeyNot($ignoreReservationId))
-            ->with('room')
+            ->with(['room', 'sessionReschedule'])
             ->orderBy('start_at')
             ->first();
 

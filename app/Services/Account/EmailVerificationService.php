@@ -59,10 +59,10 @@ class EmailVerificationService
      *
      * @throws DomainException VERIFICATION_CODE_INVALID | VERIFICATION_CODE_EXPIRED | VERIFICATION_LOCKED
      */
-    public function verify(User $user, string $code): void
+    public function verify(User $user, string $code): bool
     {
         if ($user->hasVerifiedEmail()) {
-            return;
+            return false;
         }
 
         $record = $this->latestCode($user);
@@ -94,6 +94,8 @@ class EmailVerificationService
             $user->markEmailAsVerified();
             $user->verificationCodes()->delete();
         });
+
+        return true;
     }
 
     /**

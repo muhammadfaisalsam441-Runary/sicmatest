@@ -45,13 +45,13 @@ class RoomClosureService
             ->get();
     }
 
-    public function create(Room $room, CarbonInterface $start, CarbonInterface $end, string $reason, User $admin): RoomClosure
+    public function create(Room $room, CarbonInterface $start, CarbonInterface $end, string $reason, User $admin, bool $cancelImpacted = false): RoomClosure
     {
         if ($end->lessThanOrEqualTo($start)) {
             throw new DomainException('INVALID_DURATION', 'Waktu selesai penutupan harus setelah waktu mulai.');
         }
 
-        return DB::transaction(function () use ($room, $start, $end, $reason, $admin): RoomClosure {
+        return DB::transaction(function () use ($room, $start, $end, $reason, $admin, $cancelImpacted): RoomClosure {
             Room::query()->whereKey($room->id)->lockForUpdate()->first();
 
             $closure = RoomClosure::create([
@@ -74,14 +74,19 @@ class RoomClosureService
             AvailabilityCache::bust();
             $this->audit->log('room_closure.created', $closure, null, $closure->only(['room_id', 'start_at', 'end_at', 'reason']), $reason);
 
-            foreach ($this->impact($room, $start, $end) as $reservation) {
-                $this->notifications->notify(
-                    $reservation->creator,
-                    'room.closed',
-                    'Ruang '.$room->name.' ditutup',
-                    'Ruang yang kamu pesan ditutup: '.$reason.'. Hubungi admin atau cari ruangan lain.',
-                    ['reservation_id' => $reservation->id],
-                );
+            $impacted = $this->impact($room, $start, $end);
+            foreach ($impacted as $reservation) {
+                if ($cancelImpacted) {
+                    app(ReservationService::class)->cancel($reservation, $admin, "Penutupan ruang {$room->name}: {$reason}");
+                } else {
+                    $this->notifications->notify(
+                        $reservation->creator,
+                        'room.closed',
+                        'Ruang '.$room->name.' ditutup',
+                        'Ruang yang kamu pesan ditutup: '.$reason.'. Hubungi admin atau cari ruangan lain.',
+                        ['reservation_id' => $reservation->id],
+                    );
+                }
             }
 
             return $closure;

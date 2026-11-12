@@ -334,7 +334,7 @@ export function installPortalNavigation(Alpine, renderIcons) {
             const response = await fetch(url, {
                 method: active.method, body: options.body,
                 credentials: 'same-origin', signal: active.controller.signal,
-                headers: { Accept: options.form ? 'application/json, text/html' : 'text/html' },
+                headers: { Accept: options.form ? 'text/html, application/json;q=0.9' : 'text/html' },
             });
             if (request !== active) return;
             if (response.status === 401) {
@@ -347,8 +347,12 @@ export function installPortalNavigation(Alpine, renderIcons) {
             if (type.includes('application/json')) {
                 const data = await response.json();
                 if (!response.ok) {
-                    if (options.form) showErrors(options.form, data);
-                    else if (!options.silent) notice(data.message || 'Halaman belum dapat dimuat.');
+                    if (options.form) {
+                        showErrors(options.form, data);
+                        options.form.dispatchEvent(new CustomEvent('sicma:form-error', { bubbles: true, detail: data }));
+                    } else if (!options.silent) {
+                        notice(data.message || 'Halaman belum dapat dimuat.');
+                    }
                     return;
                 }
                 request = null;
@@ -442,6 +446,7 @@ export function installPortalNavigation(Alpine, renderIcons) {
             form.removeAttribute('aria-busy');
             form.inert = false;
             for (const button of buttons) button.disabled = false;
+            form.dispatchEvent(new CustomEvent('sicma:form-complete', { bubbles: true }));
         }
     });
 

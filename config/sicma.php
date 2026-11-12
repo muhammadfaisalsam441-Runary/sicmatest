@@ -28,6 +28,8 @@ return [
         'min_minutes' => 30, // BELUM DITETAPKAN
         'max_minutes' => 200, // 4 SKS = 200 menit
         'duration_options' => [
+            30 => '30 menit',
+            50 => '1 SKS (50 menit)',
             100 => '2 SKS (100 menit)',
             150 => '3 SKS (150 menit)',
             200 => '4 SKS (200 menit)',

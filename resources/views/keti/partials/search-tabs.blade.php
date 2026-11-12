@@ -1,7 +1,6 @@
-{{-- Navigasi pencarian, kalender ruang, dan jadwal kelas. --}}
+{{-- Navigasi pencarian ruangan dan kalender booking. --}}
 @props(['active'])
 <x-tabs :items="[
-    ['label' => 'Sekarang', 'href' => route('keti.search'), 'active' => $active === 'sekarang'],
+    ['label' => 'Cari Ruangan', 'href' => route('keti.search'), 'active' => in_array($active, ['sekarang', 'cari-ruangan'], true)],
     ['label' => 'Booking Ruangan', 'href' => route('keti.rooms.calendar'), 'active' => $active === 'kalender'],
-    ['label' => 'My Class', 'href' => route('keti.my-class'), 'active' => $active === 'my-class'],
 ]" />

@@ -328,7 +328,7 @@ class RoomCalendarTest extends TestCase
             'room' => $room->id, 'mulai' => '2026-11-05 10:00', 'durasi' => 200,
         ]))->assertOk()->assertSee('10:00–13:20 WITA')
             ->assertSee('select name="purpose"', false)->assertDontSee('input name="purpose"', false)
-            ->assertDontSee('name="participants"', false);
+            ->assertSee('name="participants"', false);
         foreach (['Diskusi / Kerja Kelompok', 'Praktikum Tambahan', 'Seminar / Ujian', 'Kegiatan Organisasi / Himpunan', 'Lainnya'] as $purpose) {
             $details->assertSee('<option value="'.$purpose.'"', false);
         }

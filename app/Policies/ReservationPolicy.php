@@ -20,7 +20,7 @@ class ReservationPolicy
      */
     public function manage(User $user, Reservation $reservation): bool
     {
-        return $user->isApprovedKeti() && $this->isRepresentativeOf($user, $reservation);
+        return $user->isApprovedKeti() && ($this->isRepresentativeOf($user, $reservation) || $this->isJointClassOf($user, $reservation));
     }
 
     /**

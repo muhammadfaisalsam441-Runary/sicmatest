@@ -5,39 +5,46 @@
 
 @section('content')
     <div class="flex flex-col gap-6">
-        <x-page-header title="My Class" subtitle="Jadwal dan ruangan kelasmu." />
-        @include('keti.partials.search-tabs', ['active' => 'my-class'])
-        <p class="text-sm text-muted">Perkuliahan berlangsung Senin–Jumat.</p>
+        <x-page-header title="My Class" :subtitle="'Jadwal dan perkuliahan Kelas '.$classGroup->name.'.'" />
 
-        <x-card class="flex items-center justify-between">
-            <div class="flex flex-col gap-1">
-                <h2 class="text-lg font-semibold">Kelas {{ $classGroup->name }}</h2>
-                <p class="text-sm text-muted">Ketua tingkat: {{ auth()->user()->name }}</p>
-            </div>
-            <div class="flex flex-col items-end gap-1">
-                <span class="text-xs text-muted">Tanggal jadwal</span>
-                <span class="font-semibold">{{ Wita::longDate($date) }}</span>
-            </div>
-        </x-card>
+        <div class="flex items-center justify-between">
+            <a href="{{ route('keti.my-class', ['tanggal' => $date->subWeek()->toDateString()]) }}" class="inline-flex items-center gap-1.5 rounded-control border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary-soft/60">
+                <i data-lucide="chevron-left" class="size-4"></i>
+                <span>Minggu lalu</span>
+            </a>
+            <span class="text-xs font-semibold text-muted">
+                {{ Wita::date($days->first()) }} – {{ Wita::date($days->last()) }}
+            </span>
+            <a href="{{ route('keti.my-class', ['tanggal' => $date->addWeek()->toDateString()]) }}" class="inline-flex items-center gap-1.5 rounded-control border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary-soft/60">
+                <span>Minggu depan</span>
+                <i data-lucide="chevron-right" class="size-4"></i>
+            </a>
+        </div>
 
-        <nav class="flex gap-2" aria-label="Pilih hari">
+        <nav class="grid grid-cols-5 gap-3" aria-label="Pilih hari">
             @foreach ($days as $day)
                 <a href="{{ route('keti.my-class', ['tanggal' => $day->toDateString()]) }}"
-                   @class(['flex flex-col items-center rounded-control px-5 py-2 text-sm', 'bg-primary text-white' => $day->isSameDay($date), 'bg-primary-soft text-primary hover:bg-primary-soft/70' => ! $day->isSameDay($date)])>
-                    <span class="font-semibold">{{ Wita::dayName($day) }}</span>
-                    <span class="text-xs">{{ Wita::date($day) }}</span>
+                   @class([
+                       'flex flex-col items-center justify-center rounded-card border px-4 py-3 text-sm transition-all',
+                       'border-primary bg-primary text-white shadow-sm' => $day->isSameDay($date),
+                       'border-border bg-surface text-ink hover:border-primary/50 hover:bg-primary-soft/40' => ! $day->isSameDay($date),
+                   ])>
+                    <span class="font-semibold text-sm">{{ Wita::dayName($day) }}</span>
+                    <span @class(['text-xs mt-0.5', 'text-white/80' => $day->isSameDay($date), 'text-muted' => ! $day->isSameDay($date)])>
+                        {{ Wita::date($day) }}
+                    </span>
                 </a>
             @endforeach
         </nav>
 
         @if ($meetings->isEmpty() && $replacements->isEmpty())
-            <x-empty-state title="Belum ada jadwal" message="Tidak ada jadwal kelas pada tanggal yang dipilih." icon="calendar">
+            <x-empty-state title="Belum ada jadwal" :message="! in_array($date->dayOfWeekIso, config('sicma.scheduler.days'), true) ? 'Perkuliahan berlangsung Senin–Jumat.' : 'Tidak ada jadwal kelas pada tanggal yang dipilih.'" icon="calendar">
                 <x-button variant="soft" :href="route('keti.search')">Cari ruangan kosong</x-button>
             </x-empty-state>
         @else
             <div class="flex items-center justify-between">
                 <h2 class="text-xl font-semibold">{{ $meetings->count() + $replacements->count() }} jadwal</h2>
-                <span class="text-xs text-muted">Jadwal kelas • Hari yang dipilih</span>
+                <span class="text-xs text-muted">{{ Wita::longDate($date) }}</span>
             </div>
             <div class="grid grid-cols-2 gap-4">
                 @foreach ($meetings as $meeting)

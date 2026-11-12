@@ -73,15 +73,20 @@ class KetiApplicationService
     /**
      * Ajukan ulang setelah diminta perbaikan/ditolak. Riwayat pengajuan lama tetap tersimpan.
      */
-    public function resubmit(User $user, ClassGroup $classGroup): KetiApplication
+    public function resubmit(User $user, ClassGroup $classGroup, ?string $name = null, ?string $nim = null): KetiApplication
     {
-        $latest = $user->latestKetiApplication;
+        $application = DB::transaction(function () use ($user, $classGroup, $name, $nim): KetiApplication {
+            $latest = $user->ketiApplications()->lockForUpdate()->latest('id')->first();
 
-        if (! in_array($latest?->status, [KetiApplicationStatus::NeedsRevision, KetiApplicationStatus::Rejected], true)) {
-            throw new DomainException('INVALID_STATUS_TRANSITION', 'Pengajuan ini tidak dapat diajukan ulang.');
-        }
+            if (! in_array($latest?->status, [KetiApplicationStatus::NeedsRevision, KetiApplicationStatus::Rejected], true)) {
+                throw new DomainException('INVALID_STATUS_TRANSITION', 'Pengajuan ini tidak dapat diajukan ulang.');
+            }
 
-        $application = DB::transaction(function () use ($user, $classGroup, $latest): KetiApplication {
+            $userUpdates = array_filter(['name' => $name, 'nim' => $nim], fn ($v) => $v !== null && $v !== '');
+            if (! empty($userUpdates)) {
+                $user->forceFill($userUpdates)->save();
+            }
+
             $application = $user->ketiApplications()->create([
                 'class_group_id' => $classGroup->id,
                 'status' => KetiApplicationStatus::Pending,
@@ -89,6 +94,8 @@ class KetiApplicationService
 
             $this->audit->log('keti_application.resubmitted', $application, ['previous_application_id' => $latest->id], [
                 'class_group_id' => $classGroup->id,
+                'name' => $name,
+                'nim' => $nim,
             ]);
 
             return $application;

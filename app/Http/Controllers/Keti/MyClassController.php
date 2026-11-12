@@ -20,7 +20,13 @@ class MyClassController extends Controller
         $request->validate(['tanggal' => ['nullable', 'date_format:Y-m-d']]);
 
         $classGroup = $request->user()->activeClassGroup();
-        $date = CarbonImmutable::parse($request->query('tanggal', now()->toDateString()))->startOfDay();
+        $dateParam = $request->query('tanggal');
+        if ($dateParam === null) {
+            $now = CarbonImmutable::now();
+            $date = $now->isWeekend() ? $now->next(CarbonImmutable::MONDAY)->startOfDay() : $now->startOfDay();
+        } else {
+            $date = CarbonImmutable::parse($dateParam)->startOfDay();
+        }
         $weekStart = $date->startOfWeek();
         $now = CarbonImmutable::now();
 

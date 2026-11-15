@@ -18,6 +18,8 @@
     },
     "dependencies": {
         "alpinejs": "^3.17.5",
-        "lucide": "^1.67.0"
+        "laravel-echo": "^2.6.3",
+        "lucide": "^1.67.0",
+        "pusher-js": "^8.6.0"
     }
 }

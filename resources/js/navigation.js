@@ -83,6 +83,8 @@ export function installPortalNavigation(Alpine, renderIcons) {
     let request = null;
     let rendering = false;
     let scrollTimer = null;
+    let pendingRealtimeRefresh = false;
+    let realtimeTimer = null;
     history.scrollRestoration = 'manual';
 
     function formKey(form) {
@@ -492,8 +494,23 @@ export function installPortalNavigation(Alpine, renderIcons) {
     });
 
     function refresh() {
-        if (request || rendering || !canBackgroundRefresh(document)) return;
-        return visit(currentUrl, { history: 'replace', keepScroll: true, silent: true });
+        if (request || rendering || !canBackgroundRefresh(document)) return false;
+        pendingRealtimeRefresh = false;
+        const activeVisit = visit(currentUrl, { history: 'replace', keepScroll: true, silent: true });
+        return typeof activeVisit?.finally === 'function'
+            ? activeVisit.finally(() => {
+                if (pendingRealtimeRefresh && canBackgroundRefresh(document)) void refresh();
+            })
+            : activeVisit;
+    }
+
+    function triggerRealtimeRefresh(delay = 80) {
+        pendingRealtimeRefresh = true;
+        clearTimeout(realtimeTimer);
+        realtimeTimer = setTimeout(() => {
+            realtimeTimer = null;
+            if (canBackgroundRefresh(document)) void refresh();
+        }, delay);
     }
 
     setInterval(() => {
@@ -504,7 +521,17 @@ export function installPortalNavigation(Alpine, renderIcons) {
         if (document.visibilityState === 'visible') void refresh();
     });
 
-    return { refresh };
+    document.addEventListener('sicma:realtime-update', () => triggerRealtimeRefresh());
+
+    document.addEventListener('focusout', () => {
+        if (pendingRealtimeRefresh) triggerRealtimeRefresh(120);
+    });
+
+    document.addEventListener('close', () => {
+        if (pendingRealtimeRefresh) triggerRealtimeRefresh(120);
+    }, true);
+
+    return { refresh, triggerRealtimeRefresh };
 }
 
 export function registerStatusPolling(Alpine, navigation) {
@@ -513,8 +540,13 @@ export function registerStatusPolling(Alpine, navigation) {
         progress: options.progress ?? { stage: 'Menunggu antrean', total: 0, placed: 0 },
         timer: null,
         controller: null,
+        realtimeHandler: null,
         init() {
             this.timer = setInterval(() => this.poll(), options.interval);
+            this.realtimeHandler = () => {
+                void this.poll();
+            };
+            globalThis.document?.addEventListener?.('sicma:realtime-update', this.realtimeHandler);
         },
         async poll() {
             if (this.controller || document.visibilityState === 'hidden') return;
@@ -546,6 +578,10 @@ export function registerStatusPolling(Alpine, navigation) {
         destroy() {
             clearInterval(this.timer);
             this.controller?.abort();
+            if (this.realtimeHandler) {
+                globalThis.document?.removeEventListener?.('sicma:realtime-update', this.realtimeHandler);
+                this.realtimeHandler = null;
+            }
         },
     }));
 }

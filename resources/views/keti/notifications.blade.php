@@ -23,7 +23,7 @@
 
         @forelse ($notifications as $notification)
             @php($isUnread = $notification->read_at === null)
-            <x-card :class="'sicma-card-enter sicma-card-interactive flex flex-col justify-between gap-4 sm:flex-row sm:items-center '.($isUnread ? 'border-l-4 border-l-primary bg-primary-soft/20' : '')" style="--stagger: {{ $loop->index }}">
+            <x-card :class="'sicma-card-enter sicma-card-interactive flex flex-col justify-between gap-4 sm:flex-row sm:items-center '.($isUnread ? 'border-primary/25 bg-primary-soft/20' : '')" style="--stagger: {{ $loop->index }}">
                 <div class="flex min-w-0 items-start gap-3.5">
                     <span @class([
                         'flex size-10 shrink-0 items-center justify-center rounded-control border',

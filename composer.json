@@ -12,8 +12,10 @@
         "php": "^8.3",
         "dompdf/dompdf": "~3.1.0",
         "laravel/framework": "^13.17",
+        "laravel/reverb": "^1.13",
         "laravel/tinker": "^3.0",
-        "phpoffice/phpspreadsheet": "^5.10"
+        "phpoffice/phpspreadsheet": "^5.10",
+        "predis/predis": "^3.7"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",

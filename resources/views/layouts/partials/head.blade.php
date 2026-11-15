@@ -1,6 +1,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="csrf-token" content="{{ csrf_token() }}">
+@if (config('sicma.realtime.enabled', true) && config('broadcasting.default') === 'reverb' && filled(config('broadcasting.connections.reverb.key')))
+<meta name="reverb-config" content="{{ json_encode([
+    'key' => config('broadcasting.connections.reverb.key'),
+    'wsHost' => config('broadcasting.connections.reverb.client.host'),
+    'wsPort' => (int) (config('broadcasting.connections.reverb.client.port') ?: 8080),
+    'wssPort' => (int) (config('broadcasting.connections.reverb.client.port') ?: 8080),
+    'forceTLS' => config('broadcasting.connections.reverb.client.scheme', 'http') === 'https',
+    'channel' => config('sicma.realtime.channel') ?: 'sicma.availability',
+    'event' => config('sicma.realtime.event') ?: 'availability.updated',
+], JSON_THROW_ON_ERROR) }}">
+@endif
 
 <title>{{ $title ?? null ? $title.' • ' : '' }}{{ config('app.name') }}</title>
 <link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any">

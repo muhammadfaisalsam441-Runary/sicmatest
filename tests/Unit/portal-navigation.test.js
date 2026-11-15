@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { canBackgroundRefresh, captureFields, restoreFields, hasFormChanges, isEditingField, navigationState, formActionUrl, registerStatusPolling } from '../../resources/js/navigation.js';
+import { installRealtimePush, parseReverbConfig } from '../../resources/js/realtime.js';
 
 function input(name, value = '', extra = {}) {
     return { tagName: 'INPUT', type: 'text', name, value, defaultValue: value, ...extra };
@@ -183,4 +184,140 @@ test('refresh latar belakang ditahan saat modal terbuka, tab tersembunyi, atau p
 
     assert.equal(isEditingField(input('q', 'AE 107')), true);
     assert.equal(isEditingField({ tagName: 'INPUT', type: 'submit' }), false);
+});
+
+test('parseReverbConfig membaca meta reverb-config, fallback ke location.hostname, dan mengabaikan konfigurasi kosong', () => {
+    const docWithHost = {
+        querySelector: (selector) => selector === 'meta[name="reverb-config"]'
+            ? {
+                getAttribute: (name) => name === 'content'
+                    ? JSON.stringify({
+                        key: 'sicma-key',
+                        wsHost: 'ws.sicma.test',
+                        wsPort: 6001,
+                        wssPort: 443,
+                        forceTLS: true,
+                        channel: 'sicma.availability',
+                        event: 'availability.updated',
+                    })
+                    : null,
+            }
+            : null,
+    };
+
+    assert.deepEqual(
+        parseReverbConfig(docWithHost, {}, { location: { hostname: 'ignored.test' } }),
+        {
+            key: 'sicma-key',
+            wsHost: 'ws.sicma.test',
+            wsPort: 6001,
+            wssPort: 443,
+            forceTLS: true,
+            channel: 'sicma.availability',
+            event: 'availability.updated',
+        },
+    );
+
+    const docEmptyHost = {
+        querySelector: () => ({
+            content: JSON.stringify({
+                key: 'sicma-key',
+                wsHost: null,
+                wsPort: 8080,
+                wssPort: 8080,
+                forceTLS: false,
+                channel: 'sicma.availability',
+                event: 'availability.updated',
+            }),
+        }),
+    };
+
+    assert.equal(
+        parseReverbConfig(docEmptyHost, {}, { location: { hostname: 'portal.sicma.test' } }).wsHost,
+        'portal.sicma.test',
+    );
+    assert.equal(parseReverbConfig(docEmptyHost, {}, undefined).wsHost, '127.0.0.1');
+
+    const emptyDoc = { querySelector: () => null };
+    assert.equal(parseReverbConfig(emptyDoc, {}, { location: { hostname: 'sicma.test' } }), null);
+    assert.deepEqual(
+        parseReverbConfig(
+            emptyDoc,
+            { VITE_REVERB_APP_KEY: 'env-key', VITE_REVERB_PORT: '9090', VITE_REVERB_SCHEME: 'https' },
+            { location: { hostname: 'env.sicma.test' } },
+        ),
+        {
+            key: 'env-key',
+            wsHost: 'env.sicma.test',
+            wsPort: 9090,
+            wssPort: 9090,
+            forceTLS: true,
+            channel: 'sicma.availability',
+            event: 'availability.updated',
+        },
+    );
+
+    const docMissingChannel = {
+        querySelector: () => ({ content: JSON.stringify({ key: 'sicma-key', channel: '' }) }),
+    };
+    assert.equal(parseReverbConfig(docMissingChannel, {}, { location: { hostname: 'sicma.test' } }), null);
+
+    assert.equal(installRealtimePush(null, emptyDoc, {}), null);
+    assert.equal(installRealtimePush(null, emptyDoc, { WebSocket: class {} }), null);
+});
+
+test('statusPolling segera memanggil poll saat sicma:realtime-update diterima dan melepas listener saat destroy', async () => {
+    const originals = {
+        fetch: globalThis.fetch,
+        document: globalThis.document,
+        setInterval: globalThis.setInterval,
+        clearInterval: globalThis.clearInterval,
+    };
+    const listeners = new Map();
+    let factory;
+    let refreshes = 0;
+    let fetchCalls = 0;
+
+    try {
+        globalThis.document = {
+            visibilityState: 'visible',
+            addEventListener: (event, handler) => listeners.set(event, handler),
+            removeEventListener: (event, handler) => {
+                if (listeners.get(event) === handler) {
+                    listeners.delete(event);
+                }
+            },
+        };
+        globalThis.fetch = async () => {
+            fetchCalls++;
+            return {
+                ok: true,
+                json: async () => ({ lock_version: 2, status: 'completed' }),
+            };
+        };
+        globalThis.setInterval = () => 77;
+        globalThis.clearInterval = () => {};
+
+        registerStatusPolling(
+            { data: (_, provider) => { factory = provider; } },
+            { refresh: async () => { refreshes++; } },
+        );
+
+        const component = factory({ url: '/status', interval: 5000, version: 1, status: 'running' });
+        component.init();
+
+        const handler = listeners.get('sicma:realtime-update');
+        assert.equal(typeof handler, 'function');
+
+        handler();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        assert.equal(fetchCalls, 1);
+        assert.equal(refreshes, 1);
+
+        component.destroy();
+        assert.equal(listeners.has('sicma:realtime-update'), false);
+    } finally {
+        Object.assign(globalThis, originals);
+    }
 });

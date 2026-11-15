@@ -77,8 +77,7 @@
                         $isOnlineCard = in_array($meeting['status'], ['online', 'switched_online'], true);
                         $isDimmed = in_array($meeting['status'], ['moved', 'finished'], true);
                         $cardClasses = 'sicma-card-interactive sicma-card-enter flex flex-col gap-3.5 hover:border-primary/35'.match (true) {
-                            $isLive => ' border-l-4 border-l-success',
-                            $isOnlineCard => ' border-l-4 border-l-primary',
+                            $isLive => ' ring-1 ring-primary/15',
                             $isDimmed => ' opacity-75',
                             default => '',
                         };
@@ -213,7 +212,7 @@
                     @endif
                 @endforeach
                 @foreach ($replacements as $reservation)
-                    <x-card class="sicma-card-interactive sicma-card-enter flex flex-col gap-3.5 border-l-4 border-l-primary hover:border-primary/35">
+                    <x-card class="sicma-card-interactive sicma-card-enter flex flex-col gap-3.5 hover:border-primary/35">
                         <div class="flex flex-wrap items-start justify-between gap-2">
                             <div class="flex min-w-0 flex-col gap-0.5">
                                 <span class="text-[11px] font-semibold uppercase tracking-wide text-primary">Kuliah Pengganti</span>
@@ -246,7 +245,7 @@
                         $targetStart = $onlineReschedule->effectiveStart();
                         $nowTime = CarbonImmutable::now();
                     @endphp
-                    <x-card class="sicma-card-interactive sicma-card-enter flex flex-col gap-3.5 border-l-4 border-l-primary hover:border-primary/35">
+                    <x-card class="sicma-card-interactive sicma-card-enter flex flex-col gap-3.5 hover:border-primary/35">
                         <div class="flex flex-wrap items-start justify-between gap-2">
                             <div class="flex min-w-0 flex-col gap-0.5">
                                 <span class="text-[11px] font-semibold uppercase tracking-wide text-primary">Kuliah Pengganti • {{ $onlineReschedule->session_title }}</span>

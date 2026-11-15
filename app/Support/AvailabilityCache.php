@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Events\RoomAvailabilityUpdated;
 use Closure;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -34,7 +35,11 @@ class AvailabilityCache
     {
         DB::afterCommit(function (): void {
             Cache::add(self::VERSION_KEY, 1);
-            Cache::increment(self::VERSION_KEY);
+            $version = (int) Cache::increment(self::VERSION_KEY);
+
+            if (config('sicma.realtime.enabled', true)) {
+                rescue(fn (): mixed => RoomAvailabilityUpdated::dispatch($version, now()->toIso8601String()), report: false);
+            }
         });
     }
 }

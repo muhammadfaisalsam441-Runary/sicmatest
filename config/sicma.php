@@ -90,4 +90,10 @@ return [
 
     'polling_seconds' => 30,
 
+    'realtime' => [
+        'enabled' => (bool) env('SICMA_REALTIME_ENABLED', true),
+        'channel' => env('SICMA_REALTIME_CHANNEL', 'sicma.availability'),
+        'event' => 'availability.updated',
+    ],
+
 ];

@@ -2,6 +2,7 @@ import Alpine from 'alpinejs';
 import { createIcons } from 'lucide';
 import * as icons from './icons';
 import { installPortalNavigation, registerStatusPolling } from './navigation';
+import { installRealtimePush } from './realtime';
 
 window.Alpine = Alpine;
 
@@ -52,6 +53,7 @@ window.sicmaCloseDialog = async function (dialog) {
 
 const navigation = installPortalNavigation(Alpine, (root = document) => window.renderIcons(root));
 registerStatusPolling(Alpine, navigation);
+installRealtimePush(navigation);
 
 const TABLE_DENSITY_KEY = 'sicma.tableDensity';
 

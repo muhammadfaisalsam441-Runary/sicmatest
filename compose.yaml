@@ -16,9 +16,23 @@ x-laravel: &laravel
     DB_USERNAME: ${DB_USERNAME:-sicma}
     DB_PASSWORD: ${DB_PASSWORD:?Isi DB_PASSWORD di .env}
     DB_URL: ""
-    SESSION_DRIVER: database
-    CACHE_STORE: database
-    QUEUE_CONNECTION: database
+    SESSION_DRIVER: ${SESSION_DRIVER:-redis}
+    CACHE_STORE: ${CACHE_STORE:-redis}
+    QUEUE_CONNECTION: ${QUEUE_CONNECTION:-redis}
+    BROADCAST_CONNECTION: ${BROADCAST_CONNECTION:-reverb}
+    REDIS_CLIENT: ${REDIS_CLIENT:-phpredis}
+    REDIS_HOST: redis
+    REDIS_PORT: 6379
+    REVERB_APP_ID: ${REVERB_APP_ID:-sicma-app}
+    REVERB_APP_KEY: ${REVERB_APP_KEY:-sicma-key}
+    REVERB_APP_SECRET: ${REVERB_APP_SECRET:-sicma-secret}
+    REVERB_HOST: reverb
+    REVERB_PORT: 8080
+    REVERB_SCHEME: http
+    VITE_REVERB_APP_KEY: ${REVERB_APP_KEY:-sicma-key}
+    VITE_REVERB_HOST: ${VITE_REVERB_HOST:-}
+    VITE_REVERB_PORT: ${REVERB_PORT:-8080}
+    VITE_REVERB_SCHEME: ${VITE_REVERB_SCHEME:-http}
     SICMA_SCHEDULER_MODE: queue
     DB_QUEUE_RETRY_AFTER: 300
     LOG_CHANNEL: stderr
@@ -27,6 +41,8 @@ x-laravel: &laravel
     - app_storage:/var/www/html/storage
   depends_on:
     mysql:
+      condition: service_healthy
+    redis:
       condition: service_healthy
 
 services:
@@ -58,6 +74,27 @@ services:
     stop_signal: SIGTERM
     command: ["php", "artisan", "schedule:work", "--no-interaction"]
 
+  reverb:
+    <<: *laravel
+    user: www-data
+    stop_signal: SIGTERM
+    command: ["php", "artisan", "reverb:start", "--host=0.0.0.0", "--port=8080", "--no-interaction"]
+    ports:
+      - "127.0.0.1:${REVERB_PORT:-8080}:8080"
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${FORWARD_REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   mysql:
     image: mysql:8.4
     restart: unless-stopped
@@ -85,4 +122,5 @@ services:
 
 volumes:
   mysql_data_v2:
+  redis_data:
   app_storage:

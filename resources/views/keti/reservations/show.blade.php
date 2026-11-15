@@ -47,35 +47,55 @@
             <x-empty-state title="Pesanan dibatalkan" message="Pembatalan tercatat. Kamu dapat mencari ruangan lain." icon="check">
                 <x-button :href="route('keti.search')">Cari ruangan lagi</x-button>
             </x-empty-state>
-            <x-card class="flex items-center justify-between">
+            <x-card class="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
                 <span class="text-sm text-muted">{{ $room->name }} • {{ Wita::date($reservation->start_at) }} {{ Wita::range($reservation->start_at, $reservation->end_at) }} • {{ $reservation->purpose }}</span>
                 <span class="text-sm text-muted">Dibatalkan {{ Wita::stamp($reservation->cancelled_at) }}{{ $reservation->cancel_reason ? ' • '.$reservation->cancel_reason : '' }}</span>
             </x-card>
         @else
-            <div class="grid grid-cols-[1fr_390px] items-start gap-6">
-                <x-card class="flex flex-col gap-5">
-                    <div class="flex items-start justify-between">
-                        <div class="flex flex-col gap-3">
-                            <h2 class="text-3xl font-medium">{{ $room->name }}</h2>
-                            <p class="text-sm text-muted">{{ ($room->building?->name ?? 'Gedung belum didata').' • Lantai '.($room->floor ?? '—') }}</p>
-                        </div>
-                        <x-status-badge :variant="$status->badgeVariant()">{{ $status->label() }}</x-status-badge>
-                    </div>
-                    <dl class="flex items-end justify-between">
+            <div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-[1fr_390px]">
+                <x-card class="sicma-card-enter flex flex-col gap-5">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
                         <div class="flex flex-col gap-1">
-                            <dt class="text-xs text-muted">Mulai</dt>
-                            <dd class="text-xl font-medium">{{ Wita::clock($reservation->actual_start_at ?? $reservation->start_at) }}</dd>
+                            <span class="text-xs font-semibold uppercase tracking-wide text-primary">{{ $reservation->purpose }}</span>
+                            <h2 class="text-2xl font-semibold text-ink sm:text-3xl">{{ $room->name }}</h2>
+                            <p class="inline-flex items-center gap-1.5 text-sm text-muted">
+                                <i data-lucide="map-pin" aria-hidden="true" class="size-4 shrink-0"></i>
+                                <span>{{ ($room->building?->name ?? 'Gedung belum didata').' • Lantai '.($room->floor ?? '—') }}</span>
+                            </p>
                         </div>
-                        <div class="flex flex-col items-end gap-1">
-                            <dt class="text-xs text-muted">{{ match ($status) { ReservationStatus::Booked => 'Selesai rencana', ReservationStatus::InUse => 'Batas penggunaan', default => 'Selesai' } }}</dt>
-                            <dd class="text-xl font-medium">{{ Wita::clock($reservation->actual_end_at ?? $reservation->end_at) }}</dd>
-                        </div>
-                    </dl>
-                    <p class="font-semibold text-primary">{{ $reservation->creator->name }} • Kelas {{ $reservation->classGroup->name }}</p>
-                    <p class="text-sm text-muted">{{ Wita::longDate($reservation->start_at) }} • {{ $reservation->purpose }}</p>
+                        <x-status-badge :variant="$status->badgeVariant()" :pulse="$status === ReservationStatus::InUse">{{ $status->label() }}</x-status-badge>
+                    </div>
+
+                    <div class="flex flex-col gap-3 rounded-control bg-page p-4">
+                        <span class="inline-flex items-center gap-1.5 text-xs font-medium text-muted">
+                            <i data-lucide="calendar" aria-hidden="true" class="size-3.5"></i>
+                            <span>{{ Wita::longDate($reservation->start_at) }}</span>
+                        </span>
+                        <dl class="grid grid-cols-2 items-end gap-4">
+                            <div class="flex flex-col gap-0.5">
+                                <dt class="text-xs text-muted">Mulai</dt>
+                                <dd class="text-xl font-semibold text-ink tabular-nums">{{ Wita::clock($reservation->actual_start_at ?? $reservation->start_at) }}</dd>
+                            </div>
+                            <div class="flex flex-col items-end gap-0.5 text-right">
+                                <dt class="text-xs text-muted">{{ match ($status) { ReservationStatus::Booked => 'Selesai rencana', ReservationStatus::InUse => 'Batas penggunaan', default => 'Selesai' } }}</dt>
+                                <dd class="text-xl font-semibold text-ink tabular-nums">{{ Wita::clock($reservation->actual_end_at ?? $reservation->end_at) }}</dd>
+                            </div>
+                        </dl>
+                    </div>
+
+                    <div class="flex flex-col gap-1.5 text-sm text-muted">
+                        <p class="inline-flex items-center gap-2 font-semibold text-primary">
+                            <i data-lucide="user" aria-hidden="true" class="size-4 shrink-0"></i>
+                            <span>{{ $reservation->creator->name }} • Kelas {{ $reservation->classGroup->name }}</span>
+                        </p>
+                        <p class="inline-flex items-center gap-2 text-xs text-muted">
+                            <i data-lucide="book-open" aria-hidden="true" class="size-3.5 shrink-0"></i>
+                            <span>Kegiatan: {{ $reservation->purpose }}</span>
+                        </p>
+                    </div>
                     <hr class="border-border">
 
-                    <div class="grid grid-cols-2 gap-3">
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         @if ($status === ReservationStatus::Booked && $canManage)
                             @unless ($academicBookingBlocked)
                                 @if ($canCheckIn ?? false)
@@ -91,7 +111,7 @@
                                 <x-button variant="danger-outline" x-data x-on:click="$dispatch('open-modal', 'batal-pesanan')">{{ $reschedule ? 'Batalkan pemindahan' : 'Batalkan' }}</x-button>
                             @endif
                             @if ($reschedule && $reschedule->schedule_session_id)
-                                <x-button variant="secondary" class="col-span-2" :href="route('keti.meetings.reschedule', ['sesi' => $reschedule->schedule_session_id, 'tanggal' => $reschedule->original_start_at->toDateString(), 'pengganti' => $reservation->id])">Pindahkan lagi</x-button>
+                                <x-button variant="secondary" class="sm:col-span-2" :href="route('keti.meetings.reschedule', ['sesi' => $reschedule->schedule_session_id, 'tanggal' => $reschedule->original_start_at->toDateString(), 'pengganti' => $reservation->id])">Pindahkan lagi</x-button>
                             @endif
                         @elseif ($status === ReservationStatus::InUse && $canManage)
                             <form method="POST" action="{{ route('keti.reservations.finish', $reservation) }}">
@@ -106,21 +126,24 @@
                     </div>
                 </x-card>
 
-                <x-card class="flex flex-col gap-4">
+                <x-card class="sicma-card-enter flex flex-col gap-4" style="--stagger: 1">
                     @if ($status === ReservationStatus::Booked && $academicBookingBlocked)
                         <h2 class="text-xl font-semibold">Pilih hari kuliah</h2>
-                        <p class="text-sm text-ink">Pesan ulang untuk Senin–Jumat melalui menu Booking Ruangan.</p>
-                        <x-button :href="route('keti.rooms.calendar')">Buka Booking Ruangan</x-button>
+                        <p class="text-sm text-ink">Pesan ulang untuk Senin–Jumat melalui menu Cari Ruangan.</p>
+                        <x-button :href="route('keti.search')">Buka Cari Ruangan</x-button>
                     @elseif ($status === ReservationStatus::Booked)
                         <h2 class="text-xl font-semibold">Sudah berada di ruangan?</h2>
                         <p class="text-sm text-ink">Tekan Mulai gunakan untuk mencatat awal pemakaian. Batalkan jika ruangan tidak jadi dipakai.</p>
-                        <p class="text-xs text-muted">Mulai gunakan dapat ditekan antara {{ Wita::clock($checkInOpensAt ?? $reservation->start_at->copy()->subMinutes((int) config('sicma.reservation.checkin_open_minutes_before')), false) }}–{{ Wita::clock($checkInClosesAt ?? $reservation->start_at->copy()->addMinutes((int) config('sicma.reservation.checkin_grace_minutes'))) }}.</p>
+                        <p class="rounded-control border border-border bg-page px-3.5 py-2.5 text-xs text-muted tabular-nums">
+                            Mulai gunakan dapat ditekan antara <strong class="text-ink">{{ Wita::clock($checkInOpensAt ?? $reservation->start_at->copy()->subMinutes((int) config('sicma.reservation.checkin_open_minutes_before')), false) }}–{{ Wita::clock($checkInClosesAt ?? $reservation->start_at->copy()->addMinutes((int) config('sicma.reservation.checkin_grace_minutes'))) }}</strong>.
+                        </p>
                     @elseif ($status === ReservationStatus::InUse)
+                        <span class="text-xs font-semibold uppercase tracking-wide text-success">Sedang berlangsung</span>
                         <h2 class="text-xl font-semibold">Sisa waktu penggunaan</h2>
-                        <p class="text-3xl font-semibold">{{ Wita::duration($remaining) }}</p>
+                        <p class="rounded-control bg-success-soft px-4 py-3 text-3xl font-semibold text-success tabular-nums">{{ Wita::duration($remaining) }}</p>
                         <p class="text-sm text-ink">Selesaikan penggunaan setelah meninggalkan ruangan.</p>
                         @if ($canManage)
-                            <div class="grid grid-cols-2 gap-3">
+                            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 @unless ($academicBookingBlocked)
                                     <x-button variant="secondary" x-data x-on:click="$dispatch('open-modal', 'perpanjang')">+{{ config('sicma.reservation.extend_minutes') }} menit</x-button>
                                 @endunless
@@ -174,7 +197,7 @@
                 <h2 class="text-xl font-semibold">Perpanjang pemakaian</h2>
                 <p class="text-sm text-muted">Tambahan {{ config('sicma.reservation.extend_minutes') }} menit tersedia selama tidak berbenturan dengan jadwal berikutnya.</p>
                 <x-info-box title="{{ $room->name }}"><p>Batas baru: {{ Wita::clock($reservation->end_at->copy()->addMinutes((int) config('sicma.reservation.extend_minutes'))) }}</p></x-info-box>
-                <div class="grid grid-cols-2 gap-3">
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <x-button variant="secondary" x-on:click="$dispatch('close-modal', 'perpanjang')">Kembali</x-button>
                     <x-button type="submit">Perpanjang {{ config('sicma.reservation.extend_minutes') }} menit</x-button>
                 </div>
@@ -189,7 +212,7 @@
                     <x-select name="issue" :options="collect(config('sicma.facility_issues'))->mapWithKeys(fn ($issue) => [$issue => $issue])" required />
                 </x-field>
                 <x-field label="Catatan (opsional)" name="note"><x-textarea name="note" rows="2" /></x-field>
-                <div class="grid grid-cols-2 gap-3">
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <x-button variant="secondary" x-on:click="$dispatch('close-modal', 'lapor-kendala')">Batal</x-button>
                     <x-button type="submit">Kirim laporan</x-button>
                 </div>

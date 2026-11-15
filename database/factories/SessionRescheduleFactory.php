@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\RescheduleMode;
 use App\Enums\RescheduleStatus;
 use App\Models\Academic\SessionReschedule;
 use App\Models\Reservation\Reservation;
@@ -28,6 +29,7 @@ class SessionRescheduleFactory extends Factory
             'original_start_at' => '2026-11-09 07:30',
             'original_end_at' => '2026-11-09 10:00',
             'original_room_id' => Room::factory(),
+            'mode' => RescheduleMode::Room,
             'reservation_id' => Reservation::factory(),
             'status' => RescheduleStatus::Active,
             'created_by' => User::factory(),

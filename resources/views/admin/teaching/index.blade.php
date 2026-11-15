@@ -14,17 +14,21 @@
         $allLecturersList = ($allLecturerOptions ?? $lecturerOptionsEnriched)->values()->all();
         $singleCount = $singleTeacherCount ?? 0;
         $teamCount = $teamTeacherCount ?? 0;
+        $lockUrlTemplate = route('admin.teaching.lock', ['assignment' => '__ID__']);
+        $destroyUrlTemplate = route('admin.teaching.destroy', ['assignment' => '__ID__']);
+        $updateUrlTemplate = route('admin.teaching.update', ['assignment' => '__ID__']);
     @endphp
-    <div class="flex flex-col gap-6"
+    <div class="flex flex-col gap-4 admin-page-stack"
          x-data="teachingManager(@js($offerings->pluck('id')->all()), @js($lecturerOptionsByOffering), @js($allLecturersList))"
+         x-effect="document.body.classList.toggle('overflow-hidden', quickModalOpen || batchModalOpen || rekapModalOpen)"
          :data-editing="(quickModalOpen || batchModalOpen || rekapModalOpen || selectedIds.length > 0) ? 'true' : null"
+         @keydown.escape.window="if (quickModalOpen) { quickModalOpen = false } else if (batchModalOpen) { batchModalOpen = false } else if (rekapModalOpen) { rekapModalOpen = false }"
          @sicma:navigated.document="quickModalOpen = false; batchModalOpen = false; rekapModalOpen = false">
-        <x-page-header title="Pembagian mengajar dan beban SKS" subtitle="Bagi mata kuliah ke dosen yang layak. Klik langsung pada nama dosen atau tombol Atur Tim untuk mengganti pengajar, peran, atau periode pertemuan.">
+        <x-page-header title="Pembagian mengajar dan beban SKS">
             @if ($period)
                 <x-slot:actions>
-                    <x-button variant="secondary" icon="chart-column-increasing" @click="rekapModalOpen = true">Rekap Beban SKS Dosen</x-button>
-                    <x-button variant="secondary" icon="calendar" :href="route('admin.teaching.phases.preview')">Atur Fase Pertemuan</x-button>
-                    <x-button icon="zap" :href="route('admin.teaching.allocation.preview')">Bagi Beban Otomatis</x-button>
+                    <x-button variant="secondary" size="sm" icon="download" :href="route('admin.teaching.export', request()->only(['filter', 'prodi', 'semester', 'q', 'sort', 'dir']))" download>Unduh CSV</x-button>
+                    <x-button variant="secondary" size="sm" icon="chart-column-increasing" @click="rekapModalOpen = true">Rekap Beban SKS Dosen</x-button>
                 </x-slot:actions>
             @endif
         </x-page-header>
@@ -36,143 +40,148 @@
             </x-alert>
         @endif
 
-        <x-card>
+        <x-card padding="px-2 py-1.5" class="w-fit max-w-full">
             <x-schedule-steps :current="2" />
         </x-card>
 
-        <x-tabs :items="[
+        <x-tabs size="sm" :items="[
             ['label' => 'Penugasan Dosen & SKS', 'href' => route('admin.teaching.index'), 'active' => true],
             ['label' => 'Bagi Beban Otomatis', 'href' => route('admin.teaching.allocation.preview'), 'active' => false],
             ['label' => 'Atur Fase Pertemuan (UTS/UAS)', 'href' => route('admin.teaching.phases.preview'), 'active' => false],
         ]" />
 
-
+        @if (! $period)
+            <x-empty-state title="Belum ada semester aktif" message="Atur semester di Data Akademik lebih dulu untuk mengelola pembagian mengajar." icon="calendar" />
+        @else
 
         {{-- Toolbar Filter & Pencarian Cepat --}}
-        <x-card class="flex flex-col gap-4">
-            <div class="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-4">
-                {{-- Tabs Filter Status --}}
-                <div class="flex flex-wrap items-center gap-2">
-                    <a href="{{ route('admin.teaching.index', array_merge(request()->query(), ['filter' => 'semua', 'page' => 1])) }}"
-                       @class([
-                           'rounded-full px-3.5 py-1.5 text-xs font-semibold transition',
-                           'bg-primary text-white' => $filter === 'semua',
-                           'bg-page text-muted hover:text-ink hover:bg-border' => $filter !== 'semua',
-                       ])>
-                        Semua ({{ number_format($totalCount) }})
-                    </a>
-                    <a href="{{ route('admin.teaching.index', array_merge(request()->query(), ['filter' => 'tanpa_pengampu', 'page' => 1])) }}"
-                       @class([
-                           'rounded-full px-3.5 py-1.5 text-xs font-semibold transition',
-                           'bg-danger text-white' => $filter === 'tanpa_pengampu',
-                           'bg-danger-soft/60 text-danger hover:bg-danger-soft' => $filter !== 'tanpa_pengampu',
-                       ])>
-                        ⚠️ Belum Ada Pengampu ({{ number_format($withoutLead) }})
-                    </a>
-                    <a href="{{ route('admin.teaching.index', array_merge(request()->query(), ['filter' => 'tunggal', 'page' => 1])) }}"
-                       @class([
-                           'rounded-full px-3.5 py-1.5 text-xs font-semibold transition',
-                           'bg-primary text-white' => $filter === 'tunggal',
-                           'bg-page text-muted hover:text-ink hover:bg-border' => $filter !== 'tunggal',
-                       ])>
-                        Dosen Tunggal / Tanpa Mitra ({{ number_format($singleCount) }})
-                    </a>
-                    <a href="{{ route('admin.teaching.index', array_merge(request()->query(), ['filter' => 'tim_mitra', 'page' => 1])) }}"
-                       @class([
-                           'rounded-full px-3.5 py-1.5 text-xs font-semibold transition',
-                           'bg-success text-white' => $filter === 'tim_mitra',
-                           'bg-success-soft/60 text-success hover:bg-success-soft' => $filter !== 'tim_mitra',
-                       ])>
-                        Tim 2 Dosen ({{ number_format($teamCount) }})
-                    </a>
-                    <a href="{{ route('admin.teaching.index', array_merge(request()->query(), ['filter' => 'lengkap', 'page' => 1])) }}"
-                       @class([
-                           'rounded-full px-3.5 py-1.5 text-xs font-semibold transition',
-                           'bg-primary text-white' => $filter === 'lengkap',
-                           'bg-page text-muted hover:text-ink hover:bg-border' => $filter !== 'lengkap',
-                       ])>
-                        ✅ Sudah Ada Pengampu ({{ number_format($withLead) }})
-                    </a>
-                </div>
+        <x-card padding="p-4" class="admin-table-card flex flex-col gap-3">
+            {{-- Tabs Filter Status (1 baris ringkas) --}}
+            <div class="flex flex-wrap items-center gap-1.5 border-b border-border pb-3">
+                <a href="{{ route('admin.teaching.index', array_merge(request()->query(), ['filter' => 'semua', 'page' => 1])) }}"
+                   @class([
+                       'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition',
+                       'bg-primary text-white' => $filter === 'semua',
+                       'bg-page text-muted hover:text-ink hover:bg-border' => $filter !== 'semua',
+                   ])>
+                    Semua ({{ number_format($totalCount) }})
+                </a>
+                <a href="{{ route('admin.teaching.index', array_merge(request()->query(), ['filter' => 'tanpa_pengampu', 'page' => 1])) }}"
+                   title="Belum Ada Pengampu"
+                   @class([
+                       'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition',
+                       'bg-danger text-white' => $filter === 'tanpa_pengampu',
+                       'bg-danger-soft/60 text-danger hover:bg-danger-soft' => $filter !== 'tanpa_pengampu',
+                   ])>
+                    <i data-lucide="triangle-alert" class="size-3.5 shrink-0" aria-hidden="true"></i>
+                    <span>Belum Ada ({{ number_format($withoutLead) }})</span>
+                </a>
+                <a href="{{ route('admin.teaching.index', array_merge(request()->query(), ['filter' => 'tunggal', 'page' => 1])) }}"
+                   title="Dosen Tunggal / Tanpa Mitra"
+                   @class([
+                       'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition',
+                       'bg-primary text-white' => $filter === 'tunggal',
+                       'bg-page text-muted hover:text-ink hover:bg-border' => $filter !== 'tunggal',
+                   ])>
+                    Tunggal ({{ number_format($singleCount) }})
+                </a>
+                <a href="{{ route('admin.teaching.index', array_merge(request()->query(), ['filter' => 'tim_mitra', 'page' => 1])) }}"
+                   title="Tim 2 Dosen"
+                   @class([
+                       'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition',
+                       'bg-success text-white' => $filter === 'tim_mitra',
+                       'bg-success-soft/60 text-success hover:bg-success-soft' => $filter !== 'tim_mitra',
+                   ])>
+                    Tim ({{ number_format($teamCount) }})
+                </a>
+                <a href="{{ route('admin.teaching.index', array_merge(request()->query(), ['filter' => 'lengkap', 'page' => 1])) }}"
+                   title="Sudah Ada Pengampu"
+                   @class([
+                       'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition',
+                       'bg-primary text-white' => $filter === 'lengkap',
+                       'bg-page text-muted hover:text-ink hover:bg-border' => $filter !== 'lengkap',
+                   ])>
+                    <i data-lucide="circle-check" class="size-3.5 shrink-0" aria-hidden="true"></i>
+                    <span>Lengkap ({{ number_format($withLead) }})</span>
+                </a>
             </div>
 
-            {{-- Form Pencarian & Filter --}}
-            <form method="GET" action="{{ route('admin.teaching.index') }}" class="grid grid-cols-1 items-end gap-3 sm:grid-cols-2 lg:grid-cols-12">
+            {{-- Form Pencarian & Filter (1 baris kompak) --}}
+            <form id="teaching-filter-form" method="GET" action="{{ route('admin.teaching.index') }}" class="flex flex-wrap items-center gap-2">
                 <input type="hidden" name="filter" value="{{ $filter }}">
+                @if ($sort !== 'class')
+                    <input type="hidden" name="sort" value="{{ $sort }}">
+                @endif
+                @if ($dir !== 'asc')
+                    <input type="hidden" name="dir" value="{{ $dir }}">
+                @endif
+                @if ($offerings->total() === 0)
+                    <input type="hidden" name="per_page" value="{{ $perPage }}">
+                @endif
 
-                <div class="sm:col-span-2 lg:col-span-3">
-                    <label class="mb-1 block text-xs font-medium text-muted">Cari Mata Kuliah / Kelas / Dosen</label>
-                    <div class="relative">
-                        <i data-lucide="search" class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted"></i>
-                        <input type="text" name="q" value="{{ $keyword }}" placeholder="Ketik nama MK, kode, kelas, dosen..."
-                               class="w-full rounded-control border border-border bg-surface pl-9 pr-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary">
-                    </div>
+                <div class="relative min-w-[200px] flex-1">
+                    <i data-lucide="search" class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" aria-hidden="true"></i>
+                    <input id="teaching-q"
+                           type="search"
+                           name="q"
+                           value="{{ $keyword }}"
+                           data-table-search
+                           aria-label="Cari Mata Kuliah, Kelas, atau Dosen"
+                           @input.debounce.400ms="$el.form.requestSubmit()"
+                           placeholder="Cari matkul, kode, kelas, atau dosen... (/)"
+                           class="w-full rounded-control border border-border bg-surface pl-9 pr-3 py-2 text-sm text-ink placeholder:text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary">
                 </div>
 
-                <div class="sm:col-span-1 lg:col-span-3">
-                    <label class="mb-1 block text-xs font-medium text-muted">Program Studi</label>
-                    <select name="prodi" @change="$el.form.requestSubmit()" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
-                        <option value="">Semua Program Studi</option>
-                        @foreach ($studyPrograms as $val => $label)
-                            <option value="{{ $val }}" @selected($prodi === $val)>{{ $label }}</option>
-                        @endforeach
-                    </select>
-                </div>
+                <select id="teaching-prodi"
+                        name="prodi"
+                        aria-label="Program Studi"
+                        @change="$el.form.requestSubmit()"
+                        class="w-full sm:w-52 rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
+                    <option value="">Semua Program Studi</option>
+                    @foreach ($studyPrograms as $val => $label)
+                        <option value="{{ $val }}" @selected($prodi === $val)>{{ $label }}</option>
+                    @endforeach
+                </select>
 
-                <div class="sm:col-span-1 lg:col-span-2">
-                    <label class="mb-1 block text-xs font-medium text-muted">Semester</label>
-                    <select name="semester" @change="$el.form.requestSubmit()" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
-                        <option value="">Semua Semester</option>
-                        @foreach ($semesterOptions as $sOpt)
-                            <option value="{{ $sOpt['value'] }}" @selected($semester === (string) $sOpt['value'])>{{ $sOpt['label'] }}</option>
-                        @endforeach
-                    </select>
-                </div>
+                <select id="teaching-semester"
+                        name="semester"
+                        aria-label="Semester"
+                        @change="$el.form.requestSubmit()"
+                        class="w-full sm:w-44 rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
+                    <option value="">Semua Semester</option>
+                    @foreach ($semesterOptions as $sOpt)
+                        <option value="{{ $sOpt['value'] }}" @selected($semester === (string) $sOpt['value'])>{{ $sOpt['label'] }}</option>
+                    @endforeach
+                </select>
 
-                <div class="sm:col-span-1 lg:col-span-2">
-                    <label class="mb-1 block text-xs font-medium text-muted">Per Halaman</label>
-                    <select name="per_page" @change="$el.form.requestSubmit()" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
-                        @foreach ([25, 50, 100] as $n)
-                            <option value="{{ $n }}" @selected($perPage == $n)>{{ $n }} baris</option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <div class="flex gap-2 sm:col-span-1 lg:col-span-2">
-                    <button type="submit" class="inline-flex h-[38px] flex-1 items-center justify-center gap-1.5 rounded-control bg-primary px-3 text-xs font-semibold text-white hover:bg-primary/90 transition" title="Terapkan Filter">
-                        <i data-lucide="search" class="size-3.5"></i>
-                        <span>Cari</span>
-                    </button>
-                    @if ($keyword !== '' || $prodi !== '' || $semester !== '' || $filter !== 'semua')
-                        <a href="{{ route('admin.teaching.index') }}" class="inline-flex h-[38px] items-center justify-center gap-1 rounded-control border border-border bg-surface px-2.5 text-xs font-medium text-muted hover:text-ink hover:bg-page transition" title="Reset Filter">
-                            <i data-lucide="rotate-ccw" class="size-3.5"></i>
-                            <span>Reset</span>
-                        </a>
-                    @endif
-                </div>
+                @if ($keyword !== '' || $prodi !== '' || $semester !== '' || $filter !== 'semua')
+                    <x-button variant="secondary" size="sm" icon="rotate-ccw" :href="route('admin.teaching.index')" title="Reset Filter" class="shrink-0">Reset</x-button>
+                @endif
             </form>
-        </x-card>
-
-        {{-- TABEL GRID DATA-HEAVY (SPREADSHEET-LIKE) --}}
-        <div class="overflow-hidden rounded-card border border-border bg-surface shadow-xs">
-            <div class="overflow-x-auto">
+            {{-- TABEL GRID DATA-HEAVY (SPREADSHEET-LIKE - MENYATU DENGAN FILTER) --}}
+            <x-table-scroll>
+                <x-slot:title>{{ number_format($offerings->total()) }} penawaran • {{ $period->name }}</x-slot:title>
+                <x-slot:headerActions>
+                    <x-table-density-toggle />
+                </x-slot:headerActions>
                 <table class="w-full border-collapse text-left text-sm">
-                    <thead class="border-b border-border bg-page text-xs font-semibold text-muted">
+                    <thead class="sticky top-0 z-10 border-b border-border bg-page text-xs font-semibold text-muted">
                         <tr>
-                            <th class="w-10 px-3 py-3 text-center">
+                            <th scope="col" class="w-10 px-3 py-3 text-center">
                                 <input type="checkbox"
                                        @change="toggleSelectAll($event.target.checked)"
                                        :checked="isAllSelected()"
+                                       aria-label="Pilih semua penawaran di halaman ini"
                                        class="size-4 rounded border-border text-primary focus:ring-primary cursor-pointer"
-                                       title="Pilih semua di halaman ini">
+                                       title="Pilih semua di halaman ini (mendukung Shift+Klik)">
                             </th>
-                            <th class="w-36 px-4 py-3">Kelas</th>
-                            <th class="px-4 py-3">Mata Kuliah & Kode</th>
-                            <th class="w-20 px-3 py-3 text-center">SKS</th>
-                            <th class="px-4 py-3">Dosen Pengampu (SKS)</th>
-                            <th class="px-4 py-3">Dosen Mitra (SKS)</th>
-                            <th class="w-24 px-3 py-3 text-center">Skema</th>
-                            <th class="w-28 px-4 py-3 text-right">Aksi</th>
+                            <x-sortable-th column="class" :sort="$sort" :dir="$dir" class="w-36 px-4 py-3">Kelas</x-sortable-th>
+                            <x-sortable-th column="course" :sort="$sort" :dir="$dir" class="px-4 py-3">Mata Kuliah & Kode</x-sortable-th>
+                            <x-sortable-th column="sks" :sort="$sort" :dir="$dir" align="center" class="w-20 px-3 py-3">SKS</x-sortable-th>
+                            <th scope="col" class="px-4 py-3">Dosen Pengampu (SKS)</th>
+                            <th scope="col" class="px-4 py-3">Dosen Mitra (SKS)</th>
+                            <th scope="col" class="w-24 px-3 py-3 text-center">Skema</th>
+                            <th scope="col" class="w-28 px-4 py-3 text-right">Aksi</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-border">
@@ -205,14 +214,21 @@
                                 ] : null;
                                 $leadSks = $offering->course->sks;
                                 $isSelectedFromQuery = request()->integer('penawaran') === $offering->id;
+                                $isAlternateBlock = $classBlockAlternate[$offering->id] ?? false;
                             @endphp
-                            <tr @class(['border-b border-border transition hover:bg-primary-soft/20', 'bg-primary-soft/20 ring-1 ring-inset ring-primary/30' => $isSelectedFromQuery])
-                                :class="{ 'bg-primary-soft/30': selectedIds.map(Number).includes({{ $offering->id }}) }">
+                            <tr @class([
+                                'border-b border-border transition',
+                                'bg-primary-soft/20 ring-1 ring-inset ring-primary/30' => $isSelectedFromQuery,
+                                'bg-primary-soft/45 hover:bg-primary-soft/70' => ! $isSelectedFromQuery && $isAlternateBlock,
+                                'bg-surface hover:bg-page/70' => ! $isSelectedFromQuery && ! $isAlternateBlock,
+                            ])
+                                :class="selectedIds.map(Number).includes({{ $offering->id }}) ? '!bg-primary-soft/75 ring-1 ring-inset ring-primary/35' : ''">
                                 {{-- Checkbox --}}
                                 <td class="w-10 px-3 py-3 text-center">
                                     <input type="checkbox"
                                            :value="{{ $offering->id }}"
                                            x-model.number="selectedIds"
+                                           aria-label="Pilih {{ $offering->course->name }} {{ $offering->classGroup->name }}"
                                            class="size-4 rounded border-border text-primary focus:ring-primary cursor-pointer">
                                 </td>
 
@@ -260,7 +276,7 @@
                                             @if ($leadAssignment->is_locked)
                                                 <span class="font-semibold text-ink text-sm">{{ $leadAssignment->lecturer->name }}</span>
                                                 <span title="Penugasan dikunci" class="text-primary inline-flex items-center">
-                                                    <i data-lucide="lock" class="size-3.5"></i>
+                                                    <i data-lucide="lock" class="size-3.5" aria-hidden="true"></i>
                                                 </span>
                                             @else
                                                 <button type="button"
@@ -276,7 +292,7 @@
                                         </div>
                                     @else
                                         <span class="inline-flex items-center gap-1 text-xs font-semibold text-danger">
-                                            <i data-lucide="circle-alert" class="size-3.5 shrink-0"></i>
+                                            <i data-lucide="circle-alert" class="size-3.5 shrink-0" aria-hidden="true"></i>
                                             <span>Belum Ada</span>
                                         </span>
                                     @endif
@@ -300,7 +316,7 @@
                                                     @if ($partnerAssignment->is_locked)
                                                         <span class="font-medium text-ink text-xs">{{ $partnerAssignment->lecturer->name }}</span>
                                                         <span title="Penugasan dikunci" class="text-primary inline-flex items-center">
-                                                            <i data-lucide="lock" class="size-3"></i>
+                                                            <i data-lucide="lock" class="size-3" aria-hidden="true"></i>
                                                         </span>
                                                     @else
                                                         <button type="button"
@@ -341,28 +357,26 @@
                                 {{-- Aksi Cepat --}}
                                 <td class="w-28 px-4 py-3 text-right whitespace-nowrap">
                                     @if ($leadAssignment)
-                                        <button type="button"
-                                                @click="openEditAssignment(@js($offeringPayload), @js($leadPayload))"
-                                                class="inline-flex items-center gap-1.5 rounded-control border border-border bg-surface px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary-soft hover:border-primary/40 transition cursor-pointer"
-                                                title="Kelola tim pengajar kelas ini">
-                                            <i data-lucide="pencil" class="size-3.5"></i>
-                                            <span>Atur Tim</span>
-                                        </button>
+                                        <x-button type="button"
+                                                  variant="secondary"
+                                                  size="sm"
+                                                  icon="pencil"
+                                                  @click="openEditAssignment(@js($offeringPayload), @js($leadPayload))"
+                                                  title="Kelola tim pengajar kelas ini">Atur Tim</x-button>
                                     @else
-                                        <button type="button"
-                                                @click="openQuickAssign({{ $offering->id }}, @js($offering->course->name), @js($offering->classGroup->name), 'lead', {{ $offering->course->sks }}, @js($teamPayload))"
-                                                class="inline-flex items-center gap-1.5 rounded-control border border-danger/40 bg-danger-soft/40 px-2.5 py-1 text-xs font-semibold text-danger hover:bg-danger-soft transition cursor-pointer"
-                                                title="Tugaskan pengampu kelas ini">
-                                            <i data-lucide="user-plus" class="size-3.5"></i>
-                                            <span>Tugaskan</span>
-                                        </button>
+                                        <x-button type="button"
+                                                  variant="danger-outline"
+                                                  size="sm"
+                                                  icon="user-plus"
+                                                  @click="openQuickAssign({{ $offering->id }}, @js($offering->course->name), @js($offering->classGroup->name), 'lead', {{ $offering->course->sks }}, @js($teamPayload))"
+                                                  title="Tugaskan pengampu kelas ini">Tugaskan</x-button>
                                     @endif
                                 </td>
                             </tr>
                         @empty
                             <tr>
                                 <td colspan="8" class="py-12 text-center text-muted">
-                                    <i data-lucide="search-x" class="mx-auto size-8 text-muted/60 mb-2"></i>
+                                    <i data-lucide="search-x" class="mx-auto size-8 text-muted/60 mb-2" aria-hidden="true"></i>
                                     <p class="font-medium text-ink">Tidak ditemukan penawaran mata kuliah yang sesuai filter.</p>
                                     <p class="text-xs text-muted mt-1">Coba sesuaikan kata kunci atau bersihkan filter pencarian.</p>
                                 </td>
@@ -370,26 +384,41 @@
                         @endforelse
                     </tbody>
                 </table>
-            </div>
+            </x-table-scroll>
 
             {{-- Pagination & Data Summary Footer --}}
             @if ($offerings->total() > 0)
-                <div class="border-t border-border bg-page/50 px-4 py-3">
-                    @if ($offerings->hasPages())
-                        {{ $offerings->links() }}
-                    @else
-                        <div class="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted py-1">
-                            <div>
-                                Menampilkan <span class="font-semibold text-ink">1</span> sampai <span class="font-semibold text-ink">{{ $offerings->total() }}</span> dari <span class="font-semibold text-ink">{{ number_format($offerings->total()) }}</span> kelas penawaran
+                <div class="flex flex-col gap-3 border-t border-border pt-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="min-w-0 flex-1">
+                        @if ($offerings->hasPages())
+                            {{ $offerings->links() }}
+                        @else
+                            <div class="flex flex-wrap items-center gap-3 text-xs text-muted py-1">
+                                <span>
+                                    Menampilkan <span class="font-semibold text-ink">1</span> sampai <span class="font-semibold text-ink">{{ $offerings->total() }}</span> dari <span class="font-semibold text-ink">{{ number_format($offerings->total()) }}</span> kelas penawaran
+                                </span>
+                                <span class="inline-flex items-center justify-center min-w-[32px] h-7 px-2.5 rounded-control border border-border bg-surface text-ink text-xs font-semibold">
+                                    Halaman 1 dari 1
+                                </span>
                             </div>
-                            <span class="inline-flex items-center justify-center min-w-[32px] h-7 px-2.5 rounded-control border border-border bg-surface text-ink text-xs font-semibold">
-                                Halaman 1 dari 1
-                            </span>
-                        </div>
-                    @endif
+                        @endif
+                    </div>
+                    <div class="flex shrink-0 items-center gap-2">
+                        <span class="text-xs text-muted">Baris/hal:</span>
+                        <select id="teaching-per-page"
+                                name="per_page"
+                                form="teaching-filter-form"
+                                aria-label="Jumlah baris per halaman"
+                                @change="$el.form.requestSubmit()"
+                                class="rounded-control border border-border bg-surface px-2.5 py-1.5 text-xs text-ink focus:border-primary focus:outline-none">
+                            @foreach ([25, 50, 100] as $n)
+                                <option value="{{ $n }}" @selected($perPage == $n)>{{ $n }} baris</option>
+                            @endforeach
+                        </select>
+                    </div>
                 </div>
             @endif
-        </div>
+        </x-card>
 
         {{-- FLOATING BATCH ACTION BAR --}}
         <div x-show="selectedIds.length > 0"
@@ -400,9 +429,9 @@
              x-transition:leave="transition ease-in duration-150"
              x-transition:leave-start="opacity-100 translate-y-0"
              x-transition:leave-end="opacity-0 translate-y-4"
-             class="fixed bottom-6 left-1/2 z-40 flex -translate-x-1/2 flex-wrap items-center gap-3 rounded-xl border border-primary/30 bg-ink px-6 py-3.5 text-surface shadow-2xl">
+             class="fixed bottom-6 left-1/2 z-40 flex w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 flex-wrap items-center gap-3 rounded-xl border border-primary/30 bg-ink px-4 py-3 text-surface shadow-2xl sm:px-6 sm:py-3.5">
             <div class="flex items-center gap-2">
-                <i data-lucide="circle-check" class="size-5 text-success"></i>
+                <i data-lucide="circle-check" class="size-5 text-success shrink-0" aria-hidden="true"></i>
                 <span class="text-sm font-semibold"><span x-text="selectedIds.length"></span> kelas dipilih</span>
                 <button type="button"
                         x-show="!isAllSelected()"
@@ -411,28 +440,30 @@
                     Pilih Semua Tampil
                 </button>
             </div>
-            <div class="h-4 w-px bg-surface/20"></div>
+            <div class="hidden h-4 w-px bg-surface/20 sm:block" aria-hidden="true"></div>
             <button type="button"
                     @click="batchModalOpen = true; $nextTick(() => window.renderIcons())"
                     class="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-primary/90 transition cursor-pointer">
-                <i data-lucide="zap" class="size-3.5"></i>
+                <i data-lucide="zap" class="size-3.5" aria-hidden="true"></i>
                 <span>Tugaskan Dosen Sekaligus</span>
             </button>
             <button type="button"
                     @click="selectedIds = []"
-                    class="text-xs text-surface/70 hover:text-white transition ml-2 cursor-pointer">
+                    class="text-xs text-surface/70 hover:text-white transition sm:ml-2 cursor-pointer">
                 Batalkan Pilihan
             </button>
         </div>
 
         {{-- MODAL 1: ATUR TIM / TAMBAH & EDIT PENUGASAN DOSEN --}}
-        <div x-show="quickModalOpen" x-cloak data-modal-name="quick-assign-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div x-show="quickModalOpen" x-cloak data-modal-name="quick-assign-modal"
+             role="dialog" aria-modal="true" aria-labelledby="quick-assign-modal-title"
+             class="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-ink/80 backdrop-blur-sm" @click="quickModalOpen = false"></div>
             <div class="relative flex max-h-[90vh] w-full max-w-xl flex-col overflow-y-auto rounded-2xl bg-surface p-6 shadow-2xl">
                 <div class="flex items-start justify-between border-b border-border pb-3">
                     <div>
                         <span class="text-xs font-semibold text-primary" x-text="editingAssignmentId ? 'Ubah Penugasan Dosen' : 'Tambah Pengajar Kelas'"></span>
-                        <h3 class="text-lg font-bold text-ink" x-text="activeOffering.course"></h3>
+                        <h3 id="quick-assign-modal-title" class="text-lg font-bold text-ink" x-text="activeOffering.course"></h3>
                         <p class="text-xs text-muted">
                             Kelas: <span class="font-semibold text-ink" x-text="activeOffering.classGroup"></span>
                             <template x-if="activeOffering.sks">
@@ -440,25 +471,26 @@
                             </template>
                         </p>
                     </div>
-                    <button type="button" @click="quickModalOpen = false" class="text-muted hover:text-ink">
-                        <i data-lucide="x" class="size-5"></i>
+                    <button type="button" @click="quickModalOpen = false" aria-label="Tutup" class="rounded p-1 text-muted hover:text-ink cursor-pointer">
+                        <i data-lucide="x" class="size-5" aria-hidden="true"></i>
                     </button>
                 </div>
 
                 {{-- Daftar Anggota Tim Saat Ini pada Kelas Ini --}}
                 <template x-if="activeOffering.team && activeOffering.team.length > 0">
                     <div class="mt-4 rounded-xl border border-border bg-page p-3">
-                        <div class="mb-2 flex items-center justify-between">
+                        <div class="mb-2 flex items-center justify-between gap-2">
                             <span class="text-xs font-semibold text-ink">Tim Pengajar Saat Ini</span>
                             <button type="button"
                                     @click="switchToCreate('partner')"
-                                    class="inline-flex items-center gap-1 rounded-md bg-primary-soft px-2 py-1 text-[11px] font-semibold text-primary hover:bg-primary hover:text-white transition">
+                                    class="inline-flex items-center gap-1 rounded-md bg-primary-soft px-2 py-1 text-[11px] font-semibold text-primary hover:bg-primary hover:text-white transition cursor-pointer">
                                 <span>+ Tambah Anggota Baru</span>
                             </button>
                         </div>
                         <div class="flex flex-col gap-1.5">
                             <template x-for="member in activeOffering.team" :key="member.id">
-                                <div class="flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-xs transition"
+                                <div class="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-xs transition"
+                                     x-data="{ confirmingDelete: false }"
                                      :class="editingAssignmentId === member.id ? 'border-primary bg-primary-soft/40' : 'border-border bg-surface'">
                                     <div class="flex flex-col">
                                         <div class="flex items-center gap-1.5">
@@ -471,41 +503,50 @@
                                             Periode: <strong class="text-ink" x-text="member.phase_label"></strong>
                                         </span>
                                     </div>
-                                    <div class="flex items-center gap-1.5">
+                                    <div class="flex flex-wrap items-center gap-1.5">
                                         {{-- Toggle Lock --}}
-                                        <form method="POST" :action="`/admin/pembagian-mengajar/${member.id}/kunci`" class="inline">
+                                        <form method="POST" :action="@js($lockUrlTemplate).replace('__ID__', member.id)" class="inline">
                                             @csrf
                                             <button type="submit"
-                                                    class="rounded-md border border-border bg-surface px-2 py-1 text-[11px] font-medium transition hover:border-primary hover:text-primary"
+                                                    class="inline-flex items-center gap-1 rounded-md border border-border bg-surface px-2 py-1 text-[11px] font-medium transition hover:border-primary hover:text-primary cursor-pointer"
                                                     :class="member.is_locked ? 'text-primary' : 'text-muted'"
                                                     :title="member.is_locked ? 'Klik untuk buka kunci' : 'Klik untuk kunci penugasan'">
-                                                <span x-text="member.is_locked ? '🔒 Terkunci' : '🔓 Kunci'"></span>
+                                                <i x-show="member.is_locked" data-lucide="lock" class="size-3" aria-hidden="true"></i>
+                                                <i x-show="!member.is_locked" data-lucide="lock-open" class="size-3" aria-hidden="true"></i>
+                                                <span x-text="member.is_locked ? 'Terkunci' : 'Kunci'"></span>
                                             </button>
                                         </form>
 
                                         {{-- Edit Button --}}
-                                        <template x-if="!member.is_locked">
+                                        <template x-if="!member.is_locked && !confirmingDelete">
                                             <button type="button"
                                                     @click="openEditAssignment(activeOffering, member)"
                                                     class="inline-flex items-center gap-1 rounded-control px-2.5 py-1 text-xs font-semibold transition cursor-pointer"
                                                     :class="editingAssignmentId === member.id ? 'bg-primary text-white' : 'border border-border bg-surface text-primary hover:border-primary/40 hover:bg-primary-soft'">
-                                                <i data-lucide="pencil" class="size-3.5"></i>
+                                                <i data-lucide="pencil" class="size-3.5" aria-hidden="true"></i>
                                                 <span x-text="editingAssignmentId === member.id ? 'Sedang Diedit' : 'Edit'"></span>
                                             </button>
                                         </template>
 
-                                        {{-- Delete Button --}}
-                                        <template x-if="!member.is_locked">
-                                            <form method="POST" :action="`/admin/pembagian-mengajar/${member.id}`" class="inline" onsubmit="return confirm('Hapus pengajar ini dari tim?')">
-                                                @csrf
-                                                <input type="hidden" name="_method" value="DELETE">
-                                                <button type="submit"
-                                                        class="inline-flex items-center gap-1 rounded-control border border-danger/30 bg-danger-soft/30 px-2.5 py-1 text-xs font-semibold text-danger hover:bg-danger hover:text-white transition cursor-pointer"
-                                                        title="Hapus pengajar dari tim">
-                                                    <i data-lucide="trash-2" class="size-3.5"></i>
-                                                    <span>Hapus</span>
-                                                </button>
-                                            </form>
+                                        {{-- Delete Button with inline confirmation --}}
+                                        <template x-if="!member.is_locked && !confirmingDelete">
+                                            <button type="button"
+                                                    @click="confirmingDelete = true"
+                                                    class="inline-flex items-center gap-1 rounded-control border border-danger/30 bg-danger-soft/30 px-2.5 py-1 text-xs font-semibold text-danger hover:bg-danger hover:text-white transition cursor-pointer"
+                                                    title="Hapus pengajar dari tim">
+                                                <i data-lucide="trash-2" class="size-3.5" aria-hidden="true"></i>
+                                                <span>Hapus</span>
+                                            </button>
+                                        </template>
+                                        <template x-if="!member.is_locked && confirmingDelete">
+                                            <div class="inline-flex items-center gap-1">
+                                                <button type="button" @click="confirmingDelete = false" class="rounded-control border border-border bg-surface px-2 py-1 text-[11px] font-medium text-muted hover:text-ink cursor-pointer">Batal</button>
+                                                <form method="POST" :action="@js($destroyUrlTemplate).replace('__ID__', member.id)" class="inline">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="rounded-control bg-danger px-2 py-1 text-[11px] font-semibold text-white hover:bg-danger/90 cursor-pointer">Ya, Hapus</button>
+                                                </form>
+                                            </div>
                                         </template>
                                     </div>
                                 </div>
@@ -515,7 +556,7 @@
                 </template>
 
                 <form method="POST"
-                      :action="editingAssignmentId ? `/admin/pembagian-mengajar/${editingAssignmentId}` : '{{ route('admin.teaching.store') }}'"
+                      :action="editingAssignmentId ? @js($updateUrlTemplate).replace('__ID__', editingAssignmentId) : @js(route('admin.teaching.store'))"
                       class="mt-4 flex flex-col gap-4">
                     @csrf
                     <template x-if="editingAssignmentId">
@@ -525,7 +566,7 @@
 
                     <div>
                         <div class="mb-1.5 flex items-center justify-between">
-                            <label class="text-xs font-semibold text-ink">
+                            <label for="quick-lecturer-id" class="text-xs font-semibold text-ink">
                                 <span x-text="editingAssignmentId ? 'Ganti / Pilih Dosen Pengajar' : 'Pilih Dosen Pengajar Baru'"></span>
                                 <span class="text-danger">*</span>
                             </label>
@@ -533,16 +574,18 @@
                         </div>
 
                         <div class="relative mb-2">
-                            <input type="text"
+                            <input id="quick-lecturer-search"
+                                   type="text"
                                    x-model="quickSearch"
+                                   aria-label="Filter daftar dosen pengajar"
                                    placeholder="Ketik nama dosen untuk memfilter daftar pilihan di bawah..."
                                    class="w-full rounded-control border border-border bg-page px-3 py-1.5 text-xs text-ink focus:border-primary focus:bg-surface focus:outline-none">
                         </div>
 
-                        <select name="lecturer_id" x-model="quickLecturerId" required class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
+                        <select id="quick-lecturer-id" name="lecturer_id" x-model="quickLecturerId" required class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
                             <option value="">-- Pilih Dosen Pengajar --</option>
                             <template x-if="quickLecturers.length > 0">
-                                <optgroup label="★ Dosen Pengampu Mata Kuliah Ini (Rekomendasi)">
+                                <optgroup label="Dosen Pengampu Mata Kuliah Ini (Rekomendasi)">
                                     <template x-for="lecturer in quickLecturers" :key="'rec-' + lecturer.id">
                                         <option :value="String(lecturer.id)"
                                                 :selected="String(lecturer.id) === String(quickLecturerId)"
@@ -567,15 +610,15 @@
 
                     <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div>
-                            <label class="mb-1 block text-xs font-medium text-muted">Peran Dosen</label>
-                            <select name="role" x-model="activeOffering.role" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
+                            <label for="quick-role" class="mb-1 block text-xs font-medium text-muted">Peran Dosen</label>
+                            <select id="quick-role" name="role" x-model="activeOffering.role" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
                                 <option value="lead">Pengampu (Utama)</option>
                                 <option value="partner">Mitra (Pendamping)</option>
                             </select>
                         </div>
                         <div>
-                            <label class="mb-1 block text-xs font-medium text-muted">Periode Mengajar</label>
-                            <select name="phase" x-model="quickPhase" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
+                            <label for="quick-phase" class="mb-1 block text-xs font-medium text-muted">Periode Mengajar</label>
+                            <select id="quick-phase" name="phase" x-model="quickPhase" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
                                 <option value="full">Satu semester penuh (1–14)</option>
                                 <option value="before_uts">Pertemuan 1–7 (sampai UTS)</option>
                                 <option value="after_uts">Pertemuan 8–14 (sampai UAS)</option>
@@ -594,16 +637,18 @@
         </div>
 
         {{-- MODAL 2: BATCH ASSIGN MASSAL --}}
-        <div x-show="batchModalOpen" x-cloak data-modal-name="batch-assign-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div x-show="batchModalOpen" x-cloak data-modal-name="batch-assign-modal"
+             role="dialog" aria-modal="true" aria-labelledby="batch-assign-modal-title"
+             class="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-ink/80 backdrop-blur-sm" @click="batchModalOpen = false"></div>
-            <div class="relative w-full max-w-lg rounded-2xl bg-surface p-6 shadow-2xl">
+            <div class="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-surface p-6 shadow-2xl">
                 <div class="flex items-start justify-between border-b border-border pb-3">
                     <div>
                         <span class="text-xs font-semibold text-primary">Penyesuaian Massal</span>
-                        <h3 class="text-lg font-bold text-ink">Tugaskan Dosen (<span class="text-primary" x-text="selectedIds.length"></span> Kelas Terpilih)</h3>
+                        <h3 id="batch-assign-modal-title" class="text-lg font-bold text-ink">Tugaskan Dosen (<span class="text-primary" x-text="selectedIds.length"></span> Kelas Terpilih)</h3>
                     </div>
-                    <button type="button" @click="batchModalOpen = false" class="text-muted hover:text-ink">
-                        <i data-lucide="x" class="size-5"></i>
+                    <button type="button" @click="batchModalOpen = false" aria-label="Tutup" class="rounded p-1 text-muted hover:text-ink cursor-pointer">
+                        <i data-lucide="x" class="size-5" aria-hidden="true"></i>
                     </button>
                 </div>
 
@@ -618,8 +663,8 @@
                     </div>
 
                     <div>
-                        <label class="mb-1 block text-xs font-medium text-muted">Pilih Dosen <span class="text-danger">*</span></label>
-                        <select name="lecturer_id" required class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
+                        <label for="batch-lecturer-id" class="mb-1 block text-xs font-medium text-muted">Pilih Dosen <span class="text-danger">*</span></label>
+                        <select id="batch-lecturer-id" name="lecturer_id" required class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
                             <option value="">-- Pilih Dosen Terverifikasi --</option>
                             @foreach ($lecturerOptionsEnriched as $lec)
                                 <option value="{{ $lec['id'] }}">
@@ -629,17 +674,17 @@
                         </select>
                     </div>
 
-                    <div class="grid grid-cols-2 gap-3">
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div>
-                            <label class="mb-1 block text-xs font-medium text-muted">Peran Dosen</label>
-                            <select name="role" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
+                            <label for="batch-role" class="mb-1 block text-xs font-medium text-muted">Peran Dosen</label>
+                            <select id="batch-role" name="role" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
                                 <option value="lead">Pengampu (Utama)</option>
                                 <option value="partner">Mitra (Pendamping)</option>
                             </select>
                         </div>
                         <div>
-                            <label class="mb-1 block text-xs font-medium text-muted">Periode Mengajar</label>
-                            <select name="phase" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
+                            <label for="batch-phase" class="mb-1 block text-xs font-medium text-muted">Periode Mengajar</label>
+                            <select id="batch-phase" name="phase" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
                                 <option value="full">Satu semester penuh</option>
                                 <option value="before_uts">Pertemuan 1–7 (sampai UTS)</option>
                                 <option value="after_uts">Pertemuan 8–14 (sampai UAS)</option>
@@ -648,7 +693,7 @@
                     </div>
 
                     <div class="rounded-lg bg-page p-3 text-xs text-muted">
-                        <i data-lucide="info" class="size-4 inline text-primary mr-1"></i>
+                        <i data-lucide="info" class="size-4 inline text-primary mr-1" aria-hidden="true"></i>
                         Jika memilih peran <strong>Pengampu (Utama)</strong>, pengampu lama yang tidak dikunci pada kelas terpilih akan diperbarui. Penugasan yang sudah dikunci tidak akan diubah.
                     </div>
 
@@ -661,61 +706,64 @@
         </div>
 
         {{-- MODAL 3: REKAP LENGKAP BEBAN DOSEN --}}
-        <div x-show="rekapModalOpen" x-cloak data-modal-name="rekap-load-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div x-show="rekapModalOpen" x-cloak data-modal-name="rekap-load-modal"
+             role="dialog" aria-modal="true" aria-labelledby="rekap-load-modal-title"
+             class="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-ink/80 backdrop-blur-sm" @click="rekapModalOpen = false"></div>
             <div class="relative flex max-h-[85vh] w-full max-w-4xl flex-col rounded-2xl bg-surface p-6 shadow-2xl">
                 <div class="flex items-start justify-between border-b border-border pb-3">
                     <div>
                         <span class="text-xs font-semibold text-primary">Semester Aktif</span>
-                        <h3 class="text-xl font-bold text-ink">Rekap Beban SKS Dosen</h3>
+                        <h3 id="rekap-load-modal-title" class="text-xl font-bold text-ink">Rekap Beban SKS Dosen</h3>
                         <p class="text-xs text-muted">Target dan maksimum memakai SKS Semester, dihitung satu kali per mata kuliah di setiap kelas. SKS × Pertemuan mengikuti jumlah pertemuan setiap pengajar.</p>
                     </div>
-                    <button type="button" @click="rekapModalOpen = false" class="text-muted hover:text-ink">
-                        <i data-lucide="x" class="size-5"></i>
+                    <button type="button" @click="rekapModalOpen = false" aria-label="Tutup" class="rounded p-1 text-muted hover:text-ink cursor-pointer">
+                        <i data-lucide="x" class="size-5" aria-hidden="true"></i>
                     </button>
                 </div>
 
                 <div class="my-3">
                     <input type="text"
                            x-model="lecturerSearch"
+                           aria-label="Filter nama dosen pada tabel rekap"
                            placeholder="Filter nama dosen pada tabel rekap..."
                            class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
                 </div>
 
-                <div class="overflow-y-auto border border-border rounded-lg">
+                <div class="min-h-0 flex-1 overflow-x-auto overflow-y-auto rounded-lg border border-border custom-scrollbar">
                     <table class="w-full text-left text-sm">
-                        <thead class="sticky top-0 border-b border-border bg-page text-xs text-muted">
+                        <thead class="sticky top-0 z-10 border-b border-border bg-page text-xs text-muted">
                             <tr>
-                                <th class="py-2.5 px-4 font-semibold">Dosen</th>
-                                <th class="py-2.5 px-3 text-center font-semibold">SKS × Pertemuan</th>
-                                <th class="py-2.5 px-3 text-center font-semibold">Target</th>
-                                <th class="py-2.5 px-3 text-center font-semibold">Maks.</th>
-                                <th class="py-2.5 px-3 text-center font-semibold">SKS Semester</th>
-                                <th class="py-2.5 px-3 text-center font-semibold">Sisa</th>
-                                <th class="py-2.5 px-4 font-semibold">Status Beban</th>
+                                <th scope="col" class="py-2.5 px-4 font-semibold">Dosen</th>
+                                <th scope="col" class="py-2.5 px-3 text-center font-semibold">SKS Semester</th>
+                                <th scope="col" class="py-2.5 px-3 text-center font-semibold">Target</th>
+                                <th scope="col" class="py-2.5 px-3 text-center font-semibold">Maks.</th>
+                                <th scope="col" class="py-2.5 px-3 text-center font-semibold">Sisa</th>
+                                <th scope="col" class="py-2.5 px-4 font-semibold">Status Beban</th>
+                                <th scope="col" class="py-2.5 px-3 text-center font-semibold">SKS × Pertemuan</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-border">
                             @forelse ($loads as $load)
-                                <tr x-show="!lecturerSearch || '{{ strtolower(addslashes($load['lecturer']->name)) }}'.includes(lecturerSearch.toLowerCase())">
+                                <tr x-show="!lecturerSearch || @js(strtolower($load['lecturer']->name)).includes(lecturerSearch.toLowerCase())">
                                     <td class="py-2.5 px-4 font-medium text-ink">{{ $load['lecturer']->name }}</td>
-                                    <td class="py-2.5 px-3 text-center font-semibold text-primary">
-                                        {{ $load['meeting_sks'] }}
-                                        @if ($load['pending_phases'] > 0)
-                                            <span class="block text-[10px] text-muted">{{ $load['pending_phases'] }} penugasan perlu atur fase</span>
+                                    <td class="py-2.5 px-3 text-center font-semibold text-ink">
+                                        {{ $load['assigned'] }}
+                                        @if ($load['pending'] > 0)
+                                            <span class="block text-[10px] font-normal text-muted">+{{ $load['pending'] }} pending</span>
                                         @endif
                                     </td>
                                     <td class="py-2.5 px-3 text-center">{{ $load['target'] ?? '—' }}</td>
                                     <td class="py-2.5 px-3 text-center">{{ $load['max'] ?? '—' }}</td>
-                                    <td class="py-2.5 px-3 text-center">
-                                        {{ $load['assigned'] }}
-                                        @if ($load['pending'] > 0)
-                                            <span class="block text-[10px] text-muted">+{{ $load['pending'] }} pending</span>
-                                        @endif
-                                    </td>
                                     <td class="py-2.5 px-3 text-center">{{ $load['remaining'] ?? '—' }}</td>
                                     <td class="py-2.5 px-4">
                                         <x-status-badge :variant="$load['tone']">{{ $load['status'] }}</x-status-badge>
+                                    </td>
+                                    <td class="py-2.5 px-3 text-center font-semibold text-primary">
+                                        {{ $load['meeting_sks'] }}
+                                        @if ($load['pending_phases'] > 0)
+                                            <span class="block text-[10px] font-normal text-muted">{{ $load['pending_phases'] }} penugasan perlu atur fase</span>
+                                        @endif
                                     </td>
                                 </tr>
                             @empty
@@ -727,11 +775,12 @@
                     </table>
                 </div>
 
-                <div class="mt-4 flex items-center justify-between border-t border-border pt-3 text-xs text-muted">
+                <div class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3 text-xs text-muted">
                     <span>SKS Semester menjumlahkan bobot mata kuliah pada setiap kelas yang diajar masing-masing dosen.</span>
                     <x-button variant="secondary" type="button" @click="rekapModalOpen = false">Tutup</x-button>
                 </div>
             </div>
         </div>
+        @endif
     </div>
 @endsection

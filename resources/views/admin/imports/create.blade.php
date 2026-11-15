@@ -12,29 +12,29 @@
     <div class="flex flex-col gap-6">
         <x-page-header title="Impor jadwal perkuliahan" subtitle="Unggah jadwal dalam bentuk Excel atau CSV. Hasilnya diperiksa dulu sebelum disimpan." />
 
-        <x-card>
+        <x-card padding="px-2.5 py-2" class="w-fit max-w-full">
             <x-schedule-steps :current="3" />
         </x-card>
 
         @include('admin.partials.scheduling-tabs')
 
-        <x-card>
+        <x-card padding="px-2.5 py-2" class="w-fit max-w-full">
             <x-stepper :steps="['Unggah file', 'Periksa hasil', 'Masuk draf']" :current="1" />
         </x-card>
 
-        <div class="grid grid-cols-[1fr_380px] gap-6">
+        <div class="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_380px]">
             <x-card>
-                <form method="POST" action="{{ route('admin.imports.store') }}" enctype="multipart/form-data" class="flex flex-col gap-5">
+                <form method="POST" action="{{ route('admin.imports.store') }}" enctype="multipart/form-data" class="flex flex-col gap-5" x-data="{ fileName: '' }">
                     @csrf
                     <x-field label="Semester" name="period_id">
                         <x-select name="period_id" :options="$periods" :value="$activePeriodId" required />
                     </x-field>
                     <x-field label="File jadwal" name="file" hint="Format yang didukung: .xlsx, .xls, .csv (maks. 5 MB). PDF belum dapat dibaca otomatis; simpan sebagai Excel dulu.">
-                        <label class="flex cursor-pointer flex-col items-center gap-2 rounded-card border-2 border-dashed border-border bg-page px-6 py-10 text-center hover:border-primary">
-                            <i data-lucide="file-spreadsheet" class="size-8 text-primary"></i>
-                            <span class="font-semibold">Pilih file jadwal</span>
+                        <label class="flex cursor-pointer flex-col items-center gap-2 rounded-card border-2 border-dashed border-border bg-page px-6 py-10 text-center transition hover:border-primary">
+                            <i data-lucide="file-spreadsheet" class="size-8 text-primary" aria-hidden="true"></i>
+                            <span class="font-semibold text-ink" x-text="fileName ? 'File terpilih: ' + fileName : 'Pilih file jadwal'">Pilih file jadwal</span>
                             <span class="text-xs text-muted">Kolom: Kelas, Kode MK, Mata Kuliah, Hari, Jam, Ruang, Dosen, Periode</span>
-                            <input type="file" name="file" accept=".xlsx,.xls,.csv" class="mt-2 text-sm" required>
+                            <input type="file" name="file" accept=".xlsx,.xls,.csv" class="mt-2 max-w-full text-sm" x-on:change="fileName = $event.target.files[0]?.name ?? ''" required>
                         </label>
                     </x-field>
                     <x-info-box title="Tidak ada yang tersimpan sebelum kamu memeriksa hasilnya">

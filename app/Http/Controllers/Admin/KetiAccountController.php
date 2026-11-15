@@ -3,12 +3,14 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Enums\KetiApplicationStatus;
+use App\Exceptions\DomainException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\DeclineApplicationRequest;
 use App\Models\Academic\ClassGroup;
 use App\Models\User\KetiApplication;
 use App\Models\User\User;
 use App\Services\Account\KetiApprovalService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -33,12 +35,22 @@ class KetiAccountController extends Controller
     public function index(Request $request): View
     {
         $tab = array_key_exists((string) $request->query('status'), self::TABS) ? (string) $request->query('status') : 'pending';
+        $keyword = trim((string) $request->query('q'));
+        $classGroupFilter = $request->integer('kelas') ?: null;
 
         $latestIds = KetiApplication::query()->selectRaw('MAX(id)')->groupBy('user_id');
 
         $applications = KetiApplication::query()
             ->whereIn('id', $latestIds)
             ->whereIn('status', self::TABS[$tab])
+            ->when($keyword !== '', fn (Builder $query) => $query->where(fn (Builder $q) => $q
+                ->whereHas('user', fn (Builder $uq) => $uq
+                    ->where('name', 'like', "%{$keyword}%")
+                    ->orWhere('nim', 'like', "%{$keyword}%")
+                    ->orWhere('email', 'like', "%{$keyword}%"))
+                ->orWhereHas('classGroup', fn (Builder $cq) => $cq->where('name', 'like', "%{$keyword}%"))
+            ))
+            ->when($classGroupFilter !== null, fn (Builder $query) => $query->where('class_group_id', $classGroupFilter))
             ->with(['user', 'classGroup', 'reviewer'])
             ->latest()
             ->get();
@@ -52,7 +64,51 @@ class KetiAccountController extends Controller
             'tab' => $tab,
             'applications' => $applications,
             'counts' => $counts,
+            'keyword' => $keyword,
+            'classGroupFilter' => $classGroupFilter,
             'classGroups' => ClassGroup::query()->where('is_active', true)->orderBy('name')->pluck('name', 'id'),
+        ]);
+    }
+
+    public function batchApprove(Request $request, KetiApprovalService $approvals): RedirectResponse
+    {
+        $validated = $request->validate([
+            'application_ids' => ['required', 'array', 'min:1'],
+            'application_ids.*' => ['integer', Rule::exists('keti_applications', 'id')],
+        ]);
+
+        $applications = KetiApplication::query()
+            ->whereIn('id', $validated['application_ids'])
+            ->with(['user', 'classGroup'])
+            ->get();
+
+        $approvedCount = 0;
+        $failures = [];
+
+        foreach ($applications as $application) {
+            try {
+                $approvals->approve($application, $request->user());
+                $approvedCount++;
+            } catch (DomainException $e) {
+                $failures[] = "{$application->user->name}: {$e->getMessage()}";
+            }
+        }
+
+        if ($approvedCount === 0) {
+            return back()->with('error', $failures[0] ?? 'Tidak ada pengajuan yang dapat disetujui.');
+        }
+
+        if ($failures !== []) {
+            return to_route('admin.keti-accounts.index', ['status' => 'approved'])->with('toast', [
+                'type' => 'warning',
+                'title' => "{$approvedCount} akun disetujui, ".count($failures).' dilewati',
+                'message' => implode(' ', array_slice($failures, 0, 2)),
+            ]);
+        }
+
+        return to_route('admin.keti-accounts.index', ['status' => 'approved'])->with('toast', [
+            'type' => 'success',
+            'title' => "{$approvedCount} akun Keti disetujui sekaligus",
         ]);
     }
 

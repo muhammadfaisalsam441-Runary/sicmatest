@@ -20,81 +20,106 @@
             <x-breadcrumb :items="[['Cari Ruangan', route('keti.search')], [$room->name]]" />
         </div>
 
-        <div class="flex items-center gap-5">
+        <div class="flex flex-wrap items-center gap-3 sm:gap-5">
             <x-button variant="secondary" :href="url()->previous() !== url()->current() ? url()->previous() : route('keti.search')" class="w-36">Kembali</x-button>
             <span class="text-sm text-muted">{{ Wita::longDate($current->start) }} • {{ Wita::clock($current->start) }}</span>
         </div>
 
-        <div class="grid items-start gap-6 lg:grid-cols-[1fr_390px]">
-            <div class="flex flex-col gap-6">
-                <x-card class="flex flex-col gap-5">
-                    <div class="flex items-start justify-between">
-                        <div class="flex flex-col gap-3">
-                            <h2 class="text-3xl font-medium">{{ $room->name }}</h2>
-                            <p class="text-sm text-muted">{{ $current->locationLabel() }}</p>
+        <div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-[1fr_340px]">
+            <div class="flex min-w-0 flex-col gap-6">
+                <x-card class="sicma-card-enter flex flex-col gap-5">
+                    <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                        <div class="flex flex-col gap-1.5">
+                            <h2 class="text-2xl font-semibold text-ink sm:text-3xl">{{ $room->name }}</h2>
+                            <p class="inline-flex items-center gap-1.5 text-sm text-muted">
+                                <i data-lucide="map-pin" aria-hidden="true" class="size-4 shrink-0"></i>
+                                <span>{{ $current->locationLabel() }}</span>
+                            </p>
                         </div>
-                        <div class="flex items-center gap-3">
+                        <div class="flex flex-wrap items-center justify-between gap-3 sm:justify-end">
                             <form method="POST" action="{{ $isFavorite ? route('keti.favorites.destroy', $room) : route('keti.favorites.store', $room) }}">
                                 @csrf
                                 @method($isFavorite ? 'DELETE' : 'PUT')
-                                <button type="submit" class="flex items-center gap-1 text-sm font-medium {{ $isFavorite ? 'text-danger' : 'text-primary' }}" aria-pressed="{{ $isFavorite ? 'true' : 'false' }}">
-                                    <i data-lucide="heart" class="size-4"></i>{{ $isFavorite ? 'Hapus favorit' : 'Simpan favorit' }}
+                                <button type="submit" class="flex cursor-pointer items-center gap-1.5 rounded-control border border-border bg-page px-3 py-1.5 text-xs font-semibold transition hover:border-primary/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary {{ $isFavorite ? 'text-danger' : 'text-primary' }}" aria-pressed="{{ $isFavorite ? 'true' : 'false' }}">
+                                    <i data-lucide="heart" aria-hidden="true" class="size-3.5"></i>{{ $isFavorite ? 'Hapus favorit' : 'Simpan favorit' }}
                                 </button>
                             </form>
-                            <div class="flex flex-col items-end gap-1">
-                                <span class="text-xs text-muted">Status saat ini</span>
-                                <x-status-badge :variant="$current->isAvailable() ? 'success' : ($current->badge() === 'Tutup' ? 'neutral' : 'danger')">{{ $current->badge() }}</x-status-badge>
+                            <div class="flex flex-col gap-1 sm:items-end">
+                                <span class="text-[11px] font-medium text-muted">Status saat ini</span>
+                                <x-status-badge :variant="$current->isAvailable() ? 'success' : ($current->badge() === 'Tutup' ? 'neutral' : 'danger')" :pulse="$current->badge() === 'Digunakan'">{{ $current->badge() }}</x-status-badge>
                             </div>
                         </div>
                     </div>
 
-                    <dl class="flex items-end justify-between">
+                    <dl class="grid grid-cols-1 gap-4 rounded-control bg-page p-4 sm:grid-cols-2 sm:items-end">
                         <div class="flex flex-col gap-1">
                             <dt class="text-xs text-muted">Kapasitas</dt>
-                            <dd class="text-xl font-medium">{{ $room->capacity === null ? '—' : $room->capacity.' kursi' }}</dd>
+                            <dd class="inline-flex items-center gap-2 text-xl font-semibold text-ink tabular-nums">
+                                <i data-lucide="users" aria-hidden="true" class="size-4 shrink-0 text-muted"></i>
+                                <span>{{ $room->capacity === null ? '—' : $room->capacity.' kursi' }}</span>
+                            </dd>
                         </div>
-                        <div class="flex flex-col items-end gap-1">
+                        <div class="flex flex-col gap-1 sm:items-end sm:text-right">
                             <dt class="text-xs text-muted">{{ $current->isAvailable() ? 'Tersedia sampai' : ($current->status === \App\Enums\RoomStatus::Closed ? 'Buka kembali' : 'Selesai pukul') }}</dt>
-                            <dd class="text-xl font-medium">{{ $current->isAvailable() ? Wita::clock($current->freeUntil) : ($current->busyUntil ? Wita::clock($current->busyUntil) : '—') }}</dd>
+                            <dd class="text-xl font-semibold text-ink tabular-nums">{{ $current->isAvailable() ? Wita::clock($current->freeUntil) : ($current->busyUntil ? Wita::clock($current->busyUntil) : '—') }}</dd>
                         </div>
                     </dl>
 
                     @if ($room->facilities->isNotEmpty())
                         <div class="flex flex-wrap gap-2">
                             @foreach ($room->facilities as $facility)
-                                <span class="rounded-full bg-primary-soft px-3 py-1 text-xs font-medium text-primary">{{ $facility->name }}</span>
+                                <span class="inline-flex items-center gap-1 rounded-full bg-primary-soft px-3 py-1 text-xs font-medium text-primary">
+                                    <i data-lucide="check" aria-hidden="true" class="size-3"></i>
+                                    {{ $facility->name }}
+                                </span>
                             @endforeach
                         </div>
                     @endif
 
                     @if ($currentAgenda)
-                        <p class="text-sm text-muted">Sedang berlangsung: {{ $currentAgenda['range'] }} • {{ $currentAgenda['title'] }}{{ $currentAgenda['class'] ? ' • '.$currentAgenda['class'] : '' }}</p>
+                        <div class="flex items-center gap-2.5 rounded-control border border-danger/20 bg-danger-soft/50 px-3.5 py-2.5 text-sm text-ink">
+                            <span class="sicma-live-dot size-2 shrink-0 rounded-full bg-danger" aria-hidden="true"></span>
+                            <p>Sedang berlangsung: <span class="font-semibold">{{ $currentAgenda['range'] }}</span> • {{ $currentAgenda['title'] }}{{ $currentAgenda['class'] ? ' • '.$currentAgenda['class'] : '' }}</p>
+                        </div>
                     @elseif ($nextAgenda)
-                        <p class="text-sm text-muted">Jadwal berikutnya: {{ $nextAgenda['range'] }} • {{ $nextAgenda['title'] }}</p>
+                        <div class="flex items-center gap-2.5 rounded-control border border-border bg-page px-3.5 py-2.5 text-sm text-muted">
+                            <i data-lucide="clock" aria-hidden="true" class="size-4 shrink-0 text-primary"></i>
+                            <p>Jadwal berikutnya: <span class="font-semibold text-ink">{{ $nextAgenda['range'] }}</span> • {{ $nextAgenda['title'] }}</p>
+                        </div>
                     @else
-                        <p class="text-sm text-muted">Tidak ada jadwal lain hari ini.</p>
+                        <div class="flex items-center gap-2.5 rounded-control border border-border bg-page px-3.5 py-2.5 text-sm text-muted">
+                            <i data-lucide="calendar-check" aria-hidden="true" class="size-4 shrink-0 text-success"></i>
+                            <p>Tidak ada jadwal lain hari ini.</p>
+                        </div>
                     @endif
                 </x-card>
 
                 <x-card class="flex flex-col gap-4">
                     <h2 class="text-lg font-semibold">Riwayat penggunaan</h2>
-                    <table class="w-full text-left text-sm">
-                        <thead class="border-b border-border text-xs text-muted">
-                            <tr><th class="py-3 font-medium">Pengguna</th><th class="py-3 font-medium">Waktu</th><th class="py-3 font-medium">Kegiatan</th><th class="py-3 font-medium">Status</th></tr>
-                        </thead>
-                        <tbody class="divide-y divide-border">
-                            @forelse ($history as $item)
+                    <div class="overflow-x-auto custom-scrollbar" role="region" aria-label="Jadwal hari ini di ruangan" tabindex="0">
+                        <table class="w-full text-left text-sm">
+                            <thead class="border-b border-border text-xs text-muted">
                                 <tr>
-                                    <td class="py-3">Kelas {{ $item->classGroup->name }}</td>
-                                    <td class="py-3">{{ $item->actual_start_at ? Wita::clock($item->actual_start_at, false) : Wita::clock($item->start_at, false) }}–{{ $item->actual_end_at ? Wita::clock($item->actual_end_at) : 'Selesai —' }}</td>
-                                    <td class="py-3">{{ $item->purpose }}</td>
-                                    <td class="py-3"><x-status-badge :variant="$item->status->badgeVariant()">{{ $item->status->label() }}</x-status-badge></td>
+                                    <th scope="col" class="py-3 pr-4 font-medium">Pengguna</th>
+                                    <th scope="col" class="py-3 pr-4 font-medium">Waktu</th>
+                                    <th scope="col" class="py-3 pr-4 font-medium">Kegiatan</th>
+                                    <th scope="col" class="py-3 font-medium">Status</th>
                                 </tr>
-                            @empty
-                                <tr><td colspan="4" class="py-6 text-center text-sm text-muted">Belum ada catatan pemakaian hari ini.</td></tr>
-                            @endforelse
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody class="divide-y divide-border">
+                                @forelse ($history as $item)
+                                    <tr>
+                                        <td class="py-3 pr-4">Kelas {{ $item->classGroup->name }}</td>
+                                        <td class="py-3 pr-4">{{ $item->actual_start_at ? Wita::clock($item->actual_start_at, false) : Wita::clock($item->start_at, false) }}–{{ $item->actual_end_at ? Wita::clock($item->actual_end_at) : 'Selesai —' }}</td>
+                                        <td class="py-3 pr-4">{{ $item->purpose }}</td>
+                                        <td class="py-3"><x-status-badge :variant="$item->status->badgeVariant()">{{ $item->status->label() }}</x-status-badge></td>
+                                    </tr>
+                                @empty
+                                    <tr><td colspan="4" class="py-6 text-center text-sm text-muted">Belum ada catatan pemakaian hari ini.</td></tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
                 </x-card>
             </div>
 

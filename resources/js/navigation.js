@@ -294,34 +294,56 @@ export function installPortalNavigation(Alpine, renderIcons) {
         const failed = next.body.dataset.validationErrors === 'true';
         if (options.submitted && !failed) previous.drafts.delete(options.submitted);
 
-        rendering = true;
-        Alpine.mutateDom(() => {
-            syncAttributes(document.body, next.body);
-            morphChildren(document.body, next.body, false);
-        });
-        lastSignature = nextSignature;
-        document.title = next.title;
+        const applyDomUpdate = () => {
+            rendering = true;
+            Alpine.mutateDom(() => {
+                syncAttributes(document.body, next.body);
+                morphChildren(document.body, next.body, false);
+            });
+            lastSignature = nextSignature;
+            document.title = next.title;
 
-        if (options.history !== 'pop') {
-            history[options.history === 'replace' ? 'replaceState' : 'pushState']({ sicmaScroll: point }, '', url);
-        }
-        currentUrl = url;
-        window.scrollTo({ left: point[0], top: point[1], behavior: 'instant' });
-        if (state) {
-            for (const form of document.forms) {
-                const saved = state.drafts.get(formKey(form));
-                if (!saved) continue;
-                for (const field of restoreFields(form, saved)) {
-                    field.dispatchEvent(new Event('input', { bubbles: true }));
-                    field.dispatchEvent(new Event('change', { bubbles: true }));
-                }
+            if (options.history !== 'pop') {
+                history[options.history === 'replace' ? 'replaceState' : 'pushState']({ sicmaScroll: point }, '', url);
             }
-            const modal = failed ? options.modal : (!options.submitted ? state.openModal : null);
-            if (modal) window.dispatchEvent(new CustomEvent('open-modal', { detail: modal }));
+            currentUrl = url;
+            window.scrollTo({ left: point[0], top: point[1], behavior: 'instant' });
+            if (state) {
+                for (const form of document.forms) {
+                    const saved = state.drafts.get(formKey(form));
+                    if (!saved) continue;
+                    for (const field of restoreFields(form, saved)) {
+                        field.dispatchEvent(new Event('input', { bubbles: true }));
+                        field.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                }
+                const modal = failed ? options.modal : (!options.submitted ? state.openModal : null);
+                if (modal) window.dispatchEvent(new CustomEvent('open-modal', { detail: modal }));
+            }
+            rendering = false;
+            rememberHistory(point);
+            document.dispatchEvent(new CustomEvent('sicma:navigated'));
+        };
+
+        const focusViewTarget = () => {
+            if (options.keepScroll || document.querySelector('dialog[open]')) return;
+            const heading = document.querySelector('#main-content h1, #main-content');
+            if (!heading) return;
+            if (heading.tagName === 'H1' && !heading.hasAttribute('tabindex')) {
+                heading.setAttribute('tabindex', '-1');
+            }
+            heading.focus({ preventScroll: true });
+        };
+
+        const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+        if (typeof document.startViewTransition === 'function' && !reduceMotion && !document.querySelector('dialog[open]')) {
+            const transition = document.startViewTransition(applyDomUpdate);
+            await transition.updateCallbackDone;
+            void transition.finished.finally(focusViewTarget);
+        } else {
+            applyDomUpdate();
+            focusViewTarget();
         }
-        rendering = false;
-        rememberHistory(point);
-        document.dispatchEvent(new CustomEvent('sicma:navigated'));
     }
 
     async function visit(url, options = {}) {

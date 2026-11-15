@@ -22,21 +22,33 @@
         ]" />
 
         @forelse ($notifications as $notification)
-            <x-card class="flex items-start justify-between gap-6">
-                <div class="flex gap-4">
-                    <span class="w-14 text-sm text-muted">{{ Wita::clock($notification->created_at, false) }}</span>
-                    <div class="flex flex-col gap-1">
-                        <div class="flex items-center gap-2">
-                            <h3 class="font-semibold">{{ $notification->title }}</h3>
-                            @if ($notification->read_at === null)<x-status-badge variant="primary">Baru</x-status-badge>@endif
+            @php($isUnread = $notification->read_at === null)
+            <x-card :class="'sicma-card-enter sicma-card-interactive flex flex-col justify-between gap-4 sm:flex-row sm:items-center '.($isUnread ? 'border-l-4 border-l-primary bg-primary-soft/20' : '')" style="--stagger: {{ $loop->index }}">
+                <div class="flex min-w-0 items-start gap-3.5">
+                    <span @class([
+                        'flex size-10 shrink-0 items-center justify-center rounded-control border',
+                        'border-primary/25 bg-primary-soft text-primary' => $isUnread,
+                        'border-border bg-page text-muted' => ! $isUnread,
+                    ])>
+                        <i data-lucide="bell" aria-hidden="true" class="size-4"></i>
+                    </span>
+                    <div class="flex min-w-0 flex-col gap-1">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <h3 class="font-semibold text-ink">{{ $notification->title }}</h3>
+                            @if ($isUnread)
+                                <x-status-badge variant="primary" :pulse="true">Baru</x-status-badge>
+                            @endif
                         </div>
-                        <p class="text-sm text-muted">{{ $notification->body }}</p>
-                        <p class="text-xs text-muted">{{ Wita::date($notification->created_at) }}</p>
+                        <p class="text-sm leading-relaxed text-muted">{{ $notification->body }}</p>
+                        <p class="inline-flex items-center gap-1.5 text-xs text-muted tabular-nums">
+                            <i data-lucide="clock" aria-hidden="true" class="size-3.5 shrink-0"></i>
+                            <span>{{ Wita::date($notification->created_at) }} • {{ Wita::clock($notification->created_at, false) }} WITA</span>
+                        </p>
                     </div>
                 </div>
-                <form method="POST" action="{{ route('keti.notifications.read', $notification) }}">
+                <form method="POST" action="{{ route('keti.notifications.read', $notification) }}" class="shrink-0 self-end sm:self-center">
                     @csrf
-                    <x-button type="submit" variant="soft">{{ isset($notification->data['reservation_id']) ? 'Lihat' : 'Tandai dibaca' }}</x-button>
+                    <x-button size="sm" type="submit" :variant="$isUnread ? 'soft' : 'secondary'">{{ isset($notification->data['reservation_id']) ? 'Lihat' : 'Tandai dibaca' }}</x-button>
                 </form>
             </x-card>
         @empty

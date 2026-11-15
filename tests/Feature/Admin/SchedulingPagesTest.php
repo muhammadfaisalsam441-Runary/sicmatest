@@ -2,6 +2,7 @@
 
 use App\Enums\LecturerHomebase;
 use App\Enums\LecturerProfileStatus;
+use App\Enums\ReservationStatus;
 use App\Enums\ScheduleVersionStatus;
 use App\Enums\SessionMode;
 use App\Enums\SessionPhase;
@@ -11,7 +12,9 @@ use App\Models\Academic\Course;
 use App\Models\Academic\CourseOffering;
 use App\Models\Academic\Period;
 use App\Models\Lecturer\Lecturer;
+use App\Models\Lecturer\LecturerLoadTarget;
 use App\Models\Lecturer\TeachingAssignment;
+use App\Models\Reservation\Reservation;
 use App\Models\Room\Room;
 use App\Models\Scheduling\Import;
 use App\Models\Scheduling\ScheduleSession;
@@ -202,6 +205,57 @@ test('jadwal resmi dapat difilter berdasarkan prodi', function () {
         ->assertOk()
         ->assertSee('Pemrograman Web PTIK')
         ->assertDontSee('Mikrokontroler TEKOM');
+});
+
+test('filter jadwal resmi langsung menerapkan perubahan tanpa tombol Terapkan', function () {
+    ScheduleVersion::factory()->official()->for($this->period)->create();
+
+    $this->actingAs($this->admin)
+        ->get(route('admin.schedules.index'))
+        ->assertOk()
+        ->assertDontSee('>Terapkan<', false)
+        ->assertDontSee('>Reset<', false)
+        ->assertSee('@input.debounce.400ms="$el.form.requestSubmit()"', false)
+        ->assertSee('@change="$el.form.requestSubmit()"', false);
+
+    $this->get(route('admin.schedules.index', ['q' => 'Algoritma']))
+        ->assertOk()
+        ->assertSee('Reset');
+});
+
+test('jadwal resmi default diurutkan per blok angkatan terbaru ke terlama lalu abjad kelas dengan dua warna soft bergantian per kelas', function () {
+    $official = ScheduleVersion::factory()->official()->for($this->period)->create();
+    $class2026B = ClassGroup::factory()->create(['cohort_year' => 2026, 'name' => 'PTIK B 2026']);
+    $class2026A = ClassGroup::factory()->create(['cohort_year' => 2026, 'name' => 'PTIK A 2026']);
+    $class2025 = ClassGroup::factory()->create(['cohort_year' => 2025, 'name' => 'PTIK A 2025']);
+    $class2024 = ClassGroup::factory()->create(['cohort_year' => 2024, 'name' => 'PTIK A 2024']);
+
+    $s2024 = ScheduleSession::factory()->for($official, 'version')->create(['title' => 'MK 2024 Pagi', 'day_of_week' => 1, 'start_minute' => 450, 'end_minute' => 550]);
+    $s2024->participants()->attach($class2024);
+
+    $s2026B = ScheduleSession::factory()->for($official, 'version')->create(['title' => 'MK 2026 B Pagi', 'day_of_week' => 1, 'start_minute' => 450, 'end_minute' => 550]);
+    $s2026B->participants()->attach($class2026B);
+
+    $s2026ALate = ScheduleSession::factory()->for($official, 'version')->create(['title' => 'MK 2026 A Siang', 'day_of_week' => 2, 'start_minute' => 600, 'end_minute' => 700]);
+    $s2026ALate->participants()->attach($class2026A);
+
+    $s2025 = ScheduleSession::factory()->for($official, 'version')->create(['title' => 'MK 2025', 'day_of_week' => 1, 'start_minute' => 480, 'end_minute' => 580]);
+    $s2025->participants()->attach($class2025);
+
+    $s2026AEarly = ScheduleSession::factory()->for($official, 'version')->create(['title' => 'MK 2026 A Pagi', 'day_of_week' => 1, 'start_minute' => 500, 'end_minute' => 600]);
+    $s2026AEarly->participants()->attach($class2026A);
+
+    $this->actingAs($this->admin)
+        ->get(route('admin.schedules.index'))
+        ->assertOk()
+        ->assertSeeInOrder(['MK 2026 A Pagi', 'MK 2026 A Siang', 'MK 2026 B Pagi', 'MK 2025', 'MK 2024 Pagi'])
+        ->assertViewHas('cohortBlockAlternate', fn (array $map): bool => $map[$s2026AEarly->id] === false
+            && $map[$s2026ALate->id] === false
+            && $map[$s2026B->id] === true
+            && $map[$s2025->id] === false
+            && $map[$s2024->id] === true)
+        ->assertSee('bg-primary-soft/45', false)
+        ->assertSee('bg-surface hover:bg-page/70', false);
 });
 
 test('Keti dan tamu tidak dapat mengakses pemeriksaan atau penetapan jadwal', function () {
@@ -995,4 +1049,265 @@ test('penerapan fase di TeachingPhasePlanner apply disinkronkan ke draf aktif', 
 
     $session->refresh();
     expect($session->lecturers->pluck('id')->count())->toBe(2);
+});
+
+test('data dosen mendukung sortir, ekspor csv, dan edit massal inline', function () {
+    $alpha = Lecturer::factory()->create([
+        'name' => 'Dr. Alpha',
+        'homebase' => LecturerHomebase::Jtik,
+        'profile_status' => LecturerProfileStatus::Verified,
+    ]);
+    $beta = Lecturer::factory()->create([
+        'name' => 'Dr. Beta',
+        'homebase' => LecturerHomebase::External,
+        'profile_status' => LecturerProfileStatus::Unverified,
+    ]);
+
+    LecturerLoadTarget::query()->create(['lecturer_id' => $alpha->id, 'period_id' => $this->period->id, 'target_sks' => 6, 'max_sks' => 12]);
+    LecturerLoadTarget::query()->create(['lecturer_id' => $beta->id, 'period_id' => $this->period->id, 'target_sks' => 12, 'max_sks' => 16]);
+
+    $this->actingAs($this->admin)
+        ->get(route('admin.lecturers.index', ['sort' => 'target_sks', 'dir' => 'desc']))
+        ->assertOk()
+        ->assertSeeInOrder(['Dr. Beta', 'Dr. Alpha']);
+
+    $export = $this->actingAs($this->admin)
+        ->get(route('admin.lecturers.export', ['q' => 'Alpha']))
+        ->assertOk();
+
+    $csv = $export->streamedContent();
+    expect($csv)->toContain('Dr. Alpha')
+        ->not->toContain('Dr. Beta');
+
+    $this->actingAs($this->admin)
+        ->put(route('admin.lecturers.bulk-update'), [
+            'lecturers' => [
+                [
+                    'id' => $alpha->id,
+                    'name' => 'Prof. Alpha',
+                    'nip' => '198001012005011001',
+                    'nidn' => '0001018001',
+                    'homebase' => LecturerHomebase::Jtik->value,
+                    'profile_status' => LecturerProfileStatus::Verified->value,
+                    'target_sks' => 10,
+                    'max_sks' => 16,
+                ],
+            ],
+        ])
+        ->assertRedirect();
+
+    $alpha->refresh();
+    $target = LecturerLoadTarget::query()->where('lecturer_id', $alpha->id)->where('period_id', $this->period->id)->sole();
+    expect($alpha->name)->toBe('Prof. Alpha')
+        ->and($alpha->nip)->toBe('198001012005011001')
+        ->and($target->target_sks)->toBe(10)
+        ->and($target->max_sks)->toBe(16)
+        ->and(AuditLog::query()->where('action', 'lecturer.bulk_updated')->exists())->toBeTrue();
+
+    $this->actingAs($this->admin)
+        ->put(route('admin.lecturers.bulk-update'), [
+            'lecturers' => [
+                [
+                    'id' => $alpha->id,
+                    'name' => 'Prof. Alpha',
+                    'profile_status' => LecturerProfileStatus::Verified->value,
+                    'target_sks' => 16,
+                    'max_sks' => 12,
+                ],
+            ],
+        ])
+        ->assertSessionHasErrors('lecturers.0.max_sks');
+});
+
+test('pembagian mengajar mendukung sortir kolom dan ekspor csv sesuai filter', function () {
+    $algo = Course::factory()->create(['code' => 'MK-01', 'name' => 'Algoritma Lanjut', 'sks' => 4]);
+    $db = Course::factory()->create(['code' => 'MK-02', 'name' => 'Basis Data Dasar', 'sks' => 2]);
+    $classA = ClassGroup::factory()->create(['name' => 'PTIK A', 'study_program' => 'PTIK']);
+
+    CourseOffering::factory()->for($this->period)->for($algo)->for($classA)->create();
+    CourseOffering::factory()->for($this->period)->for($db)->for($classA)->create();
+
+    $this->actingAs($this->admin)
+        ->get(route('admin.teaching.index', ['sort' => 'sks', 'dir' => 'desc']))
+        ->assertOk()
+        ->assertSeeInOrder(['Algoritma Lanjut', 'Basis Data Dasar']);
+
+    $export = $this->actingAs($this->admin)
+        ->get(route('admin.teaching.export', ['q' => 'Algoritma']))
+        ->assertOk();
+
+    $csv = $export->streamedContent();
+    expect($csv)->toContain('Algoritma Lanjut')
+        ->not->toContain('Basis Data Dasar');
+});
+
+test('pembagian mengajar default diurutkan per blok angkatan terbaru lalu abjad kelas dengan dua warna soft bergantian per kelas', function () {
+    $mkA = Course::factory()->create(['code' => 'MK-101', 'name' => 'Algoritma', 'sks' => 3]);
+    $mkB = Course::factory()->create(['code' => 'MK-102', 'name' => 'Basis Data', 'sks' => 3]);
+    $class2026B = ClassGroup::factory()->create(['cohort_year' => 2026, 'name' => 'PTIK B 2026']);
+    $class2026A = ClassGroup::factory()->create(['cohort_year' => 2026, 'name' => 'PTIK A 2026']);
+    $class2025 = ClassGroup::factory()->create(['cohort_year' => 2025, 'name' => 'PTIK A 2025']);
+
+    $off2025 = CourseOffering::factory()->for($this->period)->for($mkA)->for($class2025)->create();
+    $off2026B = CourseOffering::factory()->for($this->period)->for($mkA)->for($class2026B)->create();
+    $off2026AB = CourseOffering::factory()->for($this->period)->for($mkB)->for($class2026A)->create();
+    $off2026AA = CourseOffering::factory()->for($this->period)->for($mkA)->for($class2026A)->create();
+
+    $this->actingAs($this->admin)
+        ->get(route('admin.teaching.index'))
+        ->assertOk()
+        ->assertSeeInOrder(['PTIK A 2026', 'Algoritma', 'PTIK A 2026', 'Basis Data', 'PTIK B 2026', 'PTIK A 2025'])
+        ->assertViewHas('classBlockAlternate', fn (array $map): bool => $map[$off2026AA->id] === false
+            && $map[$off2026AB->id] === false
+            && $map[$off2026B->id] === true
+            && $map[$off2025->id] === false)
+        ->assertSee('bg-primary-soft/45', false)
+        ->assertSee('bg-surface hover:bg-page/70', false);
+});
+
+test('tabel admin menggunakan wadah scroll dengan header lengket dan tombol perluas layar penuh', function () {
+    $official = ScheduleVersion::factory()->official()->for($this->period)->create();
+    ScheduleSession::factory()->for($official, 'version')->create();
+    $draft = ScheduleVersion::factory()->for($this->period)->create(['status' => ScheduleVersionStatus::Draft]);
+    ScheduleSession::factory()->for($draft, 'version')->create();
+
+    foreach ([
+        route('admin.dashboard'),
+        route('admin.schedules.index'),
+        route('admin.teaching.index'),
+        route('admin.lecturers.index'),
+        route('admin.rooms.index'),
+        route('admin.academic.index', ['tab' => 'kelas']),
+        route('admin.academic.index', ['tab' => 'mata-kuliah']),
+        route('admin.academic.index', ['tab' => 'penawaran']),
+        route('admin.drafts.show', $draft),
+        route('admin.drafts.inspect', $draft),
+    ] as $url) {
+        $this->actingAs($this->admin)
+            ->get($url)
+            ->assertOk()
+            ->assertSee('x-data="tableScrollBox"', false)
+            ->assertSee('onTableScroll($event)', false)
+            ->assertSee('sticky top-0 z-10', false)
+            ->assertSee('Perluas')
+            ->assertDontSee('Scroll di dalam tabel untuk melihat semua baris');
+    }
+});
+
+test('halaman jadwal resmi menggunakan tab ringkas, laci filter kolapsibel, dan chip filter aktif', function () {
+    $room = Room::factory()->create(['name' => 'AE 107']);
+    $official = ScheduleVersion::factory()->official()->for($this->period)->create();
+    ScheduleSession::factory()->for($official, 'version')->create(['room_id' => $room->id]);
+
+    $this->actingAs($this->admin)
+        ->get(route('admin.schedules.index'))
+        ->assertOk()
+        ->assertSee('px-3.5 py-1.5 text-xs', false)
+        ->assertSee('x-data="filterDrawer(\'schedules-filters\', false)"', false)
+        ->assertSee('data-table-search', false)
+        ->assertSee('aria-label="Filter hari kuliah"', false)
+        ->assertSee('x-data="tableDensityToggle()"', false)
+        ->assertSee('1 sesi • Jadwal perkuliahan resmi v')
+        ->assertDontSee('Scroll di dalam tabel untuk melihat semua baris');
+
+    $this->actingAs($this->admin)
+        ->get(route('admin.schedules.index', ['ruang' => $room->id]))
+        ->assertOk()
+        ->assertSee('x-data="filterDrawer(\'schedules-filters\', true)"', false)
+        ->assertSee('Filter (1)')
+        ->assertSee('Aktif:')
+        ->assertSee('Ruang: AE 107');
+});
+
+test('halaman pemeriksaan draf menampilkan strip statistik ringkas dan pengalih bagian temuan-tinjauan di DOM', function () {
+    $draft = ScheduleVersion::factory()->for($this->period)->create(['status' => ScheduleVersionStatus::Draft]);
+    ScheduleSession::factory()->for($draft, 'version')->create(['title' => 'Pemrograman Web']);
+
+    $this->actingAs($this->admin)
+        ->get(route('admin.drafts.inspect', $draft))
+        ->assertOk()
+        ->assertSee('px-3.5 py-2', false)
+        ->assertSee('Total sesi')
+        ->assertSee('Terjadwal')
+        ->assertSee('Belum lengkap')
+        ->assertSee('Masalah wajib')
+        ->assertSee('Peringatan')
+        ->assertSee('Terkunci')
+        ->assertSee('role="tablist"', false)
+        ->assertSee('section = \'temuan\'', false)
+        ->assertSee('section = \'tinjauan\'', false)
+        ->assertSee('x-show="section === \'temuan\'"', false)
+        ->assertSee('x-show="section === \'tinjauan\'"', false)
+        ->assertSee('Temuan Pemeriksaan')
+        ->assertSee('Tinjauan Jadwal')
+        ->assertDontSee('Scroll di dalam tabel untuk melihat semua baris');
+});
+
+test('tab penawaran akademik menggunakan filter cepat berjumlah dan laci filter lanjutan', function () {
+    $course = Course::factory()->create(['name' => 'Basis Data']);
+    $classGroup = ClassGroup::factory()->create(['name' => 'PTIK B']);
+    CourseOffering::factory()->for($this->period)->for($course)->for($classGroup)->create();
+
+    $this->actingAs($this->admin)
+        ->get(route('admin.academic.index', ['tab' => 'penawaran']))
+        ->assertOk()
+        ->assertSee('px-3.5 py-1.5 text-xs', false)
+        ->assertSee('x-data="filterDrawer(\'offerings-filters\', false)"', false)
+        ->assertSee('Filter lanjutan')
+        ->assertSee('id="offering-search"', false)
+        ->assertSee('data-table-search', false)
+        ->assertSee('Belum Ada Dosen')
+        ->assertSee('Sudah Ada Dosen')
+        ->assertSee('Sudah Terjadwal')
+        ->assertSee('Belum Terjadwal')
+        ->assertDontSee('Scroll di dalam tabel untuk melihat semua baris');
+});
+
+test('halaman operasional reservasi, log pemakaian, dan akun keti mempertahankan judul, ringkasan, dan fitur tabel ringkas', function () {
+    $room = Room::factory()->create(['name' => 'Lab AI 1']);
+    $classGroup = ClassGroup::factory()->create(['name' => 'Tekom A']);
+    $keti = User::factory()->approvedKeti($classGroup)->create(['name' => 'Budi Santoso']);
+
+    Reservation::factory()->for($room)->for($classGroup)->for($keti, 'creator')->create([
+        'purpose' => 'Praktikum AI',
+        'status' => ReservationStatus::InUse,
+        'start_at' => '2026-11-04 09:00',
+        'end_at' => '2026-11-04 11:00',
+        'actual_start_at' => '2026-11-04 09:05',
+    ]);
+    User::factory()->pendingKeti($classGroup)->create();
+
+    $this->actingAs($this->admin)
+        ->get(route('admin.reservations.index'))
+        ->assertOk()
+        ->assertSee('Riwayat reservasi')
+        ->assertSee('rounded-full px-3 py-1 text-xs', false)
+        ->assertSee('x-data="tableScrollBox"', false)
+        ->assertSee('x-data="tableDensityToggle()"', false)
+        ->assertSee('Perluas')
+        ->assertDontSee('Scroll di dalam tabel untuk melihat semua baris');
+
+    $this->actingAs($this->admin)
+        ->get(route('admin.usage-logs.index', ['tanggal' => '2026-11-04']))
+        ->assertOk()
+        ->assertSee('Log pemakaian')
+        ->assertSee('x-data="filterDrawer(\'usage-active-rooms\', false)"', false)
+        ->assertSee('Ruangan Sedang Digunakan (1)')
+        ->assertSee('Detail ruang aktif')
+        ->assertSee('Lab AI 1')
+        ->assertSee('x-data="tableScrollBox"', false)
+        ->assertSee('x-data="tableDensityToggle()"', false)
+        ->assertSee('Perluas')
+        ->assertDontSee('Scroll di dalam tabel untuk melihat semua baris');
+
+    $this->actingAs($this->admin)
+        ->get(route('admin.keti-accounts.index'))
+        ->assertOk()
+        ->assertSee('Akun Keti')
+        ->assertSee('1 pengajuan menunggu pemeriksaan')
+        ->assertSee('rounded-full px-3 py-1 text-xs', false)
+        ->assertSee('x-data="tableScrollBox"', false)
+        ->assertSee('x-data="tableDensityToggle()"', false)
+        ->assertSee('Perluas')
+        ->assertDontSee('Scroll di dalam tabel untuk melihat semua baris');
 });

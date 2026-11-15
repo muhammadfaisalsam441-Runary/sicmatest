@@ -1,95 +1,94 @@
-            <div class="flex flex-col gap-6"
+            <div class="flex flex-col gap-4 admin-page-stack"
                  x-data="classManager(@js($classesPayload ?? []))"
                  :data-editing="(editMode || batchModalOpen || selectedIds.length > 0) ? 'true' : null"
                  @sicma:navigated.document="batchModalOpen = false">
-                {{-- Toolbar Pencarian, Filter Prodi, dan Tombol Mode Edit Massal --}}
-                <x-card class="flex flex-col gap-4">
-                    <div class="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-4">
-                        {{-- Filter Tabs Status --}}
-                        <div class="flex flex-wrap items-center gap-2">
-                            <button type="button" @click="statusFilter = 'semua'"
-                                    :class="statusFilter === 'semua' ? 'bg-primary text-white' : 'bg-page text-muted hover:text-ink hover:bg-border'"
-                                    class="rounded-full px-3.5 py-1.5 text-xs font-semibold transition cursor-pointer">
-                                Semua ({{ $classGroups->count() }})
-                            </button>
-                            <button type="button" @click="statusFilter = 'perlu_dilengkapi'"
-                                    :class="statusFilter === 'perlu_dilengkapi' ? 'bg-danger text-white' : 'bg-danger-soft/60 text-danger hover:bg-danger-soft'"
-                                    class="rounded-full px-3.5 py-1.5 text-xs font-semibold transition cursor-pointer">
-                                ⚠️ Perlu Dilengkapi ({{ $classStats['needs_attention'] ?? 0 }})
-                            </button>
-                            <button type="button" @click="statusFilter = 'lengkap'"
-                                    :class="statusFilter === 'lengkap' ? 'bg-success text-white' : 'bg-success-soft/60 text-success hover:bg-success-soft'"
-                                    class="rounded-full px-3.5 py-1.5 text-xs font-semibold transition cursor-pointer">
-                                ✅ Lengkap ({{ $classStats['complete'] ?? 0 }})
-                            </button>
-                            <button type="button" @click="statusFilter = 'arsip'"
-                                    :class="statusFilter === 'arsip' ? 'bg-primary text-white' : 'bg-page text-muted hover:text-ink hover:bg-border'"
-                                    class="rounded-full px-3.5 py-1.5 text-xs font-semibold transition cursor-pointer">
-                                Arsip ({{ $classStats['inactive'] ?? 0 }})
-                            </button>
-                        </div>
-
-                        {{-- Tombol Toggle Edit Massal di Tabel --}}
-                        <div class="flex items-center gap-2">
-                            <button type="button" @click="toggleEditMode()"
-                                    :class="editMode ? 'bg-amber-500 text-white ring-2 ring-amber-400/30' : 'bg-page text-ink border border-border hover:bg-primary-soft hover:text-primary'"
-                                    class="inline-flex items-center gap-1.5 rounded-control px-3.5 py-2 text-xs font-bold transition shadow-xs cursor-pointer">
-                                <i data-lucide="pencil" class="size-3.5"></i>
-                                <span x-text="editMode ? 'Tutup Edit Massal' : '⚡ Edit Massal di Tabel'"></span>
-                            </button>
-                        </div>
+                <div
+                    class="flex flex-col gap-4"
+                    x-data="{
+                        deleteClassModalOpen: false,
+                        deleteClassUrl: '',
+                        deleteClassName: '',
+                        archiveConfirmModalOpen: false,
+                        confirmDeleteClass(url, name) {
+                            this.deleteClassUrl = url;
+                            this.deleteClassName = name;
+                            this.deleteClassModalOpen = true;
+                        },
+                    }"
+                    @keydown.escape.window="batchModalOpen = false; deleteClassModalOpen = false; archiveConfirmModalOpen = false"
+                >
+                {{-- Toolbar Pencarian & Filter Prodi/Angkatan --}}
+                <x-card padding="p-4" class="admin-table-card flex flex-col gap-3">
+                    <div class="flex flex-wrap items-center gap-1.5 border-b border-border pb-2.5">
+                        <button type="button" @click="statusFilter = 'semua'"
+                                :class="statusFilter === 'semua' ? 'bg-primary text-white' : 'bg-page text-muted hover:text-ink hover:bg-border'"
+                                class="rounded-full px-3 py-1 text-xs font-semibold transition cursor-pointer">
+                            Semua ({{ $classGroups->count() }})
+                        </button>
+                        <button type="button" @click="statusFilter = 'perlu_dilengkapi'"
+                                :class="statusFilter === 'perlu_dilengkapi' ? 'bg-danger text-white' : 'bg-danger-soft/60 text-danger hover:bg-danger-soft'"
+                                class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition cursor-pointer">
+                            <i data-lucide="triangle-alert" class="size-3.5" aria-hidden="true"></i>
+                            Perlu Dilengkapi ({{ $classStats['needs_attention'] ?? 0 }})
+                        </button>
+                        <button type="button" @click="statusFilter = 'lengkap'"
+                                :class="statusFilter === 'lengkap' ? 'bg-success text-white' : 'bg-success-soft/60 text-success hover:bg-success-soft'"
+                                class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition cursor-pointer">
+                            <i data-lucide="circle-check" class="size-3.5" aria-hidden="true"></i>
+                            Lengkap ({{ $classStats['complete'] ?? 0 }})
+                        </button>
+                        <button type="button" @click="statusFilter = 'arsip'"
+                                :class="statusFilter === 'arsip' ? 'bg-primary text-white' : 'bg-page text-muted hover:text-ink hover:bg-border'"
+                                class="rounded-full px-3 py-1 text-xs font-semibold transition cursor-pointer">
+                            Arsip ({{ $classStats['inactive'] ?? 0 }})
+                        </button>
                     </div>
 
                     {{-- Form Pencarian & Filter Prodi/Angkatan --}}
-                    <div class="grid grid-cols-1 items-end gap-3 sm:grid-cols-12">
-                        <div class="sm:col-span-5">
-                            <label class="mb-1 block text-xs font-medium text-muted">Cari Nama Kelas / Kode / Prodi</label>
-                            <div class="relative">
-                                <i data-lucide="search" class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted"></i>
-                                <input type="text" x-model="search" placeholder="Ketik nama kelas (misal: PTIK A, Tekom C)..."
-                                        class="w-full rounded-control border border-border bg-surface pl-9 pr-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary">
-                            </div>
-                        </div>
-
-                        <div class="sm:col-span-3">
-                            <label class="mb-1 block text-xs font-medium text-muted">Filter Program Studi</label>
-                            <select x-model="prodiFilter" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
-                                <option value="">Semua Program Studi</option>
-                                @foreach ($distinctPrograms ?? [] as $dp)
-                                    <option value="{{ $dp }}">{{ $dp }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        <div class="sm:col-span-2">
-                            <label class="mb-1 block text-xs font-medium text-muted">Filter Angkatan</label>
-                            <select x-model="cohortFilter" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
-                                <option value="">Semua Angkatan</option>
-                                @foreach ($distinctCohorts ?? [] as $cohort)
-                                    <option value="{{ $cohort }}">Angkatan {{ $cohort }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        <div class="sm:col-span-2">
-                            <button type="button" @click="search = ''; prodiFilter = ''; cohortFilter = ''; statusFilter = 'semua'"
-                                    x-show="search !== '' || prodiFilter !== '' || cohortFilter !== '' || statusFilter !== 'semua'"
-                                    class="inline-flex h-[38px] w-full items-center justify-center gap-1.5 rounded-control border border-border px-3 text-xs font-semibold text-muted hover:text-ink hover:bg-page transition cursor-pointer">
-                                <i data-lucide="rotate-ccw" class="size-3.5"></i>
-                                <span>Reset Filter</span>
+                    <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+                        <div class="relative flex-1 min-w-[200px]">
+                            <i data-lucide="search" class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" aria-hidden="true"></i>
+                            <input id="class-search" type="search" x-model="search" data-table-search
+                                   aria-label="Cari Nama Kelas, Kode, atau Program Studi"
+                                   placeholder="Cari nama kelas, kode, atau prodi..."
+                                   class="w-full rounded-control border border-border bg-surface pl-9 pr-8 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary">
+                            <button type="button" x-show="search.trim() !== ''" x-cloak @click="search = ''" aria-label="Bersihkan pencarian" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-ink cursor-pointer" title="Bersihkan pencarian">
+                                <i data-lucide="x" class="size-3.5" aria-hidden="true"></i>
                             </button>
                         </div>
+
+                        <select id="class-prodi-filter" x-model="prodiFilter" aria-label="Filter Program Studi" class="w-full sm:w-56 rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
+                            <option value="">Semua Program Studi</option>
+                            @foreach ($distinctPrograms ?? [] as $dp)
+                                <option value="{{ $dp }}">{{ $dp }}</option>
+                            @endforeach
+                        </select>
+
+                        <select id="class-cohort-filter" x-model="cohortFilter" aria-label="Filter Angkatan" class="w-full sm:w-44 rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
+                            <option value="">Semua Angkatan</option>
+                            @foreach ($distinctCohorts ?? [] as $cohort)
+                                <option value="{{ $cohort }}">Angkatan {{ $cohort }}</option>
+                            @endforeach
+                        </select>
+
+                        <button type="button" @click="search = ''; prodiFilter = ''; cohortFilter = ''; statusFilter = 'semua'"
+                                x-show="search !== '' || prodiFilter !== '' || cohortFilter !== '' || statusFilter !== 'semua'"
+                                x-cloak
+                                class="inline-flex h-[38px] shrink-0 items-center justify-center gap-1.5 rounded-control border border-border px-3 text-xs font-semibold text-muted hover:text-ink hover:bg-page transition cursor-pointer">
+                            <i data-lucide="rotate-ccw" class="size-3.5" aria-hidden="true"></i>
+                            <span>Reset</span>
+                        </button>
                     </div>
 
                     {{-- Bar Bantuan Cepat saat Mode Edit Massal Aktif --}}
-                    <div x-show="editMode" x-cloak class="rounded-xl border border-primary/30 bg-primary-soft/30 p-3.5 flex flex-wrap items-center justify-between gap-3 animate-in fade-in duration-200">
+                    <div x-show="editMode" x-cloak class="rounded-xl border border-primary/30 bg-primary-soft/30 p-3 flex flex-wrap items-center justify-between gap-3 animate-in fade-in duration-200">
                         <div class="flex flex-wrap items-center gap-2 text-xs">
                             <span class="font-bold text-primary flex items-center gap-1.5">
-                                <i data-lucide="pencil" class="size-4"></i> Mode Edit Massal Aktif
+                                <i data-lucide="pencil" class="size-4" aria-hidden="true"></i> Mode Edit Massal Aktif
                             </span>
                             <span class="text-muted">| Set jumlah mahasiswa cepat:</span>
                             <div class="flex flex-wrap items-center gap-1.5 ml-1">
-                                <input type="number" min="1" max="500" x-model="fillEmptyValue" class="w-16 rounded border border-border bg-surface px-2 py-1 text-center text-xs font-semibold text-ink focus:border-primary focus:outline-none">
+                                <input type="number" min="1" max="500" x-model="fillEmptyValue" aria-label="Jumlah mahasiswa cepat" class="w-16 rounded border border-border bg-surface px-2 py-1 text-center text-xs font-semibold text-ink focus:border-primary focus:outline-none">
                                 <button type="button" @click="applyFillEmpty()" class="rounded bg-surface px-2.5 py-1 text-xs font-semibold text-primary border border-primary/40 hover:bg-primary hover:text-white transition shadow-xs cursor-pointer">
                                     Isi yang Kosong
                                 </button>
@@ -103,31 +102,42 @@
                                 Batal
                             </button>
                             <button type="submit" form="bulkClassForm" class="inline-flex items-center gap-1.5 rounded-control bg-primary px-4 py-1.5 text-xs font-bold text-white hover:bg-primary/90 transition shadow-sm cursor-pointer">
-                                <i data-lucide="check" class="size-4"></i>
+                                <i data-lucide="check" class="size-4" aria-hidden="true"></i>
                                 Simpan Semua Perubahan
                             </button>
                         </div>
                     </div>
 
                     {{-- TABEL KELAS --}}
-                    <div class="overflow-x-auto rounded-lg border border-border">
+                    <x-table-scroll>
+                        <x-slot:title>Menampilkan <strong class="text-ink" x-text="visibleIds.length"></strong> dari {{ $classGroups->count() }} kelas</x-slot:title>
+                        <x-slot:headerActions>
+                            <x-table-density-toggle />
+                            <button type="button" @click="toggleEditMode()"
+                                    :class="editMode ? 'bg-amber-500 text-white border-amber-500' : 'bg-surface text-ink border-border hover:bg-primary-soft hover:text-primary'"
+                                    class="inline-flex items-center gap-1.5 rounded-control border px-2.5 py-1 text-xs font-semibold transition cursor-pointer">
+                                <i data-lucide="pencil" class="size-3.5" aria-hidden="true"></i>
+                                <span x-text="editMode ? 'Tutup Edit Massal' : 'Edit Massal'"></span>
+                            </button>
+                        </x-slot:headerActions>
                         <table class="w-full border-collapse text-left text-sm">
-                            <thead class="border-b border-border bg-page text-xs font-semibold text-muted">
+                            <thead class="sticky top-0 z-10 border-b border-border bg-page text-xs font-semibold text-muted">
                                 <tr>
-                                    <th class="w-10 px-4 py-3 text-center">
+                                    <th scope="col" class="w-10 px-4 py-3 text-center">
                                         <input type="checkbox"
                                                 @change="toggleSelectAll($event.target.checked)"
                                                 :checked="isAllSelected()"
                                                 class="size-4 rounded border-border text-primary focus:ring-primary cursor-pointer"
+                                                aria-label="Pilih semua kelas yang tampil"
                                                 title="Pilih semua yang tampil">
                                     </th>
-                                    <th class="px-4 py-3 font-semibold">Nama Kelas & Kode</th>
-                                    <th class="px-4 py-3 font-semibold">Program Studi</th>
-                                    <th class="px-4 py-3 font-semibold text-center">Angkatan</th>
-                                    <th class="px-4 py-3 font-semibold text-center">Jadwal</th>
-                                    <th class="px-4 py-3 font-semibold text-center">Jumlah Mahasiswa</th>
-                                    <th class="px-4 py-3 font-semibold text-center">Status</th>
-                                    <th class="px-4 py-3 text-right font-semibold">Aksi</th>
+                                    <th scope="col" class="px-4 py-3 font-semibold">Nama Kelas & Kode</th>
+                                    <th scope="col" class="px-4 py-3 font-semibold">Program Studi</th>
+                                    <th scope="col" class="px-4 py-3 font-semibold text-center">Angkatan</th>
+                                    <th scope="col" class="px-4 py-3 font-semibold text-center">Jadwal</th>
+                                    <th scope="col" class="px-4 py-3 font-semibold text-center">Jumlah Mahasiswa</th>
+                                    <th scope="col" class="px-4 py-3 font-semibold text-center">Status</th>
+                                    <th scope="col" class="px-4 py-3 text-right font-semibold">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-border">
@@ -151,6 +161,7 @@
                                             <input type="checkbox"
                                                    value="{{ $classGroup->id }}"
                                                    x-model.number="selectedIds"
+                                                   aria-label="Pilih kelas {{ $classGroup->name }}"
                                                    class="size-4 rounded border-border text-primary focus:ring-primary cursor-pointer">
                                         </td>
 
@@ -220,8 +231,9 @@
                                                         {{ $classGroup->student_count }} mhs
                                                     </span>
                                                 @else
-                                                    <button type="button" @click="editMode = true" class="inline-flex items-center gap-1 text-xs font-semibold text-danger hover:underline cursor-pointer" title="Klik untuk edit cepat">
-                                                        ⚠️ Belum diisi
+                                                    <button type="button" @click="toggleEditMode()" class="inline-flex items-center gap-1 text-xs font-semibold text-danger hover:underline cursor-pointer" title="Klik untuk edit cepat">
+                                                        <i data-lucide="triangle-alert" class="size-3.5" aria-hidden="true"></i>
+                                                        <span>Belum diisi</span>
                                                     </button>
                                                 @endif
                                             </div>
@@ -270,34 +282,51 @@
                                             <div class="flex items-center justify-end gap-1.5">
                                                 <button type="button"
                                                         class="inline-flex items-center gap-1 rounded-control border border-border bg-surface px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary-soft hover:border-primary/40 transition cursor-pointer"
-                                                        x-data x-on:click="$dispatch('open-modal', 'class-{{ $classGroup->id }}')">
-                                                    <i data-lucide="pencil" class="size-3.5"></i>
+                                                        @click="$dispatch('class-open-form', @js([
+                                                            'id' => $classGroup->id,
+                                                            'name' => $classGroup->name,
+                                                            'code' => $classGroup->code,
+                                                            'study_program' => $classGroup->study_program,
+                                                            'cohort_year' => $classGroup->cohort_year,
+                                                            'student_count' => $classGroup->student_count,
+                                                            'is_active' => (bool) $classGroup->is_active,
+                                                        ]))">
+                                                    <i data-lucide="pencil" class="size-3.5" aria-hidden="true"></i>
                                                     <span>Edit</span>
                                                 </button>
-                                                <form method="POST" action="{{ route('admin.academic.classes.destroy', $classGroup) }}" class="inline">
-                                                    @csrf
-                                                    @method('DELETE')
-                                                    <button type="submit"
-                                                            class="inline-flex items-center gap-1 rounded-control border border-danger/30 bg-danger-soft/30 px-2.5 py-1 text-xs font-semibold text-danger hover:bg-danger hover:text-white transition cursor-pointer"
-                                                            onclick="return confirm('Hapus kelas {{ $classGroup->name }}?')">
-                                                        <i data-lucide="trash-2" class="size-3.5"></i>
-                                                        <span>Hapus</span>
-                                                    </button>
-                                                </form>
+                                                <button type="button"
+                                                        @click="confirmDeleteClass('{{ route('admin.academic.classes.destroy', $classGroup) }}', @js($classGroup->name))"
+                                                        class="inline-flex items-center gap-1 rounded-control border border-danger/30 bg-danger-soft/30 px-2.5 py-1 text-xs font-semibold text-danger hover:bg-danger hover:text-white transition cursor-pointer">
+                                                    <i data-lucide="trash-2" class="size-3.5" aria-hidden="true"></i>
+                                                    <span>Hapus</span>
+                                                </button>
                                             </div>
                                         </td>
                                     </tr>
                                 @empty
                                     <tr>
                                         <td colspan="8" class="py-12 text-center text-muted">
-                                            <i data-lucide="users" class="mx-auto size-8 text-muted/60 mb-2"></i>
+                                            <i data-lucide="users" class="mx-auto size-8 text-muted/60 mb-2" aria-hidden="true"></i>
                                             <p class="font-medium text-ink">Belum ada data kelas.</p>
                                         </td>
                                     </tr>
                                 @endforelse
+                                @if ($classGroups->isNotEmpty())
+                                    <tr x-show="visibleIds.length === 0" x-cloak>
+                                        <td colspan="8" class="py-12 text-center text-muted">
+                                            <i data-lucide="search-x" class="mx-auto size-8 text-muted/60 mb-2" aria-hidden="true"></i>
+                                            <p class="font-medium text-ink">Tidak ada kelas yang cocok dengan filter atau pencarian.</p>
+                                            <button type="button" @click="search = ''; prodiFilter = ''; cohortFilter = ''; statusFilter = 'semua'"
+                                                    class="mt-3 inline-flex items-center gap-1.5 rounded-control border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary-soft transition cursor-pointer">
+                                                <i data-lucide="rotate-ccw" class="size-3.5" aria-hidden="true"></i>
+                                                <span>Reset Filter</span>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                @endif
                             </tbody>
                         </table>
-                    </div>
+                    </x-table-scroll>
 
                     {{-- Footer jika dalam editMode --}}
                     <div x-show="editMode" x-cloak class="flex items-center justify-between border-t border-border pt-4">
@@ -307,7 +336,7 @@
                                 Batal
                             </button>
                             <button type="submit" form="bulkClassForm" class="inline-flex items-center gap-1.5 rounded-control bg-primary px-5 py-2 text-xs font-bold text-white hover:bg-primary/90 transition shadow-sm cursor-pointer">
-                                <i data-lucide="check" class="size-4"></i>
+                                <i data-lucide="check" class="size-4" aria-hidden="true"></i>
                                 Simpan Semua Perubahan
                             </button>
                         </div>
@@ -323,9 +352,9 @@
                      x-transition:leave="transition ease-in duration-150"
                      x-transition:leave-start="opacity-100 translate-y-0"
                      x-transition:leave-end="opacity-0 translate-y-4"
-                     class="fixed bottom-6 left-1/2 z-40 flex -translate-x-1/2 flex-wrap items-center gap-3 rounded-xl border border-primary/30 bg-ink px-6 py-3.5 text-surface shadow-2xl">
+                     class="fixed bottom-6 left-1/2 z-40 flex w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 flex-wrap items-center gap-3 rounded-xl border border-primary/30 bg-ink px-6 py-3.5 text-surface shadow-2xl">
                     <div class="flex items-center gap-2">
-                        <i data-lucide="circle-check" class="size-5 text-success"></i>
+                        <i data-lucide="circle-check" class="size-5 text-success" aria-hidden="true"></i>
                         <span class="text-sm font-semibold"><span x-text="selectedIds.length"></span> kelas dipilih</span>
                         <button type="button"
                                 x-show="!isAllSelected()"
@@ -338,31 +367,31 @@
 
                     {{-- 1. Atur Mahasiswa Modal --}}
                     <button type="button" @click="openBatchModal('set_student_count', 'Atur Jumlah Mahasiswa')" class="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-primary/90 transition cursor-pointer">
-                        <i data-lucide="users" class="size-3.5"></i>
+                        <i data-lucide="users" class="size-3.5" aria-hidden="true"></i>
                         Set Mahasiswa
                     </button>
 
                     {{-- 2. Set Angkatan Modal --}}
                     <button type="button" @click="openBatchModal('set_cohort_year', 'Set Tahun Angkatan')" class="inline-flex items-center gap-1.5 rounded-lg bg-surface/10 px-3 py-1.5 text-xs font-semibold text-surface hover:bg-surface/20 transition cursor-pointer">
-                        <i data-lucide="calendar" class="size-3.5"></i>
+                        <i data-lucide="calendar" class="size-3.5" aria-hidden="true"></i>
                         Set Angkatan
                     </button>
 
                     {{-- 3. Set Prodi Modal --}}
                     <button type="button" @click="openBatchModal('set_study_program', 'Set Program Studi')" class="inline-flex items-center gap-1.5 rounded-lg bg-surface/10 px-3 py-1.5 text-xs font-semibold text-surface hover:bg-surface/20 transition cursor-pointer">
-                        <i data-lucide="building-2" class="size-3.5"></i>
+                        <i data-lucide="building-2" class="size-3.5" aria-hidden="true"></i>
                         Set Prodi
                     </button>
 
                     {{-- 4. Aktifkan --}}
                     <button type="button" @click="submitBatch('activate')" class="inline-flex items-center gap-1.5 rounded-lg bg-success px-3 py-1.5 text-xs font-semibold text-white hover:bg-success/90 transition cursor-pointer">
-                        <i data-lucide="check" class="size-3.5"></i>
+                        <i data-lucide="check" class="size-3.5" aria-hidden="true"></i>
                         Aktifkan
                     </button>
 
                     {{-- 5. Arsipkan --}}
-                    <button type="button" @click="submitBatch('archive')" class="inline-flex items-center gap-1.5 rounded-lg bg-danger/85 px-3 py-1.5 text-xs font-semibold text-white hover:bg-danger transition cursor-pointer">
-                        <i data-lucide="lock" class="size-3.5"></i>
+                    <button type="button" @click="archiveConfirmModalOpen = true" class="inline-flex items-center gap-1.5 rounded-lg bg-danger/85 px-3 py-1.5 text-xs font-semibold text-white hover:bg-danger transition cursor-pointer">
+                        <i data-lucide="lock" class="size-3.5" aria-hidden="true"></i>
                         Arsipkan
                     </button>
 
@@ -390,38 +419,38 @@
                 </form>
 
                 {{-- MODAL BATCH ATUR NILAI --}}
-                <div x-show="batchModalOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
+                <div x-show="batchModalOpen" x-cloak role="dialog" aria-modal="true" aria-labelledby="batch-class-modal-title" class="fixed inset-0 z-50 flex items-center justify-center p-4">
                     <div class="absolute inset-0 bg-ink/80 backdrop-blur-sm" @click="batchModalOpen = false"></div>
                     <div class="relative w-full max-w-md rounded-2xl bg-surface p-6 shadow-2xl">
                         <div class="flex items-start justify-between border-b border-border pb-3">
                             <div>
                                 <span class="text-xs font-semibold text-primary">Penyesuaian Massal</span>
-                                <h3 class="text-lg font-bold text-ink" x-text="batchLabel + ' (' + selectedIds.length + ' Kelas Terpilih)'"></h3>
+                                <h3 id="batch-class-modal-title" class="text-lg font-bold text-ink" x-text="batchLabel + ' (' + selectedIds.length + ' Kelas Terpilih)'"></h3>
                             </div>
-                            <button type="button" @click="batchModalOpen = false" class="text-muted hover:text-ink">
-                                <i data-lucide="x" class="size-5"></i>
+                            <button type="button" @click="batchModalOpen = false" aria-label="Tutup dialog" class="cursor-pointer rounded-md p-1 text-muted hover:bg-slate-100 hover:text-ink">
+                                <i data-lucide="x" class="size-5" aria-hidden="true"></i>
                             </button>
                         </div>
 
                         <div class="mt-4 flex flex-col gap-4">
                             <template x-if="batchAction === 'set_student_count'">
                                 <div>
-                                    <label class="mb-1 block text-xs font-medium text-muted">Jumlah Mahasiswa per Kelas</label>
-                                    <input type="number" min="1" max="500" x-model="batchValue" @keydown.enter.prevent="if (batchValue) { submitBatch(); batchModalOpen = false; }" placeholder="Misal: 40" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
+                                    <label for="batch-class-student-count" class="mb-1 block text-xs font-medium text-muted">Jumlah Mahasiswa per Kelas</label>
+                                    <input id="batch-class-student-count" type="number" min="1" max="500" x-model="batchValue" @keydown.enter.prevent="if (batchValue) { submitBatch(); batchModalOpen = false; }" placeholder="Misal: 40" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
                                 </div>
                             </template>
 
                             <template x-if="batchAction === 'set_cohort_year'">
                                 <div>
-                                    <label class="mb-1 block text-xs font-medium text-muted">Tahun Angkatan</label>
-                                    <input type="number" min="2000" max="2100" x-model="batchValue" @keydown.enter.prevent="if (batchValue) { submitBatch(); batchModalOpen = false; }" placeholder="Misal: 2026" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
+                                    <label for="batch-class-cohort-year" class="mb-1 block text-xs font-medium text-muted">Tahun Angkatan</label>
+                                    <input id="batch-class-cohort-year" type="number" min="2000" max="2100" x-model="batchValue" @keydown.enter.prevent="if (batchValue) { submitBatch(); batchModalOpen = false; }" placeholder="Misal: 2026" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
                                 </div>
                             </template>
 
                             <template x-if="batchAction === 'set_study_program'">
                                 <div>
-                                    <label class="mb-1 block text-xs font-medium text-muted">Nama Program Studi</label>
-                                    <input type="text" x-model="batchValue" @keydown.enter.prevent="if (String(batchValue).trim() !== '') { submitBatch(); batchModalOpen = false; }" list="prodi-options-batch" placeholder="Misal: Pendidikan Teknik Informatika dan Komputer" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
+                                    <label for="batch-class-study-program" class="mb-1 block text-xs font-medium text-muted">Nama Program Studi</label>
+                                    <input id="batch-class-study-program" type="text" x-model="batchValue" @keydown.enter.prevent="if (String(batchValue).trim() !== '') { submitBatch(); batchModalOpen = false; }" list="prodi-options-batch" placeholder="Misal: Pendidikan Teknik Informatika dan Komputer" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
                                 </div>
                             </template>
 
@@ -441,6 +470,48 @@
                     </div>
                 </div>
 
+                {{-- MODAL KONFIRMASI ARSIP BATCH --}}
+                <div x-show="archiveConfirmModalOpen" x-cloak role="dialog" aria-modal="true" aria-labelledby="archive-class-modal-title" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div class="absolute inset-0 bg-ink/80 backdrop-blur-sm" @click="archiveConfirmModalOpen = false"></div>
+                    <div class="relative w-full max-w-md rounded-2xl bg-surface p-6 shadow-2xl">
+                        <div class="flex items-start justify-between border-b border-border pb-3">
+                            <h3 id="archive-class-modal-title" class="text-base font-bold text-ink">Arsipkan kelas terpilih?</h3>
+                            <button type="button" @click="archiveConfirmModalOpen = false" aria-label="Tutup dialog" class="cursor-pointer rounded-md p-1 text-muted hover:bg-slate-100 hover:text-ink">
+                                <i data-lucide="x" class="size-4" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                        <p class="mt-3 text-sm text-muted">
+                            Sebanyak <strong class="text-ink" x-text="selectedIds.length"></strong> kelas terpilih akan dinonaktifkan (diarsipkan) dan tidak ikut dalam penjadwalan aktif.
+                        </p>
+                        <div class="mt-5 flex justify-end gap-2">
+                            <x-button type="button" variant="ghost" @click="archiveConfirmModalOpen = false">Batal</x-button>
+                            <x-button type="button" variant="danger" icon="lock" @click="submitBatch('archive'); archiveConfirmModalOpen = false">Arsipkan</x-button>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- MODAL KONFIRMASI HAPUS KELAS --}}
+                <div x-show="deleteClassModalOpen" x-cloak role="dialog" aria-modal="true" aria-labelledby="delete-class-modal-title" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div class="absolute inset-0 bg-ink/80 backdrop-blur-sm" @click="deleteClassModalOpen = false"></div>
+                    <div class="relative w-full max-w-md rounded-2xl bg-surface p-6 shadow-2xl">
+                        <div class="flex items-start justify-between border-b border-border pb-3">
+                            <h3 id="delete-class-modal-title" class="text-base font-bold text-ink">Hapus kelas?</h3>
+                            <button type="button" @click="deleteClassModalOpen = false" aria-label="Tutup dialog" class="cursor-pointer rounded-md p-1 text-muted hover:bg-slate-100 hover:text-ink">
+                                <i data-lucide="x" class="size-4" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                        <p class="mt-3 text-sm text-muted">
+                            Kelas <strong class="text-ink" x-text="deleteClassName"></strong> akan dihapus permanen jika belum memiliki data terkait.
+                        </p>
+                        <form method="POST" :action="deleteClassUrl" class="mt-5 flex justify-end gap-2">
+                            @csrf
+                            @method('DELETE')
+                            <x-button type="button" variant="ghost" @click="deleteClassModalOpen = false">Batal</x-button>
+                            <x-button type="submit" variant="danger" icon="trash-2">Hapus Kelas</x-button>
+                        </form>
+                    </div>
+                </div>
+
                 {{-- Datalist options untuk prodi --}}
                 <datalist id="prodi-options-grid">
                     @foreach ($distinctPrograms ?? [] as $dp)
@@ -452,4 +523,5 @@
                         <option value="{{ $dp }}"></option>
                     @endforeach
                 </datalist>
+                </div>
             </div>

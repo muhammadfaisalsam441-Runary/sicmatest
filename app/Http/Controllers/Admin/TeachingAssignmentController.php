@@ -18,16 +18,24 @@ use App\Services\Academic\TeachingLoadService;
 use App\Services\Academic\TeachingPhasePlanner;
 use App\Services\Account\AuditLogger;
 use App\Services\Scheduling\ScheduleDraftService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Pembagian SKS: tim pengajar (pengampu + mitra) per penawaran dan rekap beban vs target dosen.
  */
 class TeachingAssignmentController extends Controller
 {
+    /**
+     * @var list<string>
+     */
+    private const SORTS = ['class', 'course', 'sks'];
+
     public function __construct(private AuditLogger $audit, private ScheduleDraftService $drafts) {}
 
     public function index(Request $request, TeachingLoadService $loads, LecturerService $lecturerService): View
@@ -37,6 +45,8 @@ class TeachingAssignmentController extends Controller
         $filter = (string) $request->query('filter', 'semua');
         $prodi = (string) $request->query('prodi');
         $semester = trim((string) $request->query('semester'));
+        $sort = in_array((string) $request->query('sort'), self::SORTS, true) ? (string) $request->query('sort') : 'class';
+        $dir = $request->query('dir') === 'desc' ? 'desc' : 'asc';
         $perPage = $request->integer('per_page', 25);
         if (! in_array($perPage, [15, 25, 50, 100], true)) {
             $perPage = 25;
@@ -45,95 +55,23 @@ class TeachingAssignmentController extends Controller
         $periodYear = (int) ($period?->start_date?->format('Y') ?? 2026);
         $isGanjil = $period ? ! str_contains(strtolower($period->name), 'genap') : true;
 
-        $cohorts = ClassGroup::query()
-            ->whereNotNull('cohort_year')
-            ->distinct()
-            ->orderByDesc('cohort_year')
-            ->pluck('cohort_year');
-
-        $semesterOptions = $cohorts->map(function (int $cohort) use ($periodYear, $isGanjil): array {
-            $diff = $periodYear - $cohort;
-            $sem = ($diff * 2) + ($isGanjil ? 1 : 2);
-            if ($sem <= 8) {
-                return [
-                    'value' => (string) $sem,
-                    'cohort' => $cohort,
-                    'label' => "Semester {$sem} ({$cohort})",
-                ];
-            }
-
-            return [
-                'value' => (string) $cohort,
-                'cohort' => $cohort,
-                'label' => "Mengulang ({$cohort})",
-            ];
-        })->values();
-
-        // Query penawaran mata kuliah
-        $query = CourseOffering::query()
-            ->when($period, fn ($q) => $q->whereBelongsTo($period))
-            ->with(['course', 'classGroup', 'teachingAssignments.lecturer']);
-
-        if ($keyword !== '') {
-            $query->where(function ($q) use ($keyword) {
-                $q->whereHas('course', function ($cq) use ($keyword) {
-                    $cq->where('name', 'like', "%{$keyword}%")
-                        ->orWhere('code', 'like', "%{$keyword}%");
-                })->orWhereHas('classGroup', function ($gq) use ($keyword) {
-                    $gq->where('name', 'like', "%{$keyword}%")
-                        ->orWhere('study_program', 'like', "%{$keyword}%");
-                })->orWhereHas('teachingAssignments.lecturer', function ($lq) use ($keyword) {
-                    $lq->where('name', 'like', "%{$keyword}%");
-                });
-            });
-        }
-
-        if ($prodi !== '') {
-            $query->whereHas('classGroup', function ($gq) use ($prodi) {
-                if (in_array($prodi, ['PTIK', 'Pendidikan Teknik Informatika dan Komputer'], true)) {
-                    $gq->whereIn('study_program', ['PTIK', 'Pendidikan Teknik Informatika dan Komputer']);
-                } elseif (in_array($prodi, ['TEKOM', 'Teknik Komputer'], true)) {
-                    $gq->whereIn('study_program', ['TEKOM', 'Teknik Komputer']);
-                } else {
-                    $gq->where('study_program', $prodi)->orWhere('study_program', 'like', "%{$prodi}%");
-                }
-            });
-        }
-
-        if ($semester !== '') {
-            $matchedOpt = $semesterOptions->firstWhere('value', $semester);
-            if ($matchedOpt) {
-                $query->whereHas('classGroup', fn ($gq) => $gq->where('cohort_year', $matchedOpt['cohort']));
-            } elseif (is_numeric($semester) && (int) $semester >= 2000) {
-                $query->whereHas('classGroup', fn ($gq) => $gq->where('cohort_year', (int) $semester));
-            } elseif (is_numeric($semester)) {
-                $cohort = $periodYear - intdiv((int) $semester - ($isGanjil ? 1 : 2), 2);
-                $query->whereHas('classGroup', fn ($gq) => $gq->where('cohort_year', $cohort));
-            }
-        }
-
-        if ($filter === 'tanpa_pengampu') {
-            $query->whereDoesntHave('teachingAssignments', fn ($aq) => $aq->where('role', TeachingRole::Lead));
-        } elseif ($filter === 'lengkap') {
-            $query->whereHas('teachingAssignments', fn ($aq) => $aq->where('role', TeachingRole::Lead));
-        } elseif ($filter === 'tunggal') {
-            $query->whereHas('teachingAssignments', fn ($aq) => $aq->where('role', TeachingRole::Lead))
-                ->whereDoesntHave('teachingAssignments', fn ($aq) => $aq->where('role', TeachingRole::Partner));
-        } elseif ($filter === 'tim_mitra') {
-            $query->whereHas('teachingAssignments', fn ($aq) => $aq->where('role', TeachingRole::Lead))
-                ->whereHas('teachingAssignments', fn ($aq) => $aq->where('role', TeachingRole::Partner));
-        }
+        $semesterOptions = $this->semesterOptions($periodYear, $isGanjil);
 
         $selectedId = $request->integer('penawaran');
 
-        $offerings = $query->join('class_groups', 'course_offerings.class_group_id', '=', 'class_groups.id')
-            ->join('courses', 'course_offerings.course_id', '=', 'courses.id')
-            ->select('course_offerings.*')
-            ->when($selectedId > 0, fn ($q) => $q->orderByRaw('CASE WHEN course_offerings.id = ? THEN 0 ELSE 1 END', [$selectedId]))
-            ->orderBy('class_groups.name')
-            ->orderBy('courses.name')
+        $offerings = $this->applyOfferingSort(
+            $this->filteredOfferingsQuery($period, $keyword, $prodi, $semester, $semesterOptions, $filter, $periodYear, $isGanjil)
+                ->join('class_groups', 'course_offerings.class_group_id', '=', 'class_groups.id')
+                ->join('courses', 'course_offerings.course_id', '=', 'courses.id')
+                ->select('course_offerings.*')
+                ->when($selectedId > 0, fn ($q) => $q->orderByRaw('CASE WHEN course_offerings.id = ? THEN 0 ELSE 1 END', [$selectedId])),
+            $sort,
+            $dir,
+        )
             ->paginate($perPage)
             ->withQueryString();
+
+        $classBlockAlternate = $this->classBlockAlternateMap($offerings->getCollection(), $sort);
 
         $selected = $selectedId > 0
             ? CourseOffering::with(['course', 'classGroup', 'teachingAssignments.lecturer'])->find($selectedId)
@@ -226,6 +164,7 @@ class TeachingAssignmentController extends Controller
         return view('admin.teaching.index', [
             'period' => $period,
             'offerings' => $offerings,
+            'classBlockAlternate' => $classBlockAlternate,
             'selected' => $selected,
             'loads' => $allLoads,
             'withoutLead' => $withoutLeadCount,
@@ -239,11 +178,76 @@ class TeachingAssignmentController extends Controller
             'semester' => $semester,
             'semesterOptions' => $semesterOptions,
             'perPage' => $perPage,
+            'sort' => $sort,
+            'dir' => $dir,
             'studyPrograms' => $studyPrograms,
             'lecturerOptionsEnriched' => $lecturerOptionsEnriched,
             'allLecturerOptions' => $lecturerOptionsById->values(),
             'lecturerOptionsByOffering' => $lecturerOptionsByOffering,
         ]);
+    }
+
+    public function export(Request $request): StreamedResponse
+    {
+        $period = Period::query()->active()->first();
+        $keyword = trim((string) $request->query('q'));
+        $filter = (string) $request->query('filter', 'semua');
+        $prodi = (string) $request->query('prodi');
+        $semester = trim((string) $request->query('semester'));
+        $sort = in_array((string) $request->query('sort'), self::SORTS, true) ? (string) $request->query('sort') : 'class';
+        $dir = $request->query('dir') === 'desc' ? 'desc' : 'asc';
+
+        $periodYear = (int) ($period?->start_date?->format('Y') ?? 2026);
+        $isGanjil = $period ? ! str_contains(strtolower($period->name), 'genap') : true;
+        $semesterOptions = $this->semesterOptions($periodYear, $isGanjil);
+
+        $offerings = $this->applyOfferingSort(
+            $this->filteredOfferingsQuery($period, $keyword, $prodi, $semester, $semesterOptions, $filter, $periodYear, $isGanjil)
+                ->join('class_groups', 'course_offerings.class_group_id', '=', 'class_groups.id')
+                ->join('courses', 'course_offerings.course_id', '=', 'courses.id')
+                ->select('course_offerings.*'),
+            $sort,
+            $dir,
+        )->get();
+
+        return response()->streamDownload(function () use ($offerings): void {
+            $handle = fopen('php://output', 'w');
+            fputcsv($handle, [
+                'Kelas',
+                'Program Studi',
+                'Angkatan',
+                'Kode MK',
+                'Mata Kuliah',
+                'SKS',
+                'Dosen Pengampu',
+                'Dosen Mitra',
+                'Skema',
+            ]);
+
+            foreach ($offerings as $offering) {
+                $lead = $offering->teachingAssignments->firstWhere('role', TeachingRole::Lead);
+                $partners = $offering->teachingAssignments->where('role', TeachingRole::Partner);
+                $schema = match (true) {
+                    ! $lead && $partners->isEmpty() => 'Kosong',
+                    $partners->isNotEmpty() => 'Team ('.($partners->count() + 1).')',
+                    default => 'Tunggal',
+                };
+
+                fputcsv($handle, [
+                    $offering->classGroup->name,
+                    $offering->classGroup->study_program ?? '',
+                    $offering->classGroup->cohort_year ?? '',
+                    $offering->course->code ?? '',
+                    $offering->course->name,
+                    $offering->course->sks,
+                    $lead?->lecturer?->name ?? '',
+                    $partners->map(fn ($p) => $p->lecturer->name)->implode('; '),
+                    $schema,
+                ]);
+            }
+
+            fclose($handle);
+        }, 'pembagian-mengajar-'.now()->toDateString().'.csv', ['Content-Type' => 'text/csv']);
     }
 
     public function previewAllocation(TeachingAllocationService $allocator): View
@@ -475,5 +479,158 @@ class TeachingAssignmentController extends Controller
         }
 
         return back()->with('toast', ['type' => 'success', 'title' => 'Pengajar dihapus dari tim']);
+    }
+
+    /**
+     * @return Collection<int, array{value: string, cohort: int, label: string}>
+     */
+    private function semesterOptions(int $periodYear, bool $isGanjil): Collection
+    {
+        $cohorts = ClassGroup::query()
+            ->whereNotNull('cohort_year')
+            ->distinct()
+            ->orderByDesc('cohort_year')
+            ->pluck('cohort_year');
+
+        return $cohorts->map(function (int $cohort) use ($periodYear, $isGanjil): array {
+            $diff = $periodYear - $cohort;
+            $sem = ($diff * 2) + ($isGanjil ? 1 : 2);
+            if ($sem <= 8) {
+                return [
+                    'value' => (string) $sem,
+                    'cohort' => $cohort,
+                    'label' => "Semester {$sem} ({$cohort})",
+                ];
+            }
+
+            return [
+                'value' => (string) $cohort,
+                'cohort' => $cohort,
+                'label' => "Mengulang ({$cohort})",
+            ];
+        })->values();
+    }
+
+    /**
+     * @param  Collection<int, array{value: string, cohort: int, label: string}>  $semesterOptions
+     * @return Builder<CourseOffering>
+     */
+    private function filteredOfferingsQuery(
+        ?Period $period,
+        string $keyword,
+        string $prodi,
+        string $semester,
+        Collection $semesterOptions,
+        string $filter,
+        int $periodYear,
+        bool $isGanjil,
+    ): Builder {
+        $query = CourseOffering::query()
+            ->when($period, fn ($q) => $q->whereBelongsTo($period))
+            ->with(['course', 'classGroup', 'teachingAssignments.lecturer']);
+
+        if ($keyword !== '') {
+            $query->where(function ($q) use ($keyword) {
+                $q->whereHas('course', function ($cq) use ($keyword) {
+                    $cq->where('name', 'like', "%{$keyword}%")
+                        ->orWhere('code', 'like', "%{$keyword}%");
+                })->orWhereHas('classGroup', function ($gq) use ($keyword) {
+                    $gq->where('name', 'like', "%{$keyword}%")
+                        ->orWhere('study_program', 'like', "%{$keyword}%");
+                })->orWhereHas('teachingAssignments.lecturer', function ($lq) use ($keyword) {
+                    $lq->where('name', 'like', "%{$keyword}%");
+                });
+            });
+        }
+
+        if ($prodi !== '') {
+            $query->whereHas('classGroup', function ($gq) use ($prodi) {
+                if (in_array($prodi, ['PTIK', 'Pendidikan Teknik Informatika dan Komputer'], true)) {
+                    $gq->whereIn('study_program', ['PTIK', 'Pendidikan Teknik Informatika dan Komputer']);
+                } elseif (in_array($prodi, ['TEKOM', 'Teknik Komputer'], true)) {
+                    $gq->whereIn('study_program', ['TEKOM', 'Teknik Komputer']);
+                } else {
+                    $gq->where('study_program', $prodi)->orWhere('study_program', 'like', "%{$prodi}%");
+                }
+            });
+        }
+
+        if ($semester !== '') {
+            $matchedOpt = $semesterOptions->firstWhere('value', $semester);
+            if ($matchedOpt) {
+                $query->whereHas('classGroup', fn ($gq) => $gq->where('cohort_year', $matchedOpt['cohort']));
+            } elseif (is_numeric($semester) && (int) $semester >= 2000) {
+                $query->whereHas('classGroup', fn ($gq) => $gq->where('cohort_year', (int) $semester));
+            } elseif (is_numeric($semester)) {
+                $cohort = $periodYear - intdiv((int) $semester - ($isGanjil ? 1 : 2), 2);
+                $query->whereHas('classGroup', fn ($gq) => $gq->where('cohort_year', $cohort));
+            }
+        }
+
+        if ($filter === 'tanpa_pengampu') {
+            $query->whereDoesntHave('teachingAssignments', fn ($aq) => $aq->where('role', TeachingRole::Lead));
+        } elseif ($filter === 'lengkap') {
+            $query->whereHas('teachingAssignments', fn ($aq) => $aq->where('role', TeachingRole::Lead));
+        } elseif ($filter === 'tunggal') {
+            $query->whereHas('teachingAssignments', fn ($aq) => $aq->where('role', TeachingRole::Lead))
+                ->whereDoesntHave('teachingAssignments', fn ($aq) => $aq->where('role', TeachingRole::Partner));
+        } elseif ($filter === 'tim_mitra') {
+            $query->whereHas('teachingAssignments', fn ($aq) => $aq->where('role', TeachingRole::Lead))
+                ->whereHas('teachingAssignments', fn ($aq) => $aq->where('role', TeachingRole::Partner));
+        }
+
+        return $query;
+    }
+
+    /**
+     * Terapkan urutan daftar penawaran; default per blok angkatan terbaru lalu abjad kelas.
+     *
+     * @param  Builder<CourseOffering>  $query
+     * @return Builder<CourseOffering>
+     */
+    private function applyOfferingSort(Builder $query, string $sort, string $dir): Builder
+    {
+        if ($sort === 'course') {
+            return $query->orderBy('courses.name', $dir)->orderBy('class_groups.name');
+        }
+
+        if ($sort === 'sks') {
+            return $query->orderBy('courses.sks', $dir)->orderBy('class_groups.name')->orderBy('courses.name');
+        }
+
+        return $query
+            ->orderByRaw('class_groups.cohort_year is null')
+            ->orderBy('class_groups.cohort_year', $dir === 'desc' ? 'asc' : 'desc')
+            ->orderBy('class_groups.name', $dir)
+            ->orderBy('courses.name');
+    }
+
+    /**
+     * Tandai warna selang-seling per blok kelas pada halaman saat ini.
+     *
+     * @param  Collection<int, CourseOffering>  $offerings
+     * @return array<int, bool>
+     */
+    private function classBlockAlternateMap(Collection $offerings, string $sort): array
+    {
+        if ($sort !== 'class' || $offerings->isEmpty()) {
+            return [];
+        }
+
+        $alternateByOffering = [];
+        $blockIndex = -1;
+        $previousClassId = null;
+
+        foreach ($offerings as $offering) {
+            $classId = $offering->class_group_id;
+            if ($classId !== $previousClassId) {
+                $blockIndex++;
+                $previousClassId = $classId;
+            }
+
+            $alternateByOffering[$offering->id] = $blockIndex % 2 === 1;
+        }
+
+        return $alternateByOffering;
     }
 }

@@ -1,10 +1,31 @@
-@props(['name', 'value' => null, 'rows' => 3])
+@props([
+    'name',
+    'value' => null,
+    'rows' => 3,
+    'errorKey' => null,
+    'describedBy' => null,
+])
 
-<textarea name="{{ $name }}" id="{{ $attributes->get('id', $name) }}" rows="{{ $rows }}"
-          @error($name) aria-invalid="true" aria-describedby="{{ $name }}-error" @enderror
-          {{ $attributes->except('id')->class([
-           'w-full' => ! str_contains((string) $attributes->get('class'), 'w-'),
-              'rounded-control border bg-surface px-4 py-3 text-sm text-ink placeholder:text-muted/70 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15',
-              'border-danger' => $errors->has($name),
-              'border-muted/60' => ! $errors->has($name),
-          ]) }}>{{ old($name, $value) }}</textarea>
+@php
+    $resolvedId = $attributes->get('id', $name);
+    $resolvedErrorKey = $errorKey ?? preg_replace('/\.+/', '.', trim((string) preg_replace('/\[([^\]]*)\]/', '.$1', $name), '.'));
+    $hasError = $errors->has($resolvedErrorKey);
+    $describedByIds = array_filter([
+        $describedBy,
+        $hasError ? $resolvedId.'-error' : null,
+    ]);
+    $classString = (string) $attributes->get('class');
+    $needsFullWidth = preg_match('/(?:^|\s)w-/', $classString) !== 1;
+@endphp
+
+<textarea name="{{ $name }}"
+          id="{{ $resolvedId }}"
+          rows="{{ $rows }}"
+          @if ($hasError) aria-invalid="true" @endif
+          @if ($describedByIds !== []) aria-describedby="{{ implode(' ', $describedByIds) }}" @endif
+          {{ $attributes->except(['id', 'aria-describedby'])->class([
+              'w-full' => $needsFullWidth,
+              'rounded-control border bg-surface px-4 py-3 text-sm text-ink placeholder:text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15',
+              'border-danger' => $hasError,
+              'border-muted/75' => ! $hasError,
+          ]) }}>{{ old($resolvedErrorKey, $value) }}</textarea>

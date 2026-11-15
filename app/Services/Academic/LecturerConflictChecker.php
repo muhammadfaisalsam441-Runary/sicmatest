@@ -2,6 +2,7 @@
 
 namespace App\Services\Academic;
 
+use App\Enums\RescheduleMode;
 use App\Enums\ReservationStatus;
 use App\Enums\TeachingRole;
 use App\Exceptions\DomainException;
@@ -49,10 +50,17 @@ class LecturerConflictChecker
 
         $moved = SessionReschedule::query()->active()
             ->when($ignoreRescheduleId !== null, fn ($query) => $query->whereKeyNot($ignoreRescheduleId))
-            ->whereHas('reservation', fn ($query) => $query
-                ->whereIn('status', [ReservationStatus::Booked, ReservationStatus::InUse])
-                ->where('start_at', '<', $end)
-                ->where('end_at', '>', $start))
+            ->where(fn ($query) => $query
+                ->where(fn ($q) => $q
+                    ->where('mode', RescheduleMode::Room)
+                    ->whereHas('reservation', fn ($res) => $res
+                        ->whereIn('status', [ReservationStatus::Booked, ReservationStatus::InUse])
+                        ->where('start_at', '<', $end)
+                        ->where('end_at', '>', $start)))
+                ->orWhere(fn ($q) => $q
+                    ->where('mode', RescheduleMode::Online)
+                    ->where('target_start_at', '<', $end)
+                    ->where('target_end_at', '>', $start)))
             ->whereHas('lecturers', fn ($query) => $query->whereKey($ids))
             ->with(['lecturers', 'reservation'])
             ->first();
@@ -61,7 +69,7 @@ class LecturerConflictChecker
             $lecturer = $moved->lecturers->first(fn (Lecturer $lecturer): bool => in_array($lecturer->id, $ids, true));
             $classes = ClassGroup::query()->whereKey(array_filter(explode(',', $moved->participant_key)))->orderBy('name')->pluck('name');
 
-            $this->conflict($lecturer, $lecturer->pivot->role, $moved->session_title, $classes, $moved->reservation->start_at, $moved->reservation->end_at);
+            $this->conflict($lecturer, $lecturer->pivot->role, $moved->session_title, $classes, $moved->effectiveStart(), $moved->effectiveEnd());
         }
 
         if ($start->dayOfWeekIso === 4) {

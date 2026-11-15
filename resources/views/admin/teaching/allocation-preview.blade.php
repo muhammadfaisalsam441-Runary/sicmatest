@@ -1,7 +1,7 @@
 @extends('layouts.admin')
 
 @section('title', 'Pembagian Beban Otomatis')
-@section('breadcrumb', 'Pembagian Mengajar / Pembagian Beban Otomatis')
+@section('breadcrumb', 'Pembagian Mengajar|Pembagian Beban Otomatis')
 
 @section('content')
     <div class="flex flex-col gap-5">
@@ -12,7 +12,7 @@
             </x-slot:actions>
         </x-page-header>
 
-        <x-card>
+        <x-card padding="px-2.5 py-2" class="w-fit max-w-full">
             <x-schedule-steps :current="2" />
         </x-card>
 
@@ -59,10 +59,10 @@
         @if ($plan['moves'] !== [])
             <x-card>
                 <h2 class="mb-3 font-semibold text-ink">Usulan perpindahan penugasan</h2>
-                <div class="overflow-x-auto">
+                <x-table-scroll>
                     <table class="w-full text-left text-sm">
-                        <thead class="border-b border-border text-muted">
-                            <tr><th class="px-3 py-2">Mata kuliah dan kelas</th><th class="px-3 py-2">Peran</th><th class="px-3 py-2">SKS</th><th class="px-3 py-2">Dosen saat ini</th><th class="px-3 py-2">Dosen penerima</th></tr>
+                        <thead class="sticky top-0 z-10 border-b border-border bg-page text-xs font-semibold text-muted">
+                            <tr><th scope="col" class="px-3 py-2">Mata kuliah dan kelas</th><th scope="col" class="px-3 py-2">Peran</th><th scope="col" class="px-3 py-2">SKS</th><th scope="col" class="px-3 py-2">Dosen saat ini</th><th scope="col" class="px-3 py-2">Dosen penerima</th></tr>
                         </thead>
                         <tbody class="divide-y divide-border">
                             @foreach ($plan['moves'] as $move)
@@ -73,28 +73,46 @@
                             @endforeach
                         </tbody>
                     </table>
-                </div>
+                </x-table-scroll>
             </x-card>
         @endif
 
         <x-card>
             <h2 class="mb-3 font-semibold text-ink">Perbandingan SKS Semester</h2>
-            <div class="overflow-x-auto">
+            <x-table-scroll>
                 <table class="w-full text-left text-sm">
-                    <thead class="border-b border-border text-muted">
-                        <tr><th class="px-3 py-2">Dosen</th><th class="px-3 py-2">Saat ini</th><th class="px-3 py-2">Setelah diterapkan</th><th class="px-3 py-2">Target</th><th class="px-3 py-2">Maksimum</th></tr>
+                    <thead class="sticky top-0 z-10 border-b border-border bg-page text-xs font-semibold text-muted">
+                        <tr><th scope="col" class="px-3 py-2">Dosen</th><th scope="col" class="px-3 py-2">Saat ini</th><th scope="col" class="px-3 py-2">Setelah diterapkan</th><th scope="col" class="px-3 py-2">Target</th><th scope="col" class="px-3 py-2">Maksimum</th><th scope="col" class="px-3 py-2">Status</th></tr>
                     </thead>
                     <tbody class="divide-y divide-border">
                         @foreach (collect($plan['loads'])->sortBy('name') as $load)
-                            <tr>
-                                <td class="px-3 py-3">{{ $load['name'] }}</td><td class="px-3 py-3">{{ $load['before'] }}</td>
-                                <td class="px-3 py-3 font-semibold">{{ $load['after'] }}</td><td class="px-3 py-3">{{ $load['target'] ?? 'Belum diisi' }}</td>
+                            @php
+                                $overMaxAfter = $load['max'] !== null && $load['after'] > $load['max'];
+                                $changed = (float) $load['before'] !== (float) $load['after'];
+                            @endphp
+                            <tr @class([
+                                'bg-danger-soft/40' => $overMaxAfter,
+                                'bg-primary-soft/25' => ! $overMaxAfter && $changed,
+                            ])>
+                                <td class="px-3 py-3 font-medium text-ink">{{ $load['name'] }}</td>
+                                <td class="px-3 py-3">{{ $load['before'] }}</td>
+                                <td @class(['px-3 py-3 font-semibold', 'text-danger' => $overMaxAfter, 'text-primary' => ! $overMaxAfter && $changed])>{{ $load['after'] }}</td>
+                                <td class="px-3 py-3">{{ $load['target'] ?? 'Belum diisi' }}</td>
                                 <td class="px-3 py-3">{{ $load['max'] ?? 'Belum diisi' }}</td>
+                                <td class="px-3 py-3">
+                                    @if ($overMaxAfter)
+                                        <x-status-badge variant="danger">Melebihi maks.</x-status-badge>
+                                    @elseif ($changed)
+                                        <x-status-badge variant="primary">Berubah</x-status-badge>
+                                    @else
+                                        <x-status-badge variant="neutral">Tetap</x-status-badge>
+                                    @endif
+                                </td>
                             </tr>
                         @endforeach
                     </tbody>
                 </table>
-            </div>
+            </x-table-scroll>
         </x-card>
     </div>
 @endsection

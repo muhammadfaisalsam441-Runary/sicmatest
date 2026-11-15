@@ -17,7 +17,7 @@
         <x-page-header title="Susun jadwal otomatis"
                         :subtitle="($period?->name ?? 'Semester aktif').' • Pilih bagian yang boleh berubah.'.($official ? ' Jadwal resmi v'.$official->version_no.' tetap dilindungi.' : '')" />
 
-        <x-card>
+        <x-card padding="px-2.5 py-2" class="w-fit max-w-full">
             <x-schedule-steps :current="3" />
         </x-card>
 
@@ -33,7 +33,7 @@
                     <p class="text-sm text-muted">Kamu bisa langsung mengedit sesi atau memeriksa bentrok pada draf ini tanpa perlu menyusun ulang dari awal.</p>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
-                    <x-button variant="secondary" icon="calendar-cog" :href="route('admin.drafts.show', $base)">Edit Sesi Draf</x-button>
+                    <x-button variant="secondary" icon="pencil" :href="route('admin.drafts.show', $base)">Edit Sesi Draf</x-button>
                     <x-button icon="list-checks" :href="route('admin.drafts.inspect', $base)">Buka Pemeriksaan</x-button>
                 </div>
             </x-card>
@@ -42,12 +42,25 @@
         @if (! $period)
             <x-empty-state title="Belum ada semester aktif" message="Atur semester di Data Akademik lebih dulu." icon="calendar" />
         @else
-            <form method="POST" action="{{ route('admin.scheduler.store') }}" class="grid gap-6 xl:grid-cols-[1fr_380px]" x-data="{ scope: @js($scope) }">
+            @if ($readiness)
+                <x-card class="flex flex-col gap-3">
+                    <h2 class="text-lg font-semibold">{{ $readiness['errors'] === [] ? 'Siap disusun sebagai draf' : 'Data belum siap disusun' }}</h2>
+                    <p class="text-sm text-muted">{{ $readiness['in_scope'] }} sesi dalam cakupan • {{ $readiness['fixed'] }} sesi tetap diperhitungkan</p>
+                    @foreach ($readiness['errors'] as $error)
+                        <x-alert variant="danger">{{ $error }}</x-alert>
+                    @endforeach
+                    @foreach ($readiness['warnings'] as $warning)
+                        <x-alert variant="warning">{{ $warning }}</x-alert>
+                    @endforeach
+                </x-card>
+            @endif
+
+            <form method="POST" action="{{ route('admin.scheduler.store') }}" class="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_380px]" x-data="{ scope: @js($scope) }">
                 @csrf
                 <div class="flex flex-col gap-6">
                     <x-card class="flex flex-col gap-4">
-                        <h2 class="text-lg font-semibold">1. Tentukan cakupan</h2>
-                        <div class="grid grid-cols-4 gap-3">
+                        <h2 class="text-lg font-semibold">Tentukan cakupan penyusunan</h2>
+                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                             @foreach (SchedulerService::SCOPES as $value => $label)
                                 <label class="flex cursor-pointer items-center gap-2 rounded-control border px-4 py-3 text-sm font-medium" :class="scope === @js($value) ? 'border-primary bg-primary-soft text-primary' : 'border-border'">
                                     <input type="radio" name="scope" value="{{ $value }}" x-model="scope" class="accent-primary"> {{ $label }}
@@ -60,6 +73,12 @@
                                 fn ($c) => $c->cohort_year ? 'Angkatan '.$c->cohort_year : 'Lainnya / Khusus',
                             ]);
                             $studyPrograms = $classGroups->pluck('study_program')->filter()->unique()->values();
+                            $searchableClasses = $classGroups->map(fn ($c) => [
+                                'name' => strtolower($c->name),
+                                'prodi' => $c->study_program ?: 'Program Studi Lainnya',
+                                'prodiLower' => strtolower($c->study_program ?? ''),
+                                'cohort' => (string) ($c->cohort_year ?? ''),
+                            ])->values();
                         @endphp
 
                         <div x-show="scope === 'kelas'"
@@ -68,6 +87,7 @@
                                  prodiFilter: 'semua',
                                  selected: @js(array_map('strval', old('class_ids', []))),
                                  allIds: @js($classGroups->pluck('id')->map(fn ($id) => (string) $id)->values()),
+                                 searchableClasses: @js($searchableClasses),
 
                                  selectAll() {
                                      this.selected = [...this.allIds];
@@ -104,6 +124,9 @@
                                  isProdiVisible(prodiName) {
                                      if (this.prodiFilter === 'semua') return true;
                                      return this.prodiFilter === prodiName;
+                                 },
+                                 hasVisibleClasses() {
+                                     return this.searchableClasses.some(c => this.isProdiVisible(c.prodi) && this.matchesSearch(c.name, c.prodiLower, c.cohort));
                                  }
                              }"
                              class="flex flex-col gap-3.5 rounded-card border border-border bg-page/50 p-4">
@@ -114,22 +137,22 @@
                                     <span class="text-sm font-bold text-ink">Pilih Kelas yang Dikelola</span>
                                     <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold"
                                           :class="selected.length > 0 ? 'bg-primary-soft text-primary' : 'bg-surface text-muted border border-border'">
-                                        <span class="size-1.5 rounded-full" :class="selected.length > 0 ? 'bg-primary' : 'bg-muted'"></span>
+                                        <span class="size-1.5 rounded-full" :class="selected.length > 0 ? 'bg-primary' : 'bg-muted'" aria-hidden="true"></span>
                                         <span x-text="selected.length"></span> dari {{ $classGroups->count() }} kelas terpilih
                                     </span>
                                 </div>
-                                <div class="flex items-center gap-2">
+                                <div class="flex flex-wrap items-center gap-2">
                                     <button type="button"
                                             @click="selectAll()"
                                             class="inline-flex items-center gap-1.5 rounded-control border border-border bg-surface px-2.5 py-1 text-xs font-semibold text-ink hover:bg-page hover:text-primary transition shadow-2xs cursor-pointer">
-                                        <i data-lucide="check" class="size-3 text-primary"></i>
+                                        <i data-lucide="check" class="size-3 text-primary" aria-hidden="true"></i>
                                         <span>Pilih Semua</span>
                                     </button>
                                     <button type="button"
                                             @click="deselectAll()"
                                             x-show="selected.length > 0"
                                             class="inline-flex items-center gap-1.5 rounded-control border border-border bg-surface px-2.5 py-1 text-xs font-semibold text-muted hover:bg-danger-soft hover:text-danger hover:border-danger/30 transition shadow-2xs cursor-pointer">
-                                        <i data-lucide="rotate-ccw" class="size-3"></i>
+                                        <i data-lucide="rotate-ccw" class="size-3" aria-hidden="true"></i>
                                         <span>Batalkan Pilihan</span>
                                     </button>
                                 </div>
@@ -138,16 +161,18 @@
                             {{-- Toolbar Pencarian & Filter Tab Prodi --}}
                             <div class="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center justify-between">
                                 <div class="relative flex-1">
-                                    <i data-lucide="search" class="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted"></i>
+                                    <i data-lucide="search" class="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted" aria-hidden="true"></i>
                                     <input type="text"
                                            x-model="search"
+                                           aria-label="Cari kelas atau tahun angkatan"
                                            placeholder="Cari kelas atau tahun (misal: 2024, PTIK A, TEKOM)..."
                                            class="w-full rounded-control border border-border bg-surface pl-8 pr-7 py-1.5 text-xs text-ink placeholder:text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition">
                                     <button type="button"
                                             x-show="search.length > 0"
                                             @click="search = ''"
-                                            class="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-ink text-xs font-bold px-1">
-                                        ✕
+                                            aria-label="Hapus pencarian"
+                                            class="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted hover:text-ink transition cursor-pointer">
+                                        <i data-lucide="x" class="size-3.5" aria-hidden="true"></i>
                                     </button>
                                 </div>
 
@@ -172,6 +197,9 @@
 
                             {{-- Daftar Kelompok Angkatan Kelas --}}
                             <div class="flex flex-col gap-3.5 max-h-[460px] overflow-y-auto pr-1">
+                                <p x-show="!hasVisibleClasses()" x-cloak class="py-6 text-center text-sm text-muted">
+                                    Tidak ada kelas yang cocok dengan pencarian atau filter program studi.
+                                </p>
                                 @foreach ($groupedClasses as $prodiName => $cohortGroups)
                                     <div x-show="isProdiVisible(@js($prodiName))" class="flex flex-col gap-2.5">
                                         {{-- Header Program Studi --}}
@@ -191,7 +219,7 @@
                                                 {{-- Header Angkatan & Tombol Pilih Angkatan --}}
                                                 <div class="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-2">
                                                     <div class="flex items-center gap-2">
-                                                        <span class="size-1.5 rounded-full bg-primary/70"></span>
+                                                        <span class="size-1.5 rounded-full bg-primary/70" aria-hidden="true"></span>
                                                         <span class="text-xs font-bold text-ink">{{ $cohortLabel }}</span>
                                                         <span class="rounded-full bg-page px-2 py-0.5 text-[11px] font-medium text-muted border border-border">
                                                             <span x-text="countGroupSelected(@js($cohortIds))"></span>/{{ $classes->count() }} dipilih
@@ -200,13 +228,13 @@
                                                     <button type="button"
                                                             @click="toggleGroup(@js($cohortIds))"
                                                             class="inline-flex items-center gap-1 rounded-control border border-border bg-page px-2 py-0.5 text-[11px] font-semibold text-primary hover:bg-primary-soft transition shadow-2xs cursor-pointer">
-                                                        <i data-lucide="check" class="size-3"></i>
+                                                        <i data-lucide="check" class="size-3" aria-hidden="true"></i>
                                                         <span x-text="isGroupSelected(@js($cohortIds)) ? 'Batal Pilih Angkatan' : 'Pilih Semua Angkatan'"></span>
                                                     </button>
                                                 </div>
 
                                                 {{-- Grid Checkbox Kelas --}}
-                                                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1.5 pt-1">
+                                                <div class="grid grid-cols-1 gap-1.5 pt-1 sm:grid-cols-2 md:grid-cols-4">
                                                     @foreach ($classes as $class)
                                                         <div x-show="matchesSearch(@js(strtolower($class->name)), @js(strtolower($class->study_program ?? '')), @js((string) ($class->cohort_year ?? '')))">
                                                             <label class="flex items-center gap-2 rounded-control border px-2.5 py-1.5 text-xs font-medium cursor-pointer transition select-none"
@@ -237,22 +265,9 @@
                     <x-info-box title="Pencarian otomatis maksimal 60 detik">
                         <p>Proses selesai lebih cepat jika susunan lengkap ditemukan. Jika hasil belum lengkap, kamu dapat mencoba pencarian 180 detik dari halaman hasil. Semua aturan wajib tetap dipenuhi.</p>
                     </x-info-box>
-
-                    @if ($readiness)
-                        <x-card class="flex flex-col gap-3">
-                            <h2 class="text-lg font-semibold">{{ $readiness['errors'] === [] ? 'Siap disusun sebagai draf' : 'Data belum siap disusun' }}</h2>
-                            <p class="text-sm text-muted">{{ $readiness['in_scope'] }} sesi dalam cakupan • {{ $readiness['fixed'] }} sesi tetap diperhitungkan</p>
-                            @foreach ($readiness['errors'] as $error)
-                                <x-alert variant="danger">{{ $error }}</x-alert>
-                            @endforeach
-                            @foreach ($readiness['warnings'] as $warning)
-                                <div class="rounded-control bg-amber-50 px-4 py-3 text-sm text-amber-800">{{ $warning }}</div>
-                            @endforeach
-                        </x-card>
-                    @endif
                 </div>
 
-                <div class="flex flex-col gap-6">
+                <div class="flex flex-col gap-4">
                     <x-info-box title="Jadwal di luar pilihan tetap diperhitungkan">
                         <p>Sesi di luar cakupan, pimpinan yang tidak boleh hari Kamis, jeda Jumat pukul 12.00–13.10 WITA (tidak ada perkuliahan), ketersediaan dosen, dan kapasitas ruang tetap diperiksa. Hasil selalu masuk sebagai draf baru; jadwal resmi tidak berubah sampai ditetapkan.</p>
                     </x-info-box>

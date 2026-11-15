@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\AcademicController;
 use App\Http\Controllers\Admin\ClosureController;
+use App\Http\Controllers\Admin\CohortLifecycleController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\DraftController;
 use App\Http\Controllers\Admin\ImportController;
@@ -30,6 +31,7 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', DashboardController::class)->name('dashboard');
 
 Route::get('/ruang', [RoomController::class, 'index'])->name('rooms.index');
+Route::get('/ruang/unduh', [RoomController::class, 'export'])->name('rooms.export');
 Route::post('/ruang', [RoomController::class, 'store'])->name('rooms.store');
 Route::post('/ruang/batch', [RoomController::class, 'batchUpdate'])->name('rooms.batch');
 Route::put('/ruang/massal', [RoomController::class, 'bulkUpdate'])->name('rooms.bulk-update');
@@ -40,12 +42,14 @@ Route::post('/penutupan-ruang', [ClosureController::class, 'store'])->name('clos
 Route::delete('/penutupan-ruang/{closure}', [ClosureController::class, 'destroy'])->name('closures.destroy');
 
 Route::get('/reservasi', [ReservationController::class, 'index'])->name('reservations.index');
+Route::get('/reservasi/unduh', [ReservationController::class, 'export'])->name('reservations.export');
 Route::post('/reservasi/{reservation}/batal', [ReservationController::class, 'cancel'])->name('reservations.cancel');
 
 Route::get('/log-pemakaian', [UsageLogController::class, 'index'])->name('usage-logs.index');
 Route::get('/log-pemakaian/unduh', [UsageLogController::class, 'export'])->name('usage-logs.export');
 
 Route::get('/akun-keti', [KetiAccountController::class, 'index'])->name('keti-accounts.index');
+Route::post('/akun-keti/batch-setujui', [KetiAccountController::class, 'batchApprove'])->name('keti-accounts.batch-approve');
 Route::post('/akun-keti/{application}/setujui', [KetiAccountController::class, 'approve'])->name('keti-accounts.approve');
 Route::post('/akun-keti/{application}/perbaiki', [KetiAccountController::class, 'requestRevision'])->name('keti-accounts.revise');
 Route::post('/akun-keti/{application}/tolak', [KetiAccountController::class, 'reject'])->name('keti-accounts.reject');
@@ -96,13 +100,23 @@ Route::post('/akademik/penawaran', [AcademicController::class, 'storeOffering'])
 Route::post('/akademik/penawaran/batch-delete', [AcademicController::class, 'batchDeleteOfferings'])->name('academic.offerings.batch-delete');
 Route::delete('/akademik/penawaran/{offering}', [AcademicController::class, 'destroyOffering'])->name('academic.offerings.destroy');
 
+Route::prefix('akademik/angkatan')->name('academic.cohorts.')->group(function () {
+    Route::get('/preview-arsip', [CohortLifecycleController::class, 'previewArchive'])->name('preview-archive');
+    Route::post('/luluskan', [CohortLifecycleController::class, 'graduateCohort'])->name('graduate');
+    Route::get('/preview-generate', [CohortLifecycleController::class, 'previewGenerate'])->name('preview-generate');
+    Route::post('/generate', [CohortLifecycleController::class, 'generateCohort'])->name('generate');
+});
+
 Route::get('/dosen', [LecturerController::class, 'index'])->name('lecturers.index');
+Route::get('/dosen/unduh', [LecturerController::class, 'export'])->name('lecturers.export');
 Route::post('/dosen', [LecturerController::class, 'store'])->name('lecturers.store');
 Route::post('/dosen/batch', [LecturerController::class, 'batchUpdate'])->name('lecturers.batch');
+Route::put('/dosen/massal', [LecturerController::class, 'bulkUpdate'])->name('lecturers.bulk-update');
 Route::put('/dosen/{lecturer}', [LecturerController::class, 'update'])->name('lecturers.update');
 Route::post('/dosen/impor', [LecturerController::class, 'import'])->name('lecturers.import');
 
 Route::get('/pembagian-mengajar', [TeachingAssignmentController::class, 'index'])->name('teaching.index');
+Route::get('/pembagian-mengajar/unduh', [TeachingAssignmentController::class, 'export'])->name('teaching.export');
 Route::get('/pembagian-mengajar/beban-otomatis', [TeachingAssignmentController::class, 'previewAllocation'])->name('teaching.allocation.preview');
 Route::post('/pembagian-mengajar/beban-otomatis', [TeachingAssignmentController::class, 'applyAllocation'])->name('teaching.allocation.apply');
 Route::get('/pembagian-mengajar/sks-otomatis', [TeachingAssignmentController::class, 'previewPhases'])->name('teaching.phases.preview');

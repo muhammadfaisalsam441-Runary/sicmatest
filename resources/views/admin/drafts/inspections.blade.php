@@ -14,7 +14,7 @@
                 @endif
             </x-slot:actions>
         </x-page-header>
-        <x-card><x-schedule-steps :current="4" /></x-card>
+        <x-card padding="px-2.5 py-2" class="w-fit max-w-full"><x-schedule-steps :current="4" /></x-card>
         @include('admin.partials.scheduling-tabs')
         @forelse ($versions as $version)
             <x-card class="flex flex-wrap items-center justify-between gap-4">
@@ -29,7 +29,7 @@
                     <p class="text-xs text-muted">Kesiapan dinilai pada pemeriksaan revisi terbaru.</p>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
-                    <x-button variant="secondary" icon="calendar-cog" :href="route('admin.drafts.show', $version)">Edit Sesi Draf</x-button>
+                    <x-button variant="secondary" icon="pencil" :href="route('admin.drafts.show', $version)">Edit Sesi Draf</x-button>
                     <x-button icon="list-checks" :href="route('admin.drafts.inspect', $version)">Buka Pemeriksaan</x-button>
                 </div>
             </x-card>

@@ -1,23 +1,76 @@
-@props(['name', 'title' => null, 'width' => 'max-w-lg', 'show' => false])
+@props([
+    'name',
+    'title' => null,
+    'width' => 'max-w-lg',
+    'show' => false,
+    'ariaLabel' => null,
+    'labelledBy' => null,
+    'describedBy' => null,
+])
 
 {{-- Buka dengan $dispatch('open-modal', 'nama'), tutup dengan $dispatch('close-modal', 'nama'). --}}
-<div x-data="{ open: @js($show) }"
-     x-on:open-modal.window="if ($event.detail === @js($name)) open = true"
-     x-on:close-modal.window="if ($event.detail === @js($name)) open = false"
-     x-on:keydown.escape.window="open = false"
-     x-show="open" x-cloak
-     class="fixed inset-0 z-50 flex items-center justify-center p-8"
-     data-modal-name="{{ $name }}" role="dialog" aria-modal="true" @if ($title) aria-label="{{ $title }}" @endif>
-    <div class="absolute inset-0 bg-ink/80" x-on:click="open = false"></div>
-    <div x-show="open" x-transition class="relative w-full {{ $width }} rounded-2xl bg-surface p-8 shadow-xl">
+<dialog x-data="{
+            open: @js($show),
+            init() {
+                if (this.open) {
+                    this.show();
+                }
+            },
+            show() {
+                this.open = true;
+                this.$nextTick(() => {
+                    const dialog = this.$refs.dialog;
+                    if (this.open && dialog && ! dialog.open) {
+                        dialog.showModal();
+                    }
+                    window.renderIcons?.(this.$el);
+                });
+            },
+            close() {
+                this.open = false;
+                const dialog = this.$refs.dialog;
+                if (dialog?.open) {
+                    if (window.sicmaCloseDialog) {
+                        void window.sicmaCloseDialog(dialog);
+                    } else {
+                        dialog.close();
+                    }
+                }
+            },
+        }"
+        x-ref="dialog"
+        x-on:open-modal.window="if ($event.detail === '{{ $name }}') show()"
+        x-on:close-modal.window="if ($event.detail === '{{ $name }}') close()"
+        x-on:cancel.prevent="close()"
+        x-on:close="open = false"
+        x-on:click="if ($event.target === $refs.dialog) close()"
+        closedby="any"
+        data-modal-name="{{ $name }}"
+        :data-modal-open="open ? 'true' : 'false'"
+        role="dialog"
+        @if ($labelledBy)
+            aria-labelledby="{{ $labelledBy }}"
+        @elseif ($title)
+            aria-labelledby="{{ $name }}-modal-title"
+        @else
+            aria-label="{{ $ariaLabel ?? 'Dialog' }}"
+        @endif
+        @if ($describedBy)
+            aria-describedby="{{ $describedBy }}"
+        @endif
+        {{ $attributes->merge(['class' => "m-auto w-[calc(100%-2rem)] {$width} overflow-hidden rounded-2xl border border-border bg-surface p-0 text-ink shadow-xl outline-none backdrop:bg-ink/80"]) }}>
+    <div class="max-h-[90vh] overflow-y-auto p-6 sm:p-8">
         @if ($title)
             <div class="mb-5 flex items-start justify-between gap-4">
-                <h2 class="text-xl font-semibold text-ink">{{ $title }}</h2>
-                <button type="button" x-on:click="open = false" class="text-muted hover:text-ink" aria-label="Tutup">
-                    <i data-lucide="x" class="size-5"></i>
+                <h2 id="{{ $name }}-modal-title" class="text-xl font-semibold text-ink">{{ $title }}</h2>
+                <button type="button"
+                        x-on:click="close()"
+                        class="cursor-pointer rounded-control p-1 text-muted transition hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                        aria-label="Tutup">
+                    <i data-lucide="x" aria-hidden="true" class="size-5"></i>
                 </button>
             </div>
         @endif
         {{ $slot }}
     </div>
-</div>
+</dialog>

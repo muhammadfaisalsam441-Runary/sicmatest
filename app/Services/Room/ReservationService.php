@@ -2,11 +2,13 @@
 
 namespace App\Services\Room;
 
+use App\Enums\RescheduleMode;
 use App\Enums\RescheduleStatus;
 use App\Enums\ReservationStatus;
 use App\Enums\RoomBlockSource;
 use App\Exceptions\DomainException;
 use App\Models\Academic\ClassGroup;
+use App\Models\Academic\SessionReschedule;
 use App\Models\Reservation\Reservation;
 use App\Models\Room\Room;
 use App\Models\Room\RoomBlock;
@@ -498,6 +500,7 @@ class ReservationService
         CarbonImmutable $end,
         ?int $ignoreReservationId = null,
         string $hint = 'Batalkan pesanan itu atau pilih jam lain.',
+        ?int $ignoreRescheduleId = null,
     ): void {
         $clash = Reservation::query()
             ->where(function ($query) use ($classGroup) {
@@ -521,15 +524,37 @@ class ReservationService
             ->orderBy('start_at')
             ->first();
 
-        if ($clash === null) {
-            return;
+        if ($clash !== null) {
+            throw new DomainException(
+                'CLASS_TIME_CONFLICT',
+                "Kelas {$classGroup->name} sudah memesan {$clash->room->name} pukul ".Wita::range($clash->start_at, $clash->end_at).'. '.$hint,
+                ['reservation_id' => $clash->id],
+            );
         }
 
-        throw new DomainException(
-            'CLASS_TIME_CONFLICT',
-            "Kelas {$classGroup->name} sudah memesan {$clash->room->name} pukul ".Wita::range($clash->start_at, $clash->end_at).'. '.$hint,
-            ['reservation_id' => $clash->id],
-        );
+        $onlineClash = SessionReschedule::query()
+            ->where('status', RescheduleStatus::Active)
+            ->where('mode', RescheduleMode::Online)
+            ->where('target_start_at', '<', $end)
+            ->where('target_end_at', '>', $start)
+            ->where(function ($sub) use ($classGroup) {
+                $id = (string) $classGroup->id;
+                $sub->where('participant_key', $id)
+                    ->orWhere('participant_key', 'like', "{$id},%")
+                    ->orWhere('participant_key', 'like', "%,{$id},%")
+                    ->orWhere('participant_key', 'like', "%,{$id}");
+            })
+            ->when($ignoreRescheduleId !== null, fn ($query) => $query->whereKeyNot($ignoreRescheduleId))
+            ->orderBy('target_start_at')
+            ->first();
+
+        if ($onlineClash !== null) {
+            throw new DomainException(
+                'CLASS_TIME_CONFLICT',
+                "Kelas {$classGroup->name} sudah dijadwalkan kuliah online {$onlineClash->session_title} pukul ".Wita::range($onlineClash->effectiveStart(), $onlineClash->effectiveEnd()).'. '.$hint,
+                ['reschedule_id' => $onlineClash->id],
+            );
+        }
     }
 
     /**

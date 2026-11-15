@@ -4,8 +4,36 @@ use App\Enums\KetiApplicationStatus;
 use App\Enums\UserRole;
 use App\Mail\VerificationCodeMail;
 use App\Models\Academic\ClassGroup;
+use App\Models\User\ClassRepresentative;
 use App\Models\User\User;
 use Illuminate\Support\Facades\Mail;
+
+test('halaman pendaftaran menampilkan kelas aktif dan menandai kelas yang sudah memiliki Keti aktif', function (): void {
+    $this->withoutVite();
+
+    $availableClass = ClassGroup::factory()->create(['name' => 'Tekom A', 'is_active' => true]);
+    $takenClass = ClassGroup::factory()->create(['name' => 'Tekom B', 'is_active' => true]);
+    $expiredClass = ClassGroup::factory()->create(['name' => 'Tekom C', 'is_active' => true]);
+    ClassGroup::factory()->inactive()->create(['name' => 'Tekom Nonaktif']);
+
+    ClassRepresentative::factory()->for($takenClass)->create([
+        'valid_from' => now()->subDays(10)->toDateString(),
+        'valid_to' => null,
+    ]);
+    ClassRepresentative::factory()->for($expiredClass)->create([
+        'valid_from' => now()->subMonth()->toDateString(),
+        'valid_to' => now()->subDay()->toDateString(),
+    ]);
+
+    $this->get(route('register'))
+        ->assertOk()
+        ->assertSee($availableClass->name)
+        ->assertDontSee($availableClass->name.' (Sudah ada Keti)')
+        ->assertSee($takenClass->name.' (Sudah ada Keti)')
+        ->assertSee($expiredClass->name)
+        ->assertDontSee($expiredClass->name.' (Sudah ada Keti)')
+        ->assertDontSee('Tekom Nonaktif');
+});
 
 test('Keti mendaftar, akun belum terverifikasi, dan kode dikirim', function () {
     Mail::fake();

@@ -7,16 +7,18 @@
     <div class="flex flex-col gap-6">
         <x-page-header title="Aktivitas ruangan" subtitle="Siapa saja yang memesan dan memakai ruangan." />
 
-        <div class="flex items-center justify-between">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <x-tabs :items="[
                 ['label' => 'Semua pengguna', 'href' => route('keti.activity', ['tanggal' => $date->toDateString()]), 'active' => $scope === 'semua'],
                 ['label' => 'Saya • '.$myCount, 'href' => route('keti.activity', ['cakupan' => 'saya', 'tanggal' => $date->toDateString()]), 'active' => $scope === 'saya'],
             ]" />
-            <form method="GET" action="{{ route('keti.activity') }}" class="flex items-center gap-2">
-                <input type="hidden" name="cakupan" value="{{ $scope }}">
-                <span class="text-sm text-muted">{{ $date->isToday() ? 'Hari ini • ' : '' }}{{ Wita::longDate($date) }}</span>
-                <x-input type="date" name="tanggal" :value="$date->toDateString()" class="w-44" aria-label="Tanggal" onchange="this.form.submit()" />
-            </form>
+            <search>
+                <form method="GET" action="{{ route('keti.activity') }}" class="flex flex-wrap items-center gap-2">
+                    <input type="hidden" name="cakupan" value="{{ $scope }}">
+                    <span class="text-sm text-muted">{{ $date->isToday() ? 'Hari ini • ' : '' }}{{ Wita::longDate($date) }}</span>
+                    <x-input type="date" name="tanggal" :value="$date->toDateString()" class="w-full sm:w-44" aria-label="Tanggal" onchange="this.form.requestSubmit()" />
+                </form>
+            </search>
         </div>
 
         @if ($reservations->isEmpty())
@@ -32,8 +34,7 @@
                             $canView = $item->class_group_id === $classGroup->id || ($item->sessionReschedule && in_array((string) $classGroup->id, explode(',', $item->sessionReschedule->participant_key), true));
                             $detailUrl = $canView ? route('keti.reservations.show', $item) : null;
                         @endphp
-                        <tr @class(['hover:bg-subtle/50 transition-colors', 'cursor-pointer' => $detailUrl !== null])
-                            @if ($detailUrl) onclick="window.location='{{ $detailUrl }}'" @endif>
+                        <tr class="transition-colors hover:bg-page/70">
                             <td class="px-5 py-3">
                                 @if (config('sicma.privacy.show_booker_name_to_keti') || $item->class_group_id === $classGroup->id)
                                     {{ $item->creator->name }}
@@ -43,7 +44,7 @@
                             </td>
                             <td class="px-5 py-3 font-medium">
                                 @if ($detailUrl)
-                                    <a href="{{ $detailUrl }}" class="hover:text-primary hover:underline">{{ $item->room->name }}</a>
+                                    <a href="{{ $detailUrl }}" class="rounded hover:text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">{{ $item->room->name }}</a>
                                 @else
                                     {{ $item->room->name }}
                                 @endif

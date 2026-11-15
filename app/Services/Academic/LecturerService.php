@@ -141,10 +141,73 @@ class LecturerService
                     'homebase_jtik' => ['homebase' => LecturerHomebase::Jtik],
                     'homebase_external' => ['homebase' => LecturerHomebase::External],
                 })->save();
-                $this->audit->log('lecturer.batch_'.$action, $lecturer, $before, $lecturer->only(['profile_status', 'homebase']));
+                $after = $lecturer->only(['profile_status', 'homebase']);
+                $this->audit->log('lecturer.batch_'.$action, $lecturer, $before, $after);
             }
 
             return $lecturers->count();
+        });
+    }
+
+    /**
+     * Edit massal langsung di tabel (Inline Grid).
+     *
+     * @param  list<array{id: int|string, name: string, nip?: string|null, nidn?: string|null, homebase?: string|null, profile_status: string, target_sks?: int|string|null, max_sks?: int|string|null}>  $items
+     * @return int Jumlah dosen yang disimpan
+     */
+    public function bulkUpdate(array $items): int
+    {
+        return DB::transaction(function () use ($items): int {
+            $period = Period::query()->active()->first();
+            $updatedCount = 0;
+
+            foreach ($items as $item) {
+                $lecturer = Lecturer::query()->lockForUpdate()->find((int) $item['id']);
+                if (! $lecturer) {
+                    continue;
+                }
+
+                $before = $lecturer->only(['name', 'nip', 'nidn', 'homebase', 'profile_status']);
+                $beforeTarget = $period
+                    ? $lecturer->loadTargets()->where('period_id', $period->id)->first()?->only(['target_sks', 'max_sks'])
+                    : null;
+
+                $nip = trim((string) ($item['nip'] ?? '')) ?: null;
+                $nidn = trim((string) ($item['nidn'] ?? '')) ?: null;
+                $homebaseValue = trim((string) ($item['homebase'] ?? ''));
+
+                $lecturer->forceFill([
+                    'name' => Str::squish((string) $item['name']),
+                    'nip' => $nip,
+                    'nidn' => $nidn,
+                    'homebase' => $homebaseValue !== '' ? LecturerHomebase::tryFrom($homebaseValue) : null,
+                    'profile_status' => LecturerProfileStatus::from((string) $item['profile_status']),
+                ])->save();
+
+                $afterTarget = $beforeTarget;
+                if ($period !== null && (array_key_exists('target_sks', $item) || array_key_exists('max_sks', $item))) {
+                    $targetSks = is_numeric($item['target_sks'] ?? null) ? (int) $item['target_sks'] : null;
+                    $maxSks = is_numeric($item['max_sks'] ?? null) ? (int) $item['max_sks'] : null;
+
+                    $target = $lecturer->loadTargets()->firstOrNew(['period_id' => $period->id]);
+                    $target->fill(['target_sks' => $targetSks, 'max_sks' => $maxSks])->save();
+                    $afterTarget = $target->only(['target_sks', 'max_sks']);
+                }
+
+                $after = $lecturer->only(['name', 'nip', 'nidn', 'homebase', 'profile_status']);
+                if ($before !== $after || $beforeTarget !== $afterTarget) {
+                    $this->audit->log(
+                        'lecturer.bulk_updated',
+                        $lecturer,
+                        $before + ['target' => $beforeTarget],
+                        $after + ['target' => $afterTarget],
+                    );
+                }
+
+                $updatedCount++;
+            }
+
+            return $updatedCount;
         });
     }
 

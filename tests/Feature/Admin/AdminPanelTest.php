@@ -41,9 +41,9 @@ test('semua halaman Panel Admin tampil untuk admin', function (string $routeName
 })->with([
     ['admin.dashboard', 'Ruang JTIK hari ini'],
     ['admin.rooms.index', 'Data ruang'],
-    ['admin.reservations.index', 'Reservasi tidak perlu persetujuan.'],
-    ['admin.usage-logs.index', 'Siapa yang memakai ruang'],
-    ['admin.keti-accounts.index', 'Periksa identitas dan kelas sebelum memberi akses pemesanan.'],
+    ['admin.reservations.index', 'Riwayat reservasi'],
+    ['admin.usage-logs.index', 'Log pemakaian'],
+    ['admin.keti-accounts.index', 'Akun Keti'],
     ['admin.notifications', 'Pemberitahuan'],
     ['admin.profile', 'Profil admin'],
 ]);
@@ -598,4 +598,92 @@ test('admin membatalkan pengganti dengan alasan dan pertemuan kembali ke jam asl
 
     expect($reschedule->fresh()->status)->toBe(RescheduleStatus::Cancelled)
         ->and(RoomBlock::query()->where('source_type', RoomBlockSource::Schedule)->where('start_at', '2026-11-09 07:30:00')->sole()->is_active)->toBeTrue();
+});
+
+test('kelola ruang mendukung sortir, pencarian, dan ekspor csv', function () {
+    $building = Building::factory()->create(['name' => 'Gedung AE']);
+    Room::factory()->create(['name' => 'Lab Kom 2', 'type' => RoomType::Lab, 'capacity' => 40, 'building_id' => $building->id]);
+    Room::factory()->create(['name' => 'Ruang Kecil 1', 'type' => RoomType::Classroom, 'capacity' => 20, 'building_id' => $building->id]);
+
+    $this->actingAs($this->admin)
+        ->get(route('admin.rooms.index', ['sort' => 'capacity', 'dir' => 'desc']))
+        ->assertOk()
+        ->assertSeeInOrder(['Lab Kom 2', 'Ruang Kecil 1']);
+
+    $export = $this->actingAs($this->admin)
+        ->get(route('admin.rooms.export', ['filter' => 'lab', 'q' => 'Lab Kom']))
+        ->assertOk();
+
+    $csv = $export->streamedContent();
+    expect($csv)->toContain('Lab Kom 2')
+        ->not->toContain('Ruang Kecil 1');
+});
+
+test('riwayat reservasi mendukung sortir, per_page, dan ekspor csv', function () {
+    $roomA = Room::factory()->create(['name' => 'AE 201']);
+    $roomB = Room::factory()->create(['name' => 'AE 202']);
+    $classGroup = ClassGroup::factory()->create(['name' => 'PTIK A 2024']);
+    $keti = User::factory()->create();
+
+    Reservation::factory()->for($roomA)->for($classGroup)->for($keti, 'creator')->create([
+        'status' => ReservationStatus::Booked,
+        'start_at' => CarbonImmutable::parse('2026-11-05 08:00'),
+        'end_at' => CarbonImmutable::parse('2026-11-05 10:00'),
+        'purpose' => 'Kuliah Pengganti Basis Data',
+    ]);
+    Reservation::factory()->for($roomB)->for($classGroup)->for($keti, 'creator')->create([
+        'status' => ReservationStatus::Cancelled,
+        'start_at' => CarbonImmutable::parse('2026-11-06 08:00'),
+        'end_at' => CarbonImmutable::parse('2026-11-06 10:00'),
+        'purpose' => 'Rapat Proyek',
+        'cancel_reason' => 'Ditunda',
+    ]);
+
+    $this->actingAs($this->admin)
+        ->get(route('admin.reservations.index', ['sort' => 'start_at', 'dir' => 'asc', 'per_page' => 15]))
+        ->assertOk()
+        ->assertSeeInOrder(['AE 201', 'AE 202']);
+
+    $export = $this->actingAs($this->admin)
+        ->get(route('admin.reservations.export', ['status' => 'akan-datang']))
+        ->assertOk();
+
+    $csv = $export->streamedContent();
+    expect($csv)->toContain('AE 201')
+        ->not->toContain('AE 202');
+});
+
+test('akun keti mendukung pencarian, filter kelas, dan persetujuan massal', function () {
+    $classA = ClassGroup::factory()->create(['name' => 'PTIK-A 2025', 'is_active' => true]);
+    $classB = ClassGroup::factory()->create(['name' => 'PTIK-B 2025', 'is_active' => true]);
+    $classC = ClassGroup::factory()->create(['name' => 'PTIK-C 2025', 'is_active' => true]);
+
+    $userA = User::factory()->create(['name' => 'Budi Santoso', 'email_verified_at' => now()]);
+    $userB = User::factory()->create(['name' => 'Siti Aminah', 'email_verified_at' => now()]);
+    $userC = User::factory()->create(['name' => 'Rizky Pratama', 'email_verified_at' => now()]);
+    $existingRep = User::factory()->create(['name' => 'Ketua Lama C']);
+
+    ClassRepresentative::factory()->for($existingRep)->for($classC)->create();
+
+    $appA = KetiApplication::factory()->for($userA)->for($classA)->create(['status' => KetiApplicationStatus::Pending]);
+    $appB = KetiApplication::factory()->for($userB)->for($classB)->create(['status' => KetiApplicationStatus::Pending]);
+    $appC = KetiApplication::factory()->for($userC)->for($classC)->create(['status' => KetiApplicationStatus::Pending]);
+
+    $this->actingAs($this->admin)
+        ->get(route('admin.keti-accounts.index', ['q' => 'Budi', 'kelas' => $classA->id]))
+        ->assertOk()
+        ->assertSee('Budi Santoso')
+        ->assertDontSee('Siti Aminah');
+
+    $response = $this->actingAs($this->admin)
+        ->post(route('admin.keti-accounts.batch-approve'), [
+            'application_ids' => [$appA->id, $appB->id, $appC->id],
+        ]);
+
+    $response->assertRedirect(route('admin.keti-accounts.index', ['status' => 'approved']))
+        ->assertSessionHas('toast.type', 'warning');
+
+    expect($appA->fresh()->status)->toBe(KetiApplicationStatus::Approved)
+        ->and($appB->fresh()->status)->toBe(KetiApplicationStatus::Approved)
+        ->and($appC->fresh()->status)->toBe(KetiApplicationStatus::Pending);
 });

@@ -14,7 +14,7 @@
     <div class="flex flex-col gap-6">
         <x-page-header title="Riwayat penyusunan otomatis" subtitle="Status dan hasil setiap proses dapat dibuka kembali. Status solver disimpan terpisah dari status proses." />
 
-        <x-card>
+        <x-card padding="px-2.5 py-2" class="w-fit max-w-full">
             <x-schedule-steps :current="3" />
         </x-card>
 
@@ -22,7 +22,7 @@
 
         <x-card class="flex flex-col gap-3">
             @forelse ($jobs as $job)
-                <a href="{{ route('admin.scheduler.show', $job) }}" class="flex items-center justify-between rounded-control border border-border px-4 py-3 text-sm hover:bg-primary-soft/40">
+                <a href="{{ route('admin.scheduler.show', $job) }}" class="flex flex-wrap items-center justify-between gap-3 rounded-control border border-border px-4 py-3 text-sm transition hover:bg-primary-soft/40">
                     <div class="flex flex-col">
                         <span class="font-semibold">J-{{ $job->created_at->format('Ymd') }}-{{ str_pad((string) $job->id, 2, '0', STR_PAD_LEFT) }} • {{ $job->status->label() }}{{ $job->solver_status ? ' • '.$job->solver_status->label() : '' }}</span>
                         <span class="text-muted">{{ SchedulerService::SCOPES[$job->scope['type'] ?? 'semester'] ?? '' }} • {{ $job->time_limit_seconds }} detik • {{ $job->creator?->name }} • {{ Wita::stamp($job->created_at) }}</span>

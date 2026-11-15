@@ -29,36 +29,37 @@
 @section('content')
     <div class="flex flex-col gap-6" x-data="{ loading: false }">
         <x-page-header title="Cari Ruangan" subtitle="Temukan ruangan kosong yang sesuai untuk kelasmu." />
-        @include('keti.partials.search-tabs', ['active' => 'cari-ruangan'])
 
         {{-- Satu bilah pencarian: semua kriteria utama tanpa pindah tab. --}}
-        <form id="pencarian" method="GET" action="{{ route('keti.search') }}" role="search"
-              class="grid grid-cols-12 items-end gap-3 rounded-card border border-border bg-surface p-4" x-on:submit="loading = true">
-            @foreach (array_filter(['gedung' => $filters['gedung'] ?? null, 'urutan' => $filters['urutan'] ?? null]) as $name => $value)
-                <input type="hidden" name="{{ $name }}" value="{{ $value }}">
-            @endforeach
-            <label class="col-span-3 flex flex-col gap-1.5">
-                <span class="text-xs font-medium text-muted">Ruangan</span>
-                <span class="relative">
-                    <i data-lucide="search" class="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-muted"></i>
-                    <input type="search" name="q" value="{{ $filters['q'] ?? '' }}" placeholder="Nama ruangan atau gedung"
-                           class="w-full rounded-control border border-muted/60 py-3 pr-4 pl-11 text-sm focus:border-primary focus:ring-2 focus:ring-primary/15 focus:outline-none">
-                </span>
-            </label>
-            <x-field label="Tanggal" name="tanggal" class="col-span-2">
-                <x-input type="date" name="tanggal" :value="$filters['tanggal'] ?? now()->toDateString()" :min="now()->toDateString()" :max="now()->addDays((int) config('sicma.reservation.max_days_ahead'))->toDateString()" />
-            </x-field>
-            <x-field label="Jam mulai" name="mulai" class="col-span-2">
-                <x-select name="mulai" :options="$timeOptions" :value="$filters['mulai'] ?? 'sekarang'" />
-            </x-field>
-            <x-field label="Durasi" name="durasi" class="col-span-2">
-                <x-select name="durasi" :options="$durationOptions" :value="$selectedDuration" />
-            </x-field>
-            <x-field label="Jumlah orang" name="orang" class="col-span-1">
-                <x-input type="number" name="orang" min="1" max="500" :value="$filters['orang'] ?? null" placeholder="Bebas" />
-            </x-field>
-            <x-button type="submit" class="col-span-2" icon="search">Cari</x-button>
-        </form>
+        <search>
+            <form id="pencarian" method="GET" action="{{ route('keti.search') }}"
+                  class="grid grid-cols-1 items-end gap-3 rounded-card border border-border bg-surface p-4 sm:grid-cols-2 lg:grid-cols-12" x-on:submit="loading = true">
+                @foreach (array_filter(['gedung' => $filters['gedung'] ?? null, 'urutan' => $filters['urutan'] ?? null]) as $name => $value)
+                    <input type="hidden" name="{{ $name }}" value="{{ $value }}">
+                @endforeach
+                <label class="flex flex-col gap-1.5 sm:col-span-2 lg:col-span-3">
+                    <span class="text-xs font-medium text-muted">Ruangan</span>
+                    <span class="relative">
+                        <i data-lucide="search" aria-hidden="true" class="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-muted"></i>
+                        <input type="search" name="q" value="{{ $filters['q'] ?? '' }}" placeholder="Nama ruangan atau gedung"
+                               class="w-full rounded-control border border-muted/60 py-3 pr-4 pl-11 text-sm focus:border-primary focus:ring-2 focus:ring-primary/15 focus:outline-none">
+                    </span>
+                </label>
+                <x-field label="Tanggal" name="tanggal" class="lg:col-span-2">
+                    <x-input type="date" name="tanggal" :value="$filters['tanggal'] ?? now()->toDateString()" :min="now()->toDateString()" :max="now()->addDays((int) config('sicma.reservation.max_days_ahead'))->toDateString()" />
+                </x-field>
+                <x-field label="Jam mulai" name="mulai" class="lg:col-span-2">
+                    <x-select name="mulai" :options="$timeOptions" :value="$filters['mulai'] ?? 'sekarang'" />
+                </x-field>
+                <x-field label="Durasi" name="durasi" class="lg:col-span-2">
+                    <x-select name="durasi" :options="$durationOptions" :value="$selectedDuration" />
+                </x-field>
+                <x-field label="Jumlah orang" name="orang" class="lg:col-span-1">
+                    <x-input type="number" name="orang" min="1" max="500" :value="$filters['orang'] ?? null" placeholder="Bebas" />
+                </x-field>
+                <x-button type="submit" class="sm:col-span-2 lg:col-span-2" icon="search">Cari</x-button>
+            </form>
+        </search>
 
         <div x-show="loading" x-cloak>
             <x-loading-state message="Memuat data ruangan…" />
@@ -72,21 +73,21 @@
                     <x-button variant="soft" href="#pencarian" x-on:click="$nextTick(() => document.querySelector('#pencarian input[name=q]')?.focus())">Ubah filter</x-button>
                 </x-empty-state>
             @else
-                <div class="flex items-end justify-between gap-4">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
                     <div class="flex flex-col gap-1">
                         <h2 class="text-xl font-semibold">{{ count($rooms) }} ruangan tersedia</h2>
                         <span class="text-xs text-muted">{{ $criteriaLabel }}{{ $isNow ? '' : ' • '.Wita::stamp($start) }}</span>
                     </div>
-                    <form method="GET" action="{{ route('keti.search') }}" class="flex items-center gap-2" x-on:change="loading = true; $el.requestSubmit()">
+                    <form method="GET" action="{{ route('keti.search') }}" class="flex flex-col gap-2 sm:flex-row sm:items-center" x-on:change="loading = true; $el.requestSubmit()">
                         @foreach ($carry as $name => $value)
                             <input type="hidden" name="{{ $name }}" value="{{ $value }}">
                         @endforeach
-                        <x-select name="gedung" :options="$buildingOptions" :value="$filters['gedung'] ?? null" placeholder="Semua gedung" class="w-48" aria-label="Gedung" />
-                        <x-select name="urutan" :options="['terlama' => 'Waktu terlama', 'nama' => 'Nama ruangan', 'kapasitas' => 'Kapasitas terbesar']" :value="$filters['urutan'] ?? 'terlama'" class="w-48" aria-label="Urutan" />
+                        <x-select name="gedung" :options="$buildingOptions" :value="$filters['gedung'] ?? null" placeholder="Semua gedung" class="w-full sm:w-48" aria-label="Gedung" />
+                        <x-select name="urutan" :options="['terlama' => 'Waktu terlama', 'nama' => 'Nama ruangan', 'kapasitas' => 'Kapasitas terbesar']" :value="$filters['urutan'] ?? 'terlama'" class="w-full sm:w-48" aria-label="Urutan" />
                         <noscript><x-button type="submit" variant="secondary">Terapkan</x-button></noscript>
                     </form>
                 </div>
-                <div class="grid grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                     @foreach ($rooms as $room)
                         <x-room-card size="large" :name="$room['name']" :badge="$room['badge']" :location="$room['location']" :capacity="$room['capacity']"
                                      :facilities="$room['facilities']" :time-label="$room['time_label']" :time="$room['time']" :remaining="$room['remaining']"

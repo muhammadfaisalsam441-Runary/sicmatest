@@ -7,7 +7,10 @@
             {{ $reviewStatus['errors'] }} masalah wajib • {{ $reviewStatus['warnings'] }} peringatan.
             {{ $reviewStatus['checked_at'] ? 'Diperiksa '.Wita::stamp($reviewStatus['checked_at']).'.' : 'Jalankan pemeriksaan terlebih dahulu.' }}
         </x-alert>
-        <div><x-button variant="secondary" :href="route('admin.drafts.inspect', $candidate)">Buka Pemeriksaan</x-button></div>
+        <div class="flex flex-wrap items-center gap-3">
+            <x-button variant="secondary" icon="list-checks" :href="route('admin.drafts.inspect', $candidate)">Buka Pemeriksaan</x-button>
+            <x-button variant="soft" icon="pencil" :href="route('admin.drafts.show', $candidate)">Edit Sesi Draf</x-button>
+        </div>
         @if ($reviewStatus['ready'] && auth()->user()->can('publish-schedule'))
             <form method="POST" action="{{ route('admin.drafts.publish', $candidate) }}" x-data="{ confirming: false }"
                   @submit.prevent="if (confirming) { $el.submit() } else { confirming = true }" class="flex max-w-xl flex-col gap-4">

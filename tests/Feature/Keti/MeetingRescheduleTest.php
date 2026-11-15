@@ -204,3 +204,102 @@ test('halaman menampilkan panduan saat tanggal pemindahan belum dipilih', functi
         ->assertSee('Pilih Tanggal Pemindahan')
         ->assertDontSee('Pindahkan ke sini');
 });
+
+test('Keti dapat langsung menjadikan pertemuan Online dari My Class dan mengembalikannya ke luring', function () {
+    $this->actingAs($this->keti)->get(myClassUrl('2026-11-09'))->assertOk()
+        ->assertSee('Jadikan Online')
+        ->assertSee('Ya, Jadikan Online');
+
+    $this->actingAs($this->keti)->post(route('keti.meetings.online.store'), [
+        'session_id' => $this->session->id,
+        'original_date' => '2026-11-09',
+        'lecturer_ids' => [$this->partner->id],
+        'note' => 'Arahan dosen via WhatsApp',
+        'idempotency_key' => (string) str()->uuid(),
+    ])->assertRedirect(myClassUrl('2026-11-09'));
+
+    $reschedule = SessionReschedule::query()->sole();
+
+    $this->actingAs($this->keti)->get(myClassUrl('2026-11-09'))->assertOk()
+        ->assertSee('Online • Ruang dilepas')
+        ->assertSee('Ruang AE 107 dilepas untuk kelas lain')
+        ->assertSee('Arahan dosen via WhatsApp')
+        ->assertSee('Kembalikan ke luring');
+
+    $this->actingAs($this->keti)->post(route('keti.meetings.online.cancel', $reschedule))
+        ->assertRedirect(myClassUrl('2026-11-09'));
+
+    $this->actingAs($this->keti)->get(myClassUrl('2026-11-09'))->assertOk()
+        ->assertSee('Akan datang')
+        ->assertSee('Detail ruangan');
+});
+
+test('Keti dapat memilih Kuliah Online di halaman Pindahkan meskipun ruangan fisik penuh', function () {
+    $otherKeti = User::factory()->approvedKeti(ClassGroup::factory()->create())->create();
+    $thirdKeti = User::factory()->approvedKeti(ClassGroup::factory()->create())->create();
+    foreach ([['07:30', '10:50'], ['10:50', '14:10'], ['14:10', '17:30']] as [$from, $to]) {
+        app(ReservationService::class)->create($otherKeti, $this->ae107, CarbonImmutable::parse("2026-11-10 {$from}"), CarbonImmutable::parse("2026-11-10 {$to}"), 'Acara 1', null, (string) str()->uuid());
+        app(ReservationService::class)->create($thirdKeti, $this->ae209, CarbonImmutable::parse("2026-11-10 {$from}"), CarbonImmutable::parse("2026-11-10 {$to}"), 'Acara 2', null, (string) str()->uuid());
+    }
+
+    $this->actingAs($this->keti)->get(reschedulePage(['ke_tanggal' => '2026-11-10']))->assertOk()
+        ->assertSee('Ruangan fisik penuh • Tersedia Online')
+        ->assertSee('Kuliah Online (Tanpa Ruangan)')
+        ->assertSee('Pilih Kuliah Online');
+
+    $this->actingAs($this->keti)->post(route('keti.meetings.online.store'), [
+        'session_id' => $this->session->id,
+        'original_date' => '2026-11-09',
+        'start_at' => '2026-11-10 10:00',
+        'lecturer_ids' => [$this->partner->id],
+        'idempotency_key' => (string) str()->uuid(),
+    ])->assertRedirect(myClassUrl('2026-11-10'));
+
+    $this->actingAs($this->keti)->get(myClassUrl('2026-11-09'))->assertOk()
+        ->assertSee('Dipindahkan')
+        ->assertSee('Kuliah Online');
+
+    $this->actingAs($this->keti)->get(myClassUrl('2026-11-10'))->assertOk()
+        ->assertSee('Kuliah Online (Tanpa Ruangan)')
+        ->assertSee('Kuliah Pengganti • Pemrograman Web');
+});
+
+test('Keti kelas lain dilarang mengelola kuliah online kelas yang bukan pesertanya', function () {
+    $this->actingAs($this->keti)->post(route('keti.meetings.online.store'), [
+        'session_id' => $this->session->id,
+        'original_date' => '2026-11-09',
+        'lecturer_ids' => [$this->partner->id],
+        'idempotency_key' => (string) str()->uuid(),
+    ])->assertRedirect();
+
+    $reschedule = SessionReschedule::query()->sole();
+    $otherKeti = User::factory()->approvedKeti(ClassGroup::factory()->create(['name' => 'Tekom A']))->create();
+
+    $this->actingAs($otherKeti)->post(route('keti.meetings.online.cancel', $reschedule))
+        ->assertForbidden();
+
+    $this->actingAs($otherKeti)->postJson(route('keti.meetings.online.store'), [
+        'session_id' => $this->session->id,
+        'original_date' => '2026-11-09',
+        'lecturer_ids' => [$this->partner->id],
+        'idempotency_key' => (string) str()->uuid(),
+    ])->assertStatus(409)->assertJsonPath('code', 'NOT_CLASS_REPRESENTATIVE');
+});
+
+test('Keti kelas gabungan lain ikut melihat status Kuliah Online di My Class', function () {
+    $classA = ClassGroup::factory()->create(['name' => 'Tekom A']);
+    $ketiA = User::factory()->approvedKeti($classA)->create();
+    $joint = meetingSession([$this->classC, $classA], ['title' => 'Statistika', 'day_of_week' => 3, 'start_minute' => 780, 'end_minute' => 880, 'room_id' => $this->ae107->id], $this->team);
+
+    $this->actingAs($this->keti)->post(route('keti.meetings.online.store'), [
+        'session_id' => $joint->id,
+        'original_date' => '2026-11-11',
+        'lecturer_ids' => [$this->partner->id],
+        'idempotency_key' => (string) str()->uuid(),
+    ])->assertRedirect();
+
+    $this->actingAs($ketiA)->get(myClassUrl('2026-11-11'))->assertOk()
+        ->assertSee('Online • Ruang dilepas')
+        ->assertSee('Statistika')
+        ->assertSee('Kembalikan ke luring');
+});

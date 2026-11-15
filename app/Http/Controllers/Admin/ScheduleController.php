@@ -13,6 +13,7 @@ use App\Services\Scheduling\ScheduleImportService;
 use App\Services\Scheduling\ScheduleValidator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\View\View;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -103,6 +104,8 @@ class ScheduleController extends Controller
             ->orderBy('start_minute')
             ->get();
 
+        [$sessions, $cohortBlockAlternate] = $this->orderSessionsByCohortBlock($sessions);
+
         return view('admin.schedules.index', [
             'period' => $period,
             'versions' => $versions,
@@ -118,6 +121,7 @@ class ScheduleController extends Controller
             'blockCount' => $official?->roomBlocks()->where('is_active', true)->count() ?? 0,
             'draft' => $draft,
             'sessions' => $sessions,
+            'cohortBlockAlternate' => $cohortBlockAlternate,
             'day' => $day,
             'prodi' => $prodi,
             'studyPrograms' => $studyPrograms,
@@ -156,5 +160,106 @@ class ScheduleController extends Controller
         }, 'templat-jadwal-sicma.xlsx', [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         ]);
+    }
+
+    /**
+     * Urutkan sesi per blok angkatan (terbaru ke terlama) lalu abjad kelas, dan tandai warna selang-seling per kelas.
+     *
+     * @param  Collection<int, ScheduleSession>  $sessions
+     * @return array{0: Collection<int, ScheduleSession>, 1: array<int, bool>}
+     */
+    private function orderSessionsByCohortBlock(Collection $sessions): array
+    {
+        if ($sessions->isEmpty()) {
+            return [$sessions, []];
+        }
+
+        $cohortYearsBySession = [];
+        $classNamesBySession = [];
+        foreach ($sessions as $session) {
+            $cohortYearsBySession[$session->id] = $this->sessionCohortYear($session);
+            $classNamesBySession[$session->id] = $session->participants->pluck('name')->sort()->implode(' + ');
+        }
+
+        $sorted = $sessions->sort(function (ScheduleSession $a, ScheduleSession $b) use ($cohortYearsBySession, $classNamesBySession): int {
+            $cohortA = $cohortYearsBySession[$a->id];
+            $cohortB = $cohortYearsBySession[$b->id];
+
+            if ($cohortA !== $cohortB) {
+                if ($cohortA === null) {
+                    return 1;
+                }
+                if ($cohortB === null) {
+                    return -1;
+                }
+
+                return $cohortB <=> $cohortA;
+            }
+
+            $classA = $classNamesBySession[$a->id];
+            $classB = $classNamesBySession[$b->id];
+            if ($classA !== $classB) {
+                if ($classA === '') {
+                    return 1;
+                }
+                if ($classB === '') {
+                    return -1;
+                }
+
+                $cmp = strnatcasecmp($classA, $classB);
+                if ($cmp !== 0) {
+                    return $cmp;
+                }
+
+                return $classA <=> $classB;
+            }
+
+            $dayA = $a->day_of_week ?? PHP_INT_MAX;
+            $dayB = $b->day_of_week ?? PHP_INT_MAX;
+            if ($dayA !== $dayB) {
+                return $dayA <=> $dayB;
+            }
+
+            $startA = $a->start_minute ?? PHP_INT_MAX;
+            $startB = $b->start_minute ?? PHP_INT_MAX;
+            if ($startA !== $startB) {
+                return $startA <=> $startB;
+            }
+
+            $endA = $a->end_minute ?? PHP_INT_MAX;
+            $endB = $b->end_minute ?? PHP_INT_MAX;
+            if ($endA !== $endB) {
+                return $endA <=> $endB;
+            }
+
+            return strnatcasecmp($a->title, $b->title);
+        })->values();
+
+        $alternateBySession = [];
+        $blockIndex = -1;
+        $previousBlock = '__init__';
+
+        foreach ($sorted as $session) {
+            $className = $classNamesBySession[$session->id];
+            $blockKey = ($cohortYearsBySession[$session->id] ?? 'none').'|'.($className !== '' ? mb_strtolower($className) : 'none');
+            if ($blockKey !== $previousBlock) {
+                $blockIndex++;
+                $previousBlock = $blockKey;
+            }
+
+            $alternateBySession[$session->id] = $blockIndex % 2 === 1;
+        }
+
+        return [$sorted, $alternateBySession];
+    }
+
+    /**
+     * Ambil tahun angkatan representatif dari peserta sesi.
+     */
+    private function sessionCohortYear(ScheduleSession $session): ?int
+    {
+        $year = $session->participants->pluck('cohort_year')->filter(fn (mixed $value): bool => $value !== null)->max();
+
+        return $year === null ? null : (int) $year;
     }
 }

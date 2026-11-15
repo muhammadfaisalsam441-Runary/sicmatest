@@ -7,7 +7,7 @@
     <div class="flex flex-col gap-6">
         <x-page-header title="Pemesanan gagal" subtitle="Informasi ruangan dan pemakaian kelasmu." />
         <x-error-state title="Ruangan gagal dipesan" :message="$error['message']">
-            <div class="mt-2 flex gap-3">
+            <div class="mt-2 flex flex-wrap justify-center gap-3">
                 <x-button :href="route('keti.search')">Cari ruangan lain</x-button>
                 <x-button variant="secondary" :href="route('keti.search', array_filter(['tanggal' => $start?->toDateString(), 'mulai' => $start?->format('H:i'), 'durasi' => $duration]))">Ubah filter</x-button>
             </div>
@@ -21,12 +21,22 @@
                 </div>
                 <ul class="flex flex-col divide-y divide-border">
                     @foreach ($alternatives as $alternative)
-                        <li class="flex items-center justify-between gap-4 py-3">
+                        <li class="flex flex-col justify-between gap-3 py-3 sm:flex-row sm:items-center sm:gap-4">
                             <div class="flex flex-col gap-0.5">
                                 <span class="font-semibold text-ink">{{ $alternative['name'] }}</span>
-                                <span class="text-xs text-muted">{{ $alternative['location'] }}{{ $alternative['until'] ? ' • tersedia sampai '.Wita::clock($alternative['until']) : '' }}</span>
+                                <span class="inline-flex items-center gap-1.5 text-xs text-muted">
+                                    <i data-lucide="map-pin" aria-hidden="true" class="size-3.5 shrink-0"></i>
+                                    <span>{{ $alternative['location'] }}</span>
+                                </span>
                             </div>
-                            <x-button x-data x-on:click="$dispatch('open-booking', {{ \Illuminate\Support\Js::from($alternative['booking']) }})" :aria-label="'Pesan '.$alternative['name']">Pesan</x-button>
+                            <div class="flex flex-wrap items-center gap-3 self-start sm:self-auto">
+                                @if ($alternative['until'])
+                                    <span class="rounded-full bg-success-soft px-2.5 py-1 text-xs font-medium text-success tabular-nums">
+                                        tersedia sampai {{ Wita::clock($alternative['until']) }}
+                                    </span>
+                                @endif
+                                <x-button size="sm" x-data x-on:click="$dispatch('open-booking', {{ \Illuminate\Support\Js::from($alternative['booking']) }})" :aria-label="'Pesan '.$alternative['name']">Pesan</x-button>
+                            </div>
                         </li>
                     @endforeach
                 </ul>

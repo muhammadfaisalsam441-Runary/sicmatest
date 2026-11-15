@@ -3,7 +3,7 @@
 @use('App\Services\Academic\TeachingLoadService')
 
 @section('title', 'Bagi Pertemuan Otomatis')
-@section('breadcrumb', 'Pembagian Mengajar / Bagi Pertemuan Otomatis')
+@section('breadcrumb', 'Pembagian Mengajar|Bagi Pertemuan Otomatis')
 
 @section('content')
     <div class="flex flex-col gap-5">
@@ -14,7 +14,7 @@
             </x-slot:actions>
         </x-page-header>
 
-        <x-card>
+        <x-card padding="px-2.5 py-2" class="w-fit max-w-full">
             <x-schedule-steps :current="2" />
         </x-card>
 
@@ -55,21 +55,22 @@
             @enderror
 
             @if ($plan['rows'] !== [] || $plan['unchanged'] !== [])
-                <div class="mt-4 overflow-x-auto">
+                <x-table-scroll class="mt-4">
                     <table class="w-full text-left text-sm">
-                        <thead class="border-b border-border text-muted">
+                        <thead class="sticky top-0 z-10 border-b border-border bg-page text-xs font-semibold text-muted">
                             <tr>
-                                <th class="px-3 py-2">Mata Kuliah dan Kelas</th>
-                                <th class="px-3 py-2">SKS per Pertemuan</th>
-                                <th class="px-3 py-2">Pengampu</th>
-                                <th class="px-3 py-2">Mitra · 8–14 (UAS)</th>
-                                <th class="px-3 py-2">Status</th>
+                                <th scope="col" class="px-3 py-2">Mata Kuliah dan Kelas</th>
+                                <th scope="col" class="px-3 py-2">SKS per Pertemuan</th>
+                                <th scope="col" class="px-3 py-2">Pengampu · 1–7 (UTS) / 1–14</th>
+                                <th scope="col" class="px-3 py-2">Mitra · 8–14 (UAS)</th>
+                                <th scope="col" class="px-3 py-2">Status</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-border">
                             @foreach ([...$plan['rows'], ...$plan['unchanged']] as $row)
-                                <tr>
-                                    <td class="px-3 py-2">{{ $row['label'] }}</td>
+                                @php($willChange = $row['changes'] !== [])
+                                <tr @class(['bg-primary-soft/25' => $willChange])>
+                                    <td class="px-3 py-2 font-medium text-ink">{{ $row['label'] }}</td>
                                     <td class="px-3 py-2 font-medium">{{ $row['sks'] }} SKS</td>
                                     <td class="px-3 py-2">{{ $row['lead'] }} · {{ $row['sks'] }} SKS × {{ $row['lead_meetings'] }} = {{ $row['sks'] * $row['lead_meetings'] }} SKS</td>
                                     <td class="px-3 py-2">
@@ -79,12 +80,14 @@
                                             —
                                         @endforelse
                                     </td>
-                                    <td class="px-3 py-2">{{ $row['changes'] === [] ? 'Sudah sesuai' : 'Akan diperbarui' }}</td>
+                                    <td class="px-3 py-2">
+                                        <x-status-badge :variant="$willChange ? 'primary' : 'success'">{{ $willChange ? 'Akan diperbarui' : 'Sudah sesuai' }}</x-status-badge>
+                                    </td>
                                 </tr>
                             @endforeach
                         </tbody>
                     </table>
-                </div>
+                </x-table-scroll>
             @endif
             @if ($plan['rows'] === [])
                 <p class="mt-3 text-sm text-muted">Belum ada perubahan fase yang perlu disimpan.</p>

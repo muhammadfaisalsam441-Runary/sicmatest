@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\RescheduleMode;
 use App\Enums\RescheduleStatus;
 use App\Enums\ReservationStatus;
 use App\Enums\RoomBlockSource;
@@ -307,4 +308,174 @@ test('reservasi lama berkegiatan Kuliah Pengganti tanpa pemindahan dibatalkan le
     expect($cancelled->status)->toBe(ReservationStatus::Cancelled)
         ->and($cancelled->block->is_active)->toBeFalse()
         ->and(SessionReschedule::query()->count())->toBe(0);
+});
+
+test('Jadikan Online di jam yang sama melepaskan blok ruang asli tanpa reservasi baru dan idempoten', function () {
+    $key = (string) str()->uuid();
+    $reschedule = $this->service->makeOnline($this->keti, $this->session, CarbonImmutable::parse('2026-11-09'), null, [$this->partner->id], 'Kuliah via Zoom', $key);
+
+    expect($reschedule->mode)->toBe(RescheduleMode::Online)
+        ->and($reschedule->reservation_id)->toBeNull()
+        ->and($reschedule->note)->toBe('Kuliah via Zoom')
+        ->and($reschedule->effectiveStart()->format('Y-m-d H:i'))->toBe('2026-11-09 07:30')
+        ->and($reschedule->effectiveEnd()->format('Y-m-d H:i'))->toBe('2026-11-09 10:00')
+        ->and(Reservation::query()->count())->toBe(0)
+        ->and(originalBlock()->is_active)->toBeFalse()
+        ->and(RoomBlock::query()->where('source_type', RoomBlockSource::Schedule)->where('source_id', $this->session->id)->where('start_at', '2026-11-16 07:30:00')->sole()->is_active)->toBeTrue()
+        ->and(AuditLog::query()->where('action', 'meeting.switched_online')->exists())->toBeTrue()
+        ->and(AppNotification::query()->where('user_id', $this->admin->id)->where('type', 'meeting.switched_online')->exists())->toBeTrue();
+
+    // Idempoten dengan key yang sama
+    $replay = $this->service->makeOnline($this->keti, $this->session, CarbonImmutable::parse('2026-11-09'), null, [$this->partner->id], 'Kuliah via Zoom', $key);
+    expect($replay->id)->toBe($reschedule->id)
+        ->and(SessionReschedule::query()->count())->toBe(1);
+
+    // Ruang asli AE 107 di jam 07:30-10:00 bisa langsung dipakai kelas lain
+    $otherKeti = User::factory()->approvedKeti(ClassGroup::factory()->create(['name' => 'Tekom D']))->create();
+    $otherBooking = app(ReservationService::class)->create(
+        $otherKeti,
+        $this->ae107,
+        CarbonImmutable::parse('2026-11-09 07:30'),
+        CarbonImmutable::parse('2026-11-09 10:00'),
+        'Praktikum pengganti',
+        null,
+        (string) str()->uuid(),
+    );
+    expect($otherBooking->status)->toBe(ReservationStatus::Booked);
+});
+
+test('Jadikan Online ditolak bila pertemuan sudah dimulai atau lewat', function () {
+    $this->travelTo(CarbonImmutable::parse('2026-11-09 07:30'));
+
+    expectDomainCode(fn () => $this->service->makeOnline(
+        $this->keti,
+        $this->session,
+        CarbonImmutable::parse('2026-11-09'),
+        null,
+        [$this->partner->id],
+        null,
+        (string) str()->uuid(),
+    ), 'MEETING_STARTED');
+});
+
+test('Kuliah Online mencegah bentrok kelas dan bentrok dosen pada jam targetnya', function () {
+    $this->service->makeOnline(
+        $this->keti,
+        $this->session,
+        CarbonImmutable::parse('2026-11-09'),
+        CarbonImmutable::parse('2026-11-10 10:00'),
+        [$this->partner->id],
+        null,
+        (string) str()->uuid(),
+    );
+
+    expectDomainCode(fn () => app(ReservationService::class)->create(
+        $this->keti,
+        $this->ae209,
+        CarbonImmutable::parse('2026-11-10 10:00'),
+        CarbonImmutable::parse('2026-11-10 11:00'),
+        'Rapat kelas',
+        null,
+        (string) str()->uuid(),
+    ), 'CLASS_TIME_CONFLICT');
+
+    $otherClass = ClassGroup::factory()->create(['name' => 'Tekom B']);
+    $otherKeti = User::factory()->approvedKeti($otherClass)->create();
+    $otherSession = meetingSession([$otherClass], ['title' => 'Algoritma', 'day_of_week' => 3, 'start_minute' => 600, 'end_minute' => 700, 'room_id' => Room::factory()->create()->id], $this->team);
+
+    expectDomainCode(fn () => $this->service->move(
+        $otherKeti,
+        $otherSession,
+        CarbonImmutable::parse('2026-11-11'),
+        CarbonImmutable::parse('2026-11-10 10:00'),
+        $this->ae209,
+        [$this->partner->id],
+        (string) str()->uuid(),
+    ), 'LECTURER_CONFLICT');
+});
+
+test('Kembalikan ke luring memulihkan blok ruang asli dan ditolak bila ruang sudah dipakai kelas lain', function () {
+    $online = $this->service->makeOnline($this->keti, $this->session, CarbonImmutable::parse('2026-11-09'), null, [$this->partner->id], null, (string) str()->uuid());
+
+    $cancelled = $this->service->cancelOnline($online, $this->keti);
+    expect($cancelled->status)->toBe(RescheduleStatus::Cancelled)
+        ->and(originalBlock()->is_active)->toBeTrue();
+
+    // Jadikan online lagi lalu biarkan kelas lain memesan ruang aslinya
+    $online2 = $this->service->makeOnline($this->keti, $this->session, CarbonImmutable::parse('2026-11-09'), null, [$this->partner->id], null, (string) str()->uuid());
+    $otherKeti = User::factory()->approvedKeti(ClassGroup::factory()->create(['name' => 'Tekom E']))->create();
+    app(ReservationService::class)->create(
+        $otherKeti,
+        $this->ae107,
+        CarbonImmutable::parse('2026-11-09 07:30'),
+        CarbonImmutable::parse('2026-11-09 10:00'),
+        'Seminar kelas',
+        null,
+        (string) str()->uuid(),
+    );
+
+    expectDomainCode(fn () => $this->service->cancelOnline($online2, $this->keti), 'RESTORE_NOT_POSSIBLE');
+    expect($online2->fresh()->status)->toBe(RescheduleStatus::Active);
+});
+
+test('rekomendasi Pindahkan tetap menawarkan slot bebas bentrok saat seluruh ruang fisik penuh untuk mode Online', function () {
+    $otherClass = ClassGroup::factory()->create();
+    $otherKeti = User::factory()->approvedKeti($otherClass)->create();
+    $thirdKeti = User::factory()->approvedKeti(ClassGroup::factory()->create())->create();
+
+    foreach ([['07:30', '10:50'], ['10:50', '14:10'], ['14:10', '17:30']] as [$from, $to]) {
+        app(ReservationService::class)->create($otherKeti, $this->ae107, CarbonImmutable::parse("2026-11-10 {$from}"), CarbonImmutable::parse("2026-11-10 {$to}"), 'Kegiatan 1', null, (string) str()->uuid());
+        app(ReservationService::class)->create($thirdKeti, $this->ae209, CarbonImmutable::parse("2026-11-10 {$from}"), CarbonImmutable::parse("2026-11-10 {$to}"), 'Kegiatan 2', null, (string) str()->uuid());
+    }
+
+    $recs = $this->service->recommendations(
+        $this->keti,
+        $this->session,
+        CarbonImmutable::parse('2026-11-09'),
+        CarbonImmutable::parse('2026-11-10'),
+        [$this->partner->id],
+    );
+
+    expect($recs)->not->toBeEmpty()
+        ->and($recs->first()['rooms_count'])->toBe(0);
+});
+
+test('pemindahan dua arah antara mode Online dan Ruang fisik mengganti status sebelumnya', function () {
+    $online = $this->service->makeOnline(
+        $this->keti,
+        $this->session,
+        CarbonImmutable::parse('2026-11-09'),
+        CarbonImmutable::parse('2026-11-10 10:00'),
+        [$this->partner->id],
+        'Sesi 1 online',
+        (string) str()->uuid(),
+    );
+
+    $movedToRoom = $this->service->replaceWithRoom(
+        $this->keti,
+        $online,
+        CarbonImmutable::parse('2026-11-11 10:00'),
+        $this->ae209,
+        [$this->partner->id],
+        (string) str()->uuid(),
+    );
+
+    expect($online->fresh()->status)->toBe(RescheduleStatus::Replaced)
+        ->and($movedToRoom->mode)->toBe(RescheduleMode::Room)
+        ->and($movedToRoom->reservation->room_id)->toBe($this->ae209->id)
+        ->and(originalBlock()->is_active)->toBeFalse();
+
+    $backToOnline = $this->service->replaceWithOnline(
+        $this->keti,
+        $movedToRoom,
+        CarbonImmutable::parse('2026-11-12 10:00'),
+        [$this->partner->id],
+        'Pindah kembali ke online',
+        (string) str()->uuid(),
+    );
+
+    expect($movedToRoom->fresh()->status)->toBe(RescheduleStatus::Replaced)
+        ->and($movedToRoom->reservation->fresh()->status)->toBe(ReservationStatus::Cancelled)
+        ->and($backToOnline->mode)->toBe(RescheduleMode::Online)
+        ->and($backToOnline->effectiveStart()->format('Y-m-d H:i'))->toBe('2026-11-12 10:00');
 });

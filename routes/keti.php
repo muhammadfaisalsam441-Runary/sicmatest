@@ -27,6 +27,8 @@ Route::get('/kalender-ruangan', RoomCalendarController::class)->name('rooms.cale
 Route::get('/my-class', MyClassController::class)->name('my-class');
 Route::get('/my-class/pindahkan', [MeetingRescheduleController::class, 'create'])->name('meetings.reschedule');
 Route::post('/my-class/pindahkan', [MeetingRescheduleController::class, 'store'])->middleware('throttle:20,1')->name('meetings.reschedule.store');
+Route::post('/my-class/online', [MeetingRescheduleController::class, 'storeOnline'])->middleware('throttle:20,1')->name('meetings.online.store');
+Route::post('/my-class/online/{reschedule}/batal', [MeetingRescheduleController::class, 'cancelOnline'])->middleware('throttle:20,1')->name('meetings.online.cancel');
 
 Route::get('/ruangan', [RoomController::class, 'index'])->name('rooms.index');
 Route::get('/ruangan/{room}', [RoomController::class, 'show'])->name('rooms.show');

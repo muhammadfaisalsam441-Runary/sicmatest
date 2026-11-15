@@ -13,19 +13,20 @@
 @endsection
 
 @section('content')
-    @php($clock = fn (?int $minutes) => $minutes === null ? '—' : sprintf('%02d.%02d', intdiv($minutes, 60), $minutes % 60))
+    @php
+        $clock = fn (?int $minutes) => $minutes === null ? '—' : sprintf('%02d.%02d', intdiv($minutes, 60), $minutes % 60);
+    @endphp
 
-    <div class="flex flex-col gap-6">
-        <x-page-header title="Jadwal Resmi" subtitle="Jadwal perkuliahan yang ditetapkan, rentang berlaku, dan riwayat revisi. Perubahan selalu melalui draf.">
+    <div class="flex flex-col gap-4 admin-page-stack">
+        <x-page-header title="Jadwal Resmi">
             <x-slot:actions>
-                <x-button variant="secondary" icon="download" :href="route('admin.schedules.template')">Unduh templat</x-button>
-                <x-button variant="soft" icon="upload" :href="route('admin.imports.create')">Impor Excel atau CSV</x-button>
-                <x-button :href="Nav::url('admin.scheduler.create')">Buka Susun Jadwal</x-button>
+                <x-button variant="secondary" size="sm" icon="download" :href="route('admin.schedules.template')">Unduh templat</x-button>
+                <x-button variant="soft" size="sm" icon="upload" :href="route('admin.imports.create')">Impor Excel atau CSV</x-button>
+                <x-button size="sm" :href="Nav::url('admin.scheduler.create')">Buka Susun Jadwal</x-button>
             </x-slot:actions>
         </x-page-header>
 
-        <x-card><x-schedule-steps :current="5" :version="$candidate" /></x-card>
-        <x-tabs :items="[
+        <x-tabs size="sm" :items="[
             ['label' => 'Jadwal & Riwayat', 'href' => route('admin.schedules.index'), 'active' => $tab === 'jadwal'],
             ['label' => 'Penetapan Draf', 'href' => route('admin.schedules.index', ['tab' => 'penetapan']), 'active' => $tab === 'penetapan'],
         ]" />
@@ -33,137 +34,240 @@
         @if ($tab === 'penetapan')
             @include('admin.schedules.establishment')
         @else
+        @php
+            $isActiveVersion = $active && $official && $official->id === $active->id;
+            $isUpcomingPreview = $official && ! $isActiveVersion && $official->effective_from?->isFuture();
+            $isHistoricalPreview = $official && ! $isActiveVersion && ! $isUpcomingPreview;
+        @endphp
+        @if ($isUpcomingPreview)
+            <x-alert variant="info" :title="'Pratinjau versi mendatang v'.$official->version_no">
+                Versi ini berlaku mulai {{ Wita::longDate($official->effective_from) }} dan belum menggantikan jadwal aktif hari ini.
+                <a href="{{ route('admin.schedules.index') }}" class="font-semibold text-primary hover:underline">Kembali ke jadwal aktif</a>
+            </x-alert>
+        @elseif ($isHistoricalPreview)
+            <x-alert variant="info" :title="'Pratinjau arsip versi v'.$official->version_no">
+                Kamu sedang melihat versi riwayat yang sudah digantikan.
+                <a href="{{ route('admin.schedules.index') }}" class="font-semibold text-primary hover:underline">Kembali ke jadwal aktif</a>
+            </x-alert>
+        @endif
         @foreach ($upcoming as $next)
+            @continue($official && $official->id === $next->id)
             <x-alert :title="'Versi v'.$next->version_no.' berlaku mulai '.Wita::longDate($next->effective_from)">
                 Sudah ditetapkan; belum berlaku hari ini.
                 <a href="{{ route('admin.schedules.index', ['versi' => $next->id]) }}" class="font-semibold text-primary hover:underline">Lihat versi ini</a>
             </x-alert>
         @endforeach
-        <x-card class="flex flex-col gap-3">
-            <div class="flex flex-wrap items-center justify-between gap-3">
-                <div class="flex flex-col gap-1.5">
-                    <div class="flex flex-wrap items-center gap-2.5">
-                        @if ($official)
-                            <span class="inline-flex items-center gap-1.5 rounded-full border border-success/30 bg-success-soft px-3 py-1 text-xs font-bold text-success">
-                                <span class="size-2 rounded-full bg-success"></span>
-                                Versi ditetapkan v{{ $official->version_no }}
-                            </span>
-                            <span class="text-sm font-bold text-ink">{{ $period?->name ?? 'Semester aktif' }}</span>
-                        @else
-                            <span class="inline-flex items-center gap-1.5 rounded-full border border-border bg-page px-3 py-1 text-xs font-bold text-muted">
-                                Belum ada jadwal resmi
-                            </span>
-                        @endif
-                    </div>
-
-                    @if ($official)
-                        <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-muted">
-                            <span>Berlaku: <strong class="text-ink">{{ Wita::longDate($official->effective_from) }}</strong>{{ $official->effective_to ? ' s.d. <strong class="text-ink">'.Wita::longDate($official->effective_to).'</strong>' : '' }}</span>
-                            <span>•</span>
-                            <span><strong class="text-ink">{{ number_format($blockCount) }}</strong> blok ruang aktif tercatat</span>
-                            @if ($official->publisher)
-                                <span>•</span>
-                                <span>Ditetapkan oleh {{ $official->publisher->name }}</span>
-                            @endif
-                        </div>
+        <x-card padding="px-4 py-2.5" class="flex flex-wrap items-center justify-between gap-2.5">
+            <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-muted">
+                @if ($official)
+                    @if ($isUpcomingPreview)
+                        <x-status-badge variant="primary">Versi mendatang v{{ $official->version_no }}</x-status-badge>
+                    @elseif ($isHistoricalPreview || $official->status === ScheduleVersionStatus::Superseded && ! $isActiveVersion)
+                        <x-status-badge variant="neutral">Arsip v{{ $official->version_no }}</x-status-badge>
                     @else
-                        <p class="text-xs text-muted">Status ruang tampil "Belum pasti" sampai jadwal ditetapkan.</p>
+                        <span class="inline-flex items-center gap-1.5 rounded-full border border-success/30 bg-success-soft px-2.5 py-0.5 text-xs font-bold text-success">
+                            <span class="size-1.5 rounded-full bg-success" aria-hidden="true"></span>
+                            Versi ditetapkan v{{ $official->version_no }}
+                        </span>
                     @endif
-                </div>
+                    <span class="text-sm font-bold text-ink">{{ $period?->name ?? 'Semester aktif' }}</span>
+                    <span>•</span>
+                    <span>Berlaku: <strong class="text-ink">{{ Wita::longDate($official->effective_from) }}</strong>@if ($official->effective_to) s.d. <strong class="text-ink">{{ Wita::longDate($official->effective_to) }}</strong>@endif</span>
+                    <span>•</span>
+                    <span class="rounded bg-page px-1.5 py-0.5 font-medium text-ink border border-border">{{ number_format($blockCount) }} blok ruang aktif</span>
+                    @if ($official->publisher)
+                        <span>• oleh {{ $official->publisher->name }}</span>
+                    @endif
+                @else
+                    <span class="inline-flex items-center rounded-full border border-border bg-page px-2.5 py-0.5 text-xs font-bold text-muted">
+                        Belum ada jadwal resmi
+                    </span>
+                    <span>Status ruang tampil "Belum pasti" sampai jadwal ditetapkan.</span>
+                @endif
+                <span class="inline-flex items-center text-primary cursor-help"
+                      title="{{ $active ? 'Jadwal aktif terhubung otomatis ke My Class dan pengecekan bentrok reservasi mahasiswa. Kalender semester, reservasi, dan penutupan ruang tetap diperhitungkan oleh layanan masing-masing.' : 'Belum ada jadwal yang berlaku hari ini.' }}"
+                      aria-label="Informasi keterhubungan jadwal">
+                    <i data-lucide="info" class="size-3.5" aria-hidden="true"></i>
+                </span>
+            </div>
 
+            <div class="flex flex-wrap items-center gap-2 shrink-0">
                 @if ($draft)
-                    <div class="flex items-center gap-2.5 rounded-control border border-warning/30 bg-warning-soft/40 px-3 py-1.5">
+                    <div class="flex items-center gap-2 rounded-control border border-warning/30 bg-warning-soft/40 px-2.5 py-1">
                         <span class="flex items-center gap-1.5 text-xs font-medium text-warning-ink">
-                            <span class="size-1.5 rounded-full bg-warning"></span>
+                            <span class="size-1.5 rounded-full bg-warning" aria-hidden="true"></span>
                             Draf v{{ $draft->version_no }} sedang disusun
                         </span>
-                        <a href="{{ route('admin.drafts.show', $draft) }}" class="inline-flex items-center gap-1 rounded-control bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary-soft/80 transition">
+                        <a href="{{ route('admin.drafts.show', $draft) }}" class="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline">
                             <span>Buka</span>
-                            <i data-lucide="arrow-right" class="size-3"></i>
+                            <i data-lucide="arrow-right" class="size-3" aria-hidden="true"></i>
                         </a>
                     </div>
                 @elseif ($official)
                     <form method="POST" action="{{ route('admin.drafts.store') }}">
                         @csrf
-                        <button type="submit" class="inline-flex items-center gap-1.5 rounded-control border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary-soft/60 transition shadow-2xs">
-                            <i data-lucide="pencil" class="size-3.5"></i>
-                            <span>Buat draf revisi</span>
-                        </button>
+                        <x-button type="submit" variant="secondary" size="sm" icon="pencil">Buat draf revisi</x-button>
                     </form>
                 @endif
-            </div>
-
-            <div class="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3 text-xs text-muted">
-                <p class="flex items-center gap-1.5" title="Kalender semester, reservasi, dan penutupan ruang tetap diperhitungkan oleh layanan masing-masing.">
-                    <i data-lucide="info" class="size-3.5 text-primary shrink-0"></i>
-                    <span>{{ $active ? 'Jadwal aktif terhubung otomatis ke My Class & reservasi.' : 'Belum ada jadwal yang berlaku hari ini.' }}</span>
-                </p>
                 @if ($official)
-                    <div class="flex items-center gap-2 shrink-0">
-                        <a href="{{ route('admin.drafts.excel', [$official, ...request()->only(['hari', 'prodi', 'angkatan', 'kelas', 'dosen', 'ruang', 'q'])]) }}" download class="inline-flex items-center gap-1.5 rounded-control border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-ink hover:bg-page hover:text-primary transition shadow-2xs">
-                            <i data-lucide="download" class="size-3.5 text-muted"></i>
-                            <span>Excel</span>
-                        </a>
-                        <a href="{{ route('admin.drafts.pdf', [$official, ...request()->only(['hari', 'prodi', 'angkatan', 'kelas', 'dosen', 'ruang', 'q'])]) }}" download class="inline-flex items-center gap-1.5 rounded-control border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-ink hover:bg-page hover:text-primary transition shadow-2xs">
-                            <i data-lucide="download" class="size-3.5 text-muted"></i>
-                            <span>PDF</span>
-                        </a>
-                    </div>
+                    <x-button variant="secondary" size="sm" icon="download" :href="route('admin.drafts.excel', [$official, ...request()->only(['hari', 'prodi', 'angkatan', 'kelas', 'dosen', 'ruang', 'q'])])" download>Excel</x-button>
+                    <x-button variant="secondary" size="sm" icon="download" :href="route('admin.drafts.pdf', [$official, ...request()->only(['hari', 'prodi', 'angkatan', 'kelas', 'dosen', 'ruang', 'q'])])" download>PDF</x-button>
                 @endif
             </div>
         </x-card>
 
-        <x-card class="flex flex-col gap-4">
-            <form method="GET" action="{{ route('admin.schedules.index') }}" class="grid items-end gap-3 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-[1.5fr_1fr_1fr_1fr_1fr_1fr_auto_auto]">
-                @if (request('versi'))<input type="hidden" name="versi" value="{{ $official?->id }}">@endif
-                <x-field label="Cari" name="q">
-                    <x-input name="q" :value="$keyword" placeholder="Cari kelas, ruang, mata kuliah, atau dosen" />
-                </x-field>
-                <x-field label="Prodi" name="prodi">
-                    <x-select name="prodi" :options="$studyPrograms" :value="$prodi" placeholder="Semua prodi" />
-                </x-field>
-                <x-field label="Angkatan" name="angkatan">
-                    <x-select name="angkatan" :options="$cohortYears" :value="$cohortYear" placeholder="Semua angkatan" />
-                </x-field>
-                <x-field label="Kelas" name="kelas">
-                    <x-select name="kelas" :options="$classGroups" :value="$classGroupId" placeholder="Semua kelas" />
-                </x-field>
-                <x-field label="Dosen" name="dosen">
-                    <x-select name="dosen" :options="$lecturers" :value="$lecturerId" placeholder="Semua pengajar" />
-                </x-field>
-                <x-field label="Ruang" name="ruang"><x-select name="ruang" :options="$rooms" :value="$roomId" placeholder="Semua ruang" /></x-field>
-                @if ($day)<input type="hidden" name="hari" value="{{ $day }}">@endif
-                <x-button type="submit">Terapkan</x-button>
-                <x-button variant="secondary" :href="route('admin.schedules.index', array_filter(['versi' => request('versi')]))">Reset</x-button>
-            </form>
+        <x-card padding="p-4" class="admin-table-card flex flex-col gap-3">
+            @php
+                $activeDropdownCount = collect([
+                    $prodi !== '',
+                    $cohortYear !== null,
+                    $classGroupId !== null,
+                    $lecturerId !== null,
+                    $roomId !== null,
+                ])->filter()->count();
+                $hasDropdownFilters = $activeDropdownCount > 0;
+                $hasActiveFilters = $keyword !== '' || $hasDropdownFilters || $day !== null;
+                $dropdownFilters = [
+                    ['name' => 'prodi', 'label' => 'Prodi', 'placeholder' => 'Semua prodi', 'options' => $studyPrograms, 'value' => $prodi],
+                    ['name' => 'angkatan', 'label' => 'Angkatan', 'placeholder' => 'Semua angkatan', 'options' => $cohortYears, 'value' => $cohortYear !== null ? (string) $cohortYear : ''],
+                    ['name' => 'kelas', 'label' => 'Kelas', 'placeholder' => 'Semua kelas', 'options' => $classGroups, 'value' => $classGroupId !== null ? (string) $classGroupId : ''],
+                    ['name' => 'dosen', 'label' => 'Dosen', 'placeholder' => 'Semua pengajar', 'options' => $lecturers, 'value' => $lecturerId !== null ? (string) $lecturerId : ''],
+                    ['name' => 'ruang', 'label' => 'Ruang', 'placeholder' => 'Semua ruang', 'options' => $rooms, 'value' => $roomId !== null ? (string) $roomId : ''],
+                ];
+                $baseFilterQuery = array_filter([
+                    'versi' => request('versi'),
+                    'hari' => $day,
+                    'q' => $keyword !== '' ? $keyword : null,
+                    'prodi' => $prodi !== '' ? $prodi : null,
+                    'angkatan' => $cohortYear,
+                    'kelas' => $classGroupId,
+                    'dosen' => $lecturerId,
+                    'ruang' => $roomId,
+                ]);
+                $activeChips = collect([
+                    $prodi !== '' ? ['key' => 'prodi', 'label' => 'Prodi: '.($studyPrograms[$prodi] ?? $prodi)] : null,
+                    $cohortYear !== null ? ['key' => 'angkatan', 'label' => $cohortYears[$cohortYear] ?? 'Angkatan '.$cohortYear] : null,
+                    $classGroupId !== null ? ['key' => 'kelas', 'label' => 'Kelas: '.($classGroups[$classGroupId] ?? $classGroupId)] : null,
+                    $lecturerId !== null ? ['key' => 'dosen', 'label' => 'Dosen: '.($lecturers[$lecturerId] ?? $lecturerId)] : null,
+                    $roomId !== null ? ['key' => 'ruang', 'label' => 'Ruang: '.($rooms[$roomId] ?? $roomId)] : null,
+                ])->filter()->values();
+            @endphp
 
-            <x-tabs :items="collect([null => 'Semua', 1 => 'Senin', 2 => 'Selasa', 3 => 'Rabu', 4 => 'Kamis', 5 => 'Jumat'])
-                ->map(fn ($label, $key) => ['label' => $label, 'href' => route('admin.schedules.index', array_filter(['versi' => request('versi'), 'ruang' => $roomId, 'q' => $keyword, 'prodi' => $prodi, 'angkatan' => $cohortYear, 'kelas' => $classGroupId, 'dosen' => $lecturerId, 'hari' => $key ?: null])), 'active' => (int) $day === (int) $key])->values()->all()" />
+            <form method="GET"
+                  action="{{ route('admin.schedules.index') }}"
+                  x-data="filterDrawer('schedules-filters', @json($hasDropdownFilters))"
+                  class="flex flex-col gap-2.5">
+                @if (request('versi'))<input type="hidden" name="versi" value="{{ $official?->id }}">@endif
+                @if ($day)<input type="hidden" name="hari" value="{{ $day }}">@endif
+
+                <div class="flex flex-wrap items-center gap-2">
+                    <div class="relative min-w-[200px] flex-1">
+                        <i data-lucide="search" class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted" aria-hidden="true"></i>
+                        <input id="q"
+                               type="search"
+                               name="q"
+                               value="{{ $keyword }}"
+                               data-table-search
+                               aria-label="Cari jadwal"
+                               @input.debounce.400ms="$el.form.requestSubmit()"
+                               placeholder="Cari kelas, ruang, mata kuliah, atau dosen... (/)"
+                               class="w-full rounded-control border border-border bg-surface py-1.5 pr-3 pl-8 text-xs sm:text-sm text-ink placeholder:text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary">
+                    </div>
+
+                    <nav aria-label="Filter hari kuliah" class="inline-flex flex-wrap items-center gap-0.5 rounded-control border border-border bg-page p-0.5">
+                        @foreach ([null => 'Semua', 1 => 'Senin', 2 => 'Selasa', 3 => 'Rabu', 4 => 'Kamis', 5 => 'Jumat'] as $key => $label)
+                            @php($dayActive = (int) $day === (int) $key)
+                            <a href="{{ route('admin.schedules.index', array_filter(['versi' => request('versi'), 'ruang' => $roomId, 'q' => $keyword, 'prodi' => $prodi, 'angkatan' => $cohortYear, 'kelas' => $classGroupId, 'dosen' => $lecturerId, 'hari' => $key ?: null])) }}"
+                               @if ($dayActive) aria-current="page" @endif
+                               @class([
+                                   'rounded-[6px] px-2.5 py-1 text-xs font-semibold transition',
+                                   'bg-primary text-white shadow-2xs' => $dayActive,
+                                   'text-muted hover:bg-surface hover:text-ink' => ! $dayActive,
+                               ])>{{ $label }}</a>
+                        @endforeach
+                    </nav>
+
+                    <button type="button"
+                            @click="toggle()"
+                            :aria-expanded="open.toString()"
+                            @class([
+                                'inline-flex items-center gap-1.5 rounded-control border px-2.5 py-1.5 text-xs font-semibold transition cursor-pointer shrink-0',
+                                'border-primary/40 bg-primary-soft text-primary' => $hasDropdownFilters,
+                                'border-border bg-surface text-ink hover:bg-page' => ! $hasDropdownFilters,
+                            ])>
+                        <i data-lucide="sliders-horizontal" class="size-3.5" aria-hidden="true"></i>
+                        <span>Filter{{ $activeDropdownCount > 0 ? " ({$activeDropdownCount})" : '' }}</span>
+                        <i data-lucide="chevron-down" class="size-3.5 transition-transform" :class="open ? 'rotate-180' : ''" aria-hidden="true"></i>
+                    </button>
+
+                    @if ($hasActiveFilters)
+                        <x-button variant="secondary" size="sm" icon="rotate-ccw" :href="route('admin.schedules.index', array_filter(['versi' => request('versi')]))" class="shrink-0">Reset</x-button>
+                    @endif
+                </div>
+
+                @if ($activeChips->isNotEmpty())
+                    <div x-show="!open" x-cloak class="flex flex-wrap items-center gap-1.5 text-xs">
+                        <span class="text-muted">Aktif:</span>
+                        @foreach ($activeChips as $chip)
+                            <a href="{{ route('admin.schedules.index', collect($baseFilterQuery)->except($chip['key'])->all()) }}"
+                               class="inline-flex items-center gap-1 rounded-full border border-primary/25 bg-primary-soft px-2.5 py-0.5 font-medium text-primary hover:bg-primary/15 transition"
+                               title="Hapus filter {{ $chip['label'] }}">
+                                <span>{{ $chip['label'] }}</span>
+                                <i data-lucide="x" class="size-3" aria-hidden="true"></i>
+                            </a>
+                        @endforeach
+                    </div>
+                @endif
+
+                <div x-show="open" x-cloak class="grid grid-cols-1 gap-2 border-t border-border pt-2.5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+                    @foreach ($dropdownFilters as $filterItem)
+                        <select id="{{ $filterItem['name'] }}"
+                                name="{{ $filterItem['name'] }}"
+                                aria-label="{{ $filterItem['label'] }}"
+                                @change="$el.form.requestSubmit()"
+                                class="w-full rounded-control border border-border bg-surface px-2.5 py-1.5 text-xs text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary">
+                            <option value="">{{ $filterItem['placeholder'] }}</option>
+                            @foreach ($filterItem['options'] as $optionValue => $optionLabel)
+                                <option value="{{ $optionValue }}" @selected($filterItem['value'] !== '' && $filterItem['value'] === (string) $optionValue)>{{ $optionLabel }}</option>
+                            @endforeach
+                        </select>
+                    @endforeach
+                </div>
+            </form>
 
             @if ($sessions->isEmpty())
                 <x-empty-state :title="$official ? 'Tidak ada jadwal yang cocok' : 'Belum ada jadwal'"
-                               :message="$official ? 'Coba kata kunci lain atau hapus filter hari.' : 'Impor jadwal perkuliahan agar status ruang bisa dihitung.'">
+                               :message="$official ? 'Tidak ada jadwal perkuliahan yang cocok dengan filter.' : 'Jadwal perkuliahan belum tersedia. Impor Excel atau CSV agar status ruang bisa dihitung.'">
                     <x-button variant="soft" :href="$official ? route('admin.schedules.index', array_filter(['versi' => request('versi')])) : route('admin.imports.create')">{{ $official ? 'Hapus filter' : 'Impor Excel atau CSV' }}</x-button>
                 </x-empty-state>
             @else
-                <div class="overflow-x-auto">
+                <x-table-scroll>
+                    <x-slot:title>{{ $sessions->count() }} sesi • Jadwal perkuliahan resmi v{{ $official->version_no }}</x-slot:title>
+                    <x-slot:headerActions>
+                        <x-table-density-toggle />
+                    </x-slot:headerActions>
                     <table class="w-full text-left text-sm">
-                        <thead class="border-b border-border text-xs text-muted">
+                        <thead class="sticky top-0 z-10 border-b border-border bg-page text-xs font-semibold text-muted">
                             <tr>
-                                <th class="py-3 pr-4 font-medium">Kelas</th>
-                                <th class="py-3 pr-4 font-medium whitespace-nowrap">Waktu</th>
-                                <th class="py-3 pr-4 font-medium">Ruang</th>
-                                <th class="py-3 pr-4 font-medium">Mata kuliah</th>
-                                <th class="py-3 font-medium">Tim pengajar</th>
+                                <th scope="col" class="px-4 py-3 font-medium">Kelas</th>
+                                <th scope="col" class="px-4 py-3 font-medium whitespace-nowrap">Waktu</th>
+                                <th scope="col" class="px-4 py-3 font-medium">Ruang</th>
+                                <th scope="col" class="px-4 py-3 font-medium">Mata kuliah</th>
+                                <th scope="col" class="px-4 py-3 font-medium">Tim pengajar</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-border">
                             @foreach ($sessions as $session)
-                                <tr class="hover:bg-page/50 transition">
-                                    <td class="py-3 pr-4 font-medium whitespace-nowrap">
+                                @php($isAlternateBlock = $cohortBlockAlternate[$session->id] ?? false)
+                                <tr @class([
+                                    'transition',
+                                    'bg-primary-soft/45 hover:bg-primary-soft/70' => $isAlternateBlock,
+                                    'bg-surface hover:bg-page/70' => ! $isAlternateBlock,
+                                ])>
+                                    <td class="px-4 py-3 font-medium whitespace-nowrap">
                                         <span class="font-semibold text-ink">{{ $session->participants->pluck('name')->implode(' + ') ?: '—' }}</span>
                                     </td>
-                                    <td class="py-3 pr-4 whitespace-nowrap">
+                                    <td class="px-4 py-3 whitespace-nowrap">
                                         <div class="flex flex-col">
                                             <span class="font-medium text-ink">{{ $session->day_of_week ? Wita::dayName($session->day_of_week) : '—' }}</span>
                                             <span class="text-xs text-muted">
@@ -175,7 +279,7 @@
                                             </span>
                                         </div>
                                     </td>
-                                    <td class="py-3 pr-4 whitespace-nowrap">
+                                    <td class="px-4 py-3 whitespace-nowrap">
                                         @if ($session->mode === SessionMode::Online)
                                             <span class="inline-flex items-center rounded-md bg-primary-soft px-2 py-0.5 text-xs font-semibold text-primary">Online</span>
                                         @elseif ($session->room)
@@ -186,10 +290,10 @@
                                             <span class="text-xs text-muted italic">—</span>
                                         @endif
                                     </td>
-                                    <td class="py-3 pr-4">
+                                    <td class="px-4 py-3">
                                         <span class="font-medium text-ink">{{ $session->title }}</span>
                                     </td>
-                                    <td class="py-3">
+                                    <td class="px-4 py-3">
                                         @if ($session->lecturers->isNotEmpty())
                                             <div class="flex flex-col gap-1.5">
                                                 @foreach ($session->lecturers->sortByDesc(fn ($l) => $l->pivot->role === 'lead') as $lecturer)
@@ -222,16 +326,15 @@
                             @endforeach
                         </tbody>
                     </table>
-                </div>
-                <p class="text-sm text-muted">{{ $sessions->count() }} sesi pada jadwal resmi v{{ $official->version_no }}</p>
+                </x-table-scroll>
             @endif
         </x-card>
 
-        <x-card class="flex flex-col gap-3">
-            <h2 class="text-lg font-semibold">Riwayat revisi</h2>
+        <x-card padding="p-4" class="flex flex-col gap-2.5">
+            <h2 class="text-base font-semibold">Riwayat revisi</h2>
             @forelse ($versions as $version)
-                <div class="flex items-center justify-between rounded-control border border-border px-4 py-3 text-sm">
-                    <div class="flex items-center gap-3">
+                <div class="flex flex-wrap items-center justify-between gap-2 rounded-control border border-border px-3 py-2 text-xs sm:text-sm">
+                    <div class="flex flex-wrap items-center gap-2.5">
                         <span class="font-semibold">v{{ $version->version_no }}</span>
                         <x-status-badge :variant="match ($version->status) { ScheduleVersionStatus::Official => 'success', ScheduleVersionStatus::Draft, ScheduleVersionStatus::Ready => 'primary', default => 'neutral' }">{{ $version->status->label() }}</x-status-badge>
                         <span class="text-muted">{{ $version->source->label() }} • berlaku {{ Wita::date($version->effective_from) }}{{ $version->effective_to ? ' – '.Wita::date($version->effective_to) : '' }}</span>

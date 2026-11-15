@@ -2,7 +2,7 @@
 @use('App\Support\Wita')
 @extends('layouts.keti')
 
-@section('title', 'Booking Ruangan')
+@section('title', 'Slot Kosong Ruangan')
 
 @php
     $sksOptions = config('sicma.reservation.duration_options');
@@ -14,8 +14,7 @@
 
 @section('content')
     <div class="flex flex-col gap-6">
-        <x-page-header title="Booking Ruangan" subtitle="Pilih waktu kosong dan pesan ruangan untuk kelasmu." />
-        @include('keti.partials.search-tabs', ['active' => 'kalender'])
+        <x-page-header title="Slot Kosong Ruangan" subtitle="Pilih waktu kosong dan pesan ruangan untuk kelasmu." />
         <p class="text-sm text-muted">Kalender pemesanan menampilkan hari Senin–Jumat.</p>
 
         @if ($showingNextTeachingDay)

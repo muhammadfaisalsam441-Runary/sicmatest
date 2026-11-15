@@ -13,8 +13,152 @@ window.renderIcons = (root = document) => createIcons({ icons, root });
 
 window.renderIcons();
 
+let supportsDisplayTransition;
+function canTransitionDisplay() {
+    if (supportsDisplayTransition !== undefined) return supportsDisplayTransition;
+    if (!window.CSS?.supports?.('transition-behavior', 'allow-discrete') || !document.body) {
+        return false;
+    }
+    const probe = document.createElement('div');
+    probe.style.cssText = 'transition: display 1s allow-discrete !important; display: block;';
+    document.body.appendChild(probe);
+    getComputedStyle(probe).display;
+    probe.style.display = 'none';
+    supportsDisplayTransition = getComputedStyle(probe).display === 'block';
+    probe.remove();
+    return supportsDisplayTransition;
+}
+
+function supportsTopLayerExit() {
+    return Boolean(window.CSS?.supports?.('overlay', 'auto') && canTransitionDisplay());
+}
+
+window.sicmaCloseDialog = async function (dialog) {
+    if (!dialog || !dialog.open) return;
+    if (!supportsTopLayerExit()) {
+        dialog.setAttribute('data-closing', '');
+        const animations = dialog.getAnimations({ subtree: true });
+        if (animations.length > 0) {
+            await Promise.race([
+                Promise.allSettled(animations.map((animation) => animation.finished)),
+                new Promise((resolve) => setTimeout(resolve, 2000)),
+            ]);
+        }
+        if (!dialog.hasAttribute('data-closing')) return;
+        dialog.removeAttribute('data-closing');
+    }
+    if (dialog.open) dialog.close();
+};
+
 const navigation = installPortalNavigation(Alpine, (root = document) => window.renderIcons(root));
 registerStatusPolling(Alpine, navigation);
+
+const TABLE_DENSITY_KEY = 'sicma.tableDensity';
+
+function readTableDensity() {
+    try {
+        return localStorage.getItem(TABLE_DENSITY_KEY) === 'compact' ? 'compact' : 'normal';
+    } catch {
+        return 'normal';
+    }
+}
+
+function applyTableDensity(density) {
+    const value = density === 'compact' ? 'compact' : 'normal';
+    if (document.documentElement) {
+        document.documentElement.dataset.uiDensity = value;
+    }
+    if (document.body) {
+        document.body.dataset.tableDensity = value;
+    }
+    return value;
+}
+
+applyTableDensity(readTableDensity());
+document.addEventListener('sicma:navigated', () => applyTableDensity(readTableDensity()));
+
+// Shortcut `/` untuk memfokuskan kolom pencarian tabel aktif.
+document.addEventListener('keydown', (event) => {
+    if (event.key !== '/' || event.ctrlKey || event.metaKey || event.altKey) return;
+    const active = document.activeElement;
+    if (active && (['INPUT', 'TEXTAREA', 'SELECT'].includes(active.tagName) || active.isContentEditable)) {
+        return;
+    }
+    const container = document.getElementById('main-content') || document;
+    const candidates = container.querySelectorAll('input[data-table-search], input[type="search"], input[name="q"]');
+    for (const input of candidates) {
+        if (input.offsetParent !== null && !input.disabled) {
+            event.preventDefault();
+            input.focus();
+            if (typeof input.select === 'function') {
+                input.select();
+            }
+            break;
+        }
+    }
+});
+
+// Shift+Click rentang checkbox pada baris tabel yang tampil.
+const lastCheckedByTable = new WeakMap();
+document.addEventListener('click', (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement) || target.type !== 'checkbox') return;
+    const tbody = target.closest('tbody');
+    const table = target.closest('table');
+    if (!tbody || !table) return;
+
+    const previous = lastCheckedByTable.get(table);
+    if (event.shiftKey && previous && previous !== target && table.contains(previous)) {
+        const checkboxes = Array.from(tbody.querySelectorAll('tr input[type="checkbox"]')).filter((cb) => {
+            const row = cb.closest('tr');
+            return row && row.offsetParent !== null && !cb.disabled;
+        });
+        const start = checkboxes.indexOf(previous);
+        const end = checkboxes.indexOf(target);
+        if (start !== -1 && end !== -1) {
+            const [from, to] = start < end ? [start, end] : [end, start];
+            const desired = target.checked;
+            for (let i = from; i <= to; i++) {
+                const cb = checkboxes[i];
+                if (cb !== target && cb.checked !== desired) {
+                    cb.checked = desired;
+                    cb.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            }
+        }
+    }
+    lastCheckedByTable.set(table, target);
+});
+
+Alpine.data('tableDensityToggle', () => ({
+    density: readTableDensity(),
+
+    init() {
+        this.density = applyTableDensity(readTableDensity());
+        this._onChanged = (e) => {
+            this.density = e.detail?.density ?? readTableDensity();
+        };
+        window.addEventListener('sicma:density-changed', this._onChanged);
+    },
+
+    destroy() {
+        if (this._onChanged) {
+            window.removeEventListener('sicma:density-changed', this._onChanged);
+        }
+    },
+
+    toggle() {
+        const next = this.density === 'compact' ? 'normal' : 'compact';
+        this.density = applyTableDensity(next);
+        try {
+            localStorage.setItem(TABLE_DENSITY_KEY, this.density);
+        } catch {
+            // Abaikan error penyimpanan jika browser memblokir localStorage.
+        }
+        window.dispatchEvent(new CustomEvent('sicma:density-changed', { detail: { density: this.density } }));
+        this.$nextTick(() => window.renderIcons?.(this.$el));
+    },
+}));
 
 Alpine.data('teachingManager', (pageOfferingIds, lecturerOptionsByOffering, allLecturers = []) => ({
     selectedIds: [],
@@ -92,67 +236,136 @@ Alpine.data('teachingManager', (pageOfferingIds, lecturerOptionsByOffering, allL
     },
 }));
 
-Alpine.data('lecturerManager', (pageLecturerIds) => ({
-    selectedIds: [],
-    formModalOpen: false,
-    batchTargetModalOpen: false,
-    importModalOpen: false,
-    batchAction: '',
-    courseQuery: '',
-    formLecturer: { course_ids: [] },
+Alpine.data('lecturerManager', (pageLecturerIds = [], initialLecturers = {}) => {
+    const cloneLecturers = (src) => JSON.parse(JSON.stringify(src || {}));
 
-    get selectedCourseIds() {
-        return [...new Set([...(this.formLecturer.source_course_ids ?? []), ...this.formLecturer.course_ids])];
-    },
+    return {
+        selectedIds: [],
+        editMode: false,
+        fillTargetSks: 12,
+        fillMaxSks: 16,
+        originalLecturers: cloneLecturers(initialLecturers),
+        lecturersData: cloneLecturers(initialLecturers),
+        formModalOpen: false,
+        batchTargetModalOpen: false,
+        importModalOpen: false,
+        batchAction: '',
+        courseQuery: '',
+        formLecturer: { course_ids: [] },
 
-    toggleCourse(id, checked) {
-        if (this.formLecturer.source_course_ids?.includes(id)) return;
-        this.formLecturer.course_ids = checked
-            ? [...new Set([...this.formLecturer.course_ids, id])]
-            : this.formLecturer.course_ids.filter((courseId) => courseId !== id);
-    },
+        get visibleIds() {
+            return pageLecturerIds.map(Number);
+        },
 
-    isAllSelected() {
-        const current = this.selectedIds.map(Number);
-        return pageLecturerIds.length > 0 && pageLecturerIds.every((id) => current.includes(Number(id)));
-    },
+        targetIds() {
+            const selected = this.selectedIds.map(Number);
+            return selected.length > 0 ? selected : this.visibleIds;
+        },
 
-    toggleSelectAll(checked) {
-        const pageIds = pageLecturerIds.map(Number);
-        const current = this.selectedIds.map(Number);
-        this.selectedIds = checked
-            ? [...new Set([...current, ...pageIds])]
-            : current.filter((id) => !pageIds.includes(id));
-    },
-
-    openCreateModal() {
-        this.openEditModal({ homebase: 'jtik', profile_status: 'verified', target_sks: '12', max_sks: '16', course_ids: [] });
-    },
-
-    openEditModal(data) {
-        this.formLecturer = { ...data };
-        this.courseQuery = '';
-        this.formModalOpen = true;
-        this.$nextTick(() => window.renderIcons());
-    },
-
-    submitBatch(action) {
-        if (this.selectedIds.length === 0) return;
-        this.batchAction = action;
-        this.$nextTick(() => {
-            const form = this.$refs.batchForm;
-            if (!form) return;
-            if (typeof form.requestSubmit === 'function') {
-                form.requestSubmit();
+        toggleEditMode() {
+            if (this.editMode) {
+                this.cancelEditMode();
             } else {
-                form.submit();
+                this.editMode = true;
+                this.$nextTick(() => window.renderIcons?.());
             }
-        });
-    },
-}));
+        },
+
+        cancelEditMode() {
+            this.lecturersData = cloneLecturers(this.originalLecturers);
+            this.editMode = false;
+        },
+
+        applyFillEmptySks() {
+            const tVal = this.fillTargetSks !== '' && this.fillTargetSks !== null ? Number(this.fillTargetSks) : null;
+            const mVal = this.fillMaxSks !== '' && this.fillMaxSks !== null ? Number(this.fillMaxSks) : null;
+            this.targetIds().forEach((id) => {
+                const l = this.lecturersData[id];
+                if (!l) return;
+                if (tVal !== null && (l.target_sks === '' || l.target_sks === null || l.target_sks === undefined)) {
+                    l.target_sks = tVal;
+                }
+                if (mVal !== null && (l.max_sks === '' || l.max_sks === null || l.max_sks === undefined)) {
+                    l.max_sks = mVal;
+                }
+            });
+        },
+
+        applyFillAllSks() {
+            const tVal = this.fillTargetSks !== '' && this.fillTargetSks !== null ? Number(this.fillTargetSks) : null;
+            const mVal = this.fillMaxSks !== '' && this.fillMaxSks !== null ? Number(this.fillMaxSks) : null;
+            this.targetIds().forEach((id) => {
+                const l = this.lecturersData[id];
+                if (!l) return;
+                if (tVal !== null) l.target_sks = tVal;
+                if (mVal !== null) l.max_sks = mVal;
+            });
+        },
+
+        get selectedCourseIds() {
+            return [...new Set([...(this.formLecturer.source_course_ids ?? []), ...this.formLecturer.course_ids])];
+        },
+
+        toggleCourse(id, checked) {
+            if (this.formLecturer.source_course_ids?.includes(id)) return;
+            this.formLecturer.course_ids = checked
+                ? [...new Set([...this.formLecturer.course_ids, id])]
+                : this.formLecturer.course_ids.filter((courseId) => courseId !== id);
+        },
+
+        isAllSelected() {
+            const current = this.selectedIds.map(Number);
+            return pageLecturerIds.length > 0 && pageLecturerIds.every((id) => current.includes(Number(id)));
+        },
+
+        toggleSelectAll(checked) {
+            const pageIds = pageLecturerIds.map(Number);
+            const current = this.selectedIds.map(Number);
+            this.selectedIds = checked
+                ? [...new Set([...current, ...pageIds])]
+                : current.filter((id) => !pageIds.includes(id));
+        },
+
+        openCreateModal() {
+            this.openEditModal({ homebase: 'jtik', profile_status: 'verified', target_sks: '12', max_sks: '16', course_ids: [] });
+        },
+
+        openEditModal(data) {
+            this.formLecturer = { ...data };
+            this.courseQuery = '';
+            this.formModalOpen = true;
+            this.$nextTick(() => window.renderIcons());
+        },
+
+        submitBatch(action) {
+            if (this.selectedIds.length === 0) return;
+            this.batchAction = action;
+            this.$nextTick(() => {
+                const form = this.$refs.batchForm;
+                if (!form) return;
+                if (typeof form.requestSubmit === 'function') {
+                    form.requestSubmit();
+                } else {
+                    form.submit();
+                }
+            });
+        },
+    };
+});
 
 Alpine.data('roomManager', (pageRoomIds = [], defaults = {}, initialRooms = {}) => {
     const cloneRooms = (src) => JSON.parse(JSON.stringify(src || {}));
+    const parseEditId = (val) => {
+        if (val !== undefined && val !== null && val !== '') {
+            const num = Number(val);
+            return Number.isFinite(num) && num > 0 ? num : null;
+        }
+        return null;
+    };
+    const inferredFormId = typeof defaults.form === 'string' && /^edit-(\d+)$/.test(defaults.form)
+        ? Number(defaults.form.match(/^edit-(\d+)$/)[1])
+        : null;
+    const initialRoomId = parseEditId(defaults.roomId ?? defaults.id) ?? inferredFormId;
 
     return {
         editMode: false,
@@ -175,7 +388,7 @@ Alpine.data('roomManager', (pageRoomIds = [], defaults = {}, initialRooms = {}) 
         closureReason: defaults.closureReason ?? '',
         roomToDelete: { id: null, name: '' },
         formRoom: {
-            id: null,
+            id: initialRoomId,
             name: defaults.name ?? '',
             code: defaults.code ?? '',
             type: defaults.type ?? 'classroom',
@@ -183,7 +396,7 @@ Alpine.data('roomManager', (pageRoomIds = [], defaults = {}, initialRooms = {}) 
             floor: defaults.floor ?? '',
             building: defaults.building ?? '',
             facilities: defaults.facilities ?? '',
-            is_bookable: true,
+            is_bookable: defaults.is_bookable ?? true,
         },
 
         get visibleIds() {
@@ -316,7 +529,7 @@ Alpine.data('roomManager', (pageRoomIds = [], defaults = {}, initialRooms = {}) 
             if (this.selectedIds.length === 0) return;
             const form = event.target;
             if (typeof form.requestSubmit === 'function') {
-                form.submit();
+                form.requestSubmit();
             } else {
                 form.submit();
             }
@@ -493,6 +706,140 @@ function uuidV4() {
     return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
+Alpine.data('cohortArchiveModal', (config = {}) => ({
+    cohortYear: config.initialCohort || '',
+    previewUrl: config.previewUrl || '',
+    loading: false,
+    error: null,
+    preview: null,
+    reason: '',
+    deactivateKetis: true,
+
+    async init() {
+        if (this.cohortYear) {
+            await this.fetchPreview();
+        }
+    },
+
+    async fetchPreview() {
+        if (!this.cohortYear) {
+            this.preview = null;
+            return;
+        }
+        this.loading = true;
+        this.error = null;
+        try {
+            const url = new URL(this.previewUrl, window.location.origin);
+            url.searchParams.set('cohort_year', this.cohortYear);
+            const res = await fetch(url.toString(), {
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            });
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.message || `Gagal memuat preview (${res.status})`);
+            }
+            this.preview = await res.json();
+            if (!this.reason || this.reason.startsWith('Kelulusan Angkatan')) {
+                this.reason = `Kelulusan Angkatan ${this.cohortYear}`;
+            }
+        } catch (err) {
+            this.error = err.message || 'Terjadi kesalahan saat memuat preview';
+            this.preview = null;
+        } finally {
+            this.loading = false;
+            this.$nextTick(() => window.renderIcons?.(this.$el));
+        }
+    },
+}));
+
+Alpine.data('cohortGenerateModal', (config = {}) => ({
+    sourceCohort: config.initialSource || '',
+    targetCohort: config.initialTarget || (new Date().getFullYear() + 1),
+    copyStudentCount: true,
+    defaultStudentCount: 40,
+    previewUrl: config.previewUrl || '',
+    loading: false,
+    error: null,
+    classes: [],
+    selectAll: true,
+
+    get selectedClasses() {
+        return this.classes.filter((c) => c.selected && !c.already_exists);
+    },
+
+    get selectedCount() {
+        return this.selectedClasses.length;
+    },
+
+    get isAllSelected() {
+        const selectable = this.classes.filter((c) => !c.already_exists);
+        return selectable.length > 0 && selectable.every((c) => c.selected);
+    },
+
+    toggleSelectAll(checked) {
+        this.selectAll = checked;
+        this.classes.forEach((c) => {
+            if (!c.already_exists) {
+                c.selected = checked;
+            }
+        });
+    },
+
+    async init() {
+        if (this.sourceCohort && this.targetCohort) {
+            await this.fetchPreview();
+        }
+    },
+
+    async fetchPreview() {
+        if (!this.sourceCohort || !this.targetCohort) {
+            this.classes = [];
+            return;
+        }
+        if (Number(this.sourceCohort) === Number(this.targetCohort)) {
+            this.error = 'Tahun angkatan target tidak boleh sama dengan angkatan sumber.';
+            this.classes = [];
+            return;
+        }
+        this.loading = true;
+        this.error = null;
+        try {
+            const url = new URL(this.previewUrl, window.location.origin);
+            url.searchParams.set('source_cohort_year', this.sourceCohort);
+            url.searchParams.set('target_cohort_year', this.targetCohort);
+            url.searchParams.set('copy_student_count', this.copyStudentCount ? '1' : '0');
+            if (this.defaultStudentCount) {
+                url.searchParams.set('default_student_count', this.defaultStudentCount);
+            }
+            const res = await fetch(url.toString(), {
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            });
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.message || `Gagal memuat preview (${res.status})`);
+            }
+            const data = await res.json();
+            this.classes = (data.classes || []).map((cls) => ({
+                ...cls,
+                selected: !cls.already_exists,
+            }));
+            this.selectAll = this.classes.some((c) => !c.already_exists);
+        } catch (err) {
+            this.error = err.message || 'Terjadi kesalahan saat memuat preview';
+            this.classes = [];
+        } finally {
+            this.loading = false;
+            this.$nextTick(() => window.renderIcons?.(this.$el));
+        }
+    },
+}));
+
 // Modal "Pesan ruang" bersama Portal Keti. Setiap pembukaan memakai idempotency key baru agar
 // pemesanan ruang lain tidak memakai ulang kunci pemesanan sebelumnya (B07).
 Alpine.data('bookingModal', (config = {}) => ({
@@ -521,6 +868,126 @@ Alpine.data('bookingModal', (config = {}) => ({
 
     close() {
         if (!this.submitting) this.open = false;
+    },
+}));
+
+Alpine.data('tableScrollBox', () => ({
+    fullscreen: false,
+    activeScroll: false,
+    hasAutoFitted: false,
+    scrollTimer: null,
+
+    init() {
+        this._cleanupNav = () => {
+            this.fullscreen = false;
+            this.activeScroll = false;
+        };
+        document.addEventListener('sicma:navigated', this._cleanupNav);
+    },
+
+    destroy() {
+        clearTimeout(this.scrollTimer);
+        if (this._cleanupNav) {
+            document.removeEventListener('sicma:navigated', this._cleanupNav);
+        }
+    },
+
+    toggleFullscreen() {
+        this.fullscreen = !this.fullscreen;
+        if (this.fullscreen) {
+            this.hasAutoFitted = true;
+        }
+        this.$nextTick(() => {
+            if (window.refreshIcons) {
+                window.refreshIcons();
+            }
+        });
+    },
+
+    closeFullscreen() {
+        if (!this.fullscreen) return;
+        this.fullscreen = false;
+    },
+
+    resetAutoFit() {
+        this.hasAutoFitted = false;
+    },
+
+    onTableScroll(event) {
+        const scroller = event?.target;
+        if (!scroller) return;
+
+        this.activeScroll = true;
+        clearTimeout(this.scrollTimer);
+        this.scrollTimer = setTimeout(() => {
+            this.activeScroll = false;
+        }, 700);
+
+        if (
+            this.fullscreen
+            || this.hasAutoFitted
+            || scroller.scrollTop <= 0
+            || scroller.scrollHeight <= scroller.clientHeight
+        ) {
+            return;
+        }
+
+        const box = this.$refs.box;
+        if (!box) return;
+
+        const rect = box.getBoundingClientRect();
+        const topOffset = (document.querySelector('header.sticky')?.offsetHeight ?? 56) + 12;
+        const bottomPadding = 16;
+        const viewportBottom = window.innerHeight - bottomPadding;
+
+        if (rect.top >= topOffset && rect.bottom <= viewportBottom) {
+            this.hasAutoFitted = true;
+            return;
+        }
+
+        const currentY = window.scrollY;
+        const maxTopY = currentY + rect.top - topOffset;
+        let targetY = currentY;
+
+        if (rect.top < topOffset) {
+            targetY = maxTopY;
+        } else if (rect.bottom > viewportBottom) {
+            const neededDown = rect.bottom - viewportBottom;
+            targetY = Math.min(currentY + neededDown, maxTopY);
+        }
+
+        this.hasAutoFitted = true;
+        if (Math.abs(targetY - currentY) > 4) {
+            window.scrollTo({
+                top: Math.max(0, targetY),
+                behavior: 'smooth',
+            });
+        }
+    },
+}));
+
+Alpine.data('filterDrawer', (storageKey = '', defaultOpen = false) => ({
+    open: Boolean(defaultOpen),
+
+    init() {
+        try {
+            const v = sessionStorage.getItem('sicma_drawer_' + storageKey);
+            if (v !== null) {
+                this.open = v === '1';
+            }
+        } catch {
+            // Abaikan error penyimpanan jika sessionStorage diblokir.
+        }
+    },
+
+    toggle() {
+        this.open = !this.open;
+        try {
+            sessionStorage.setItem('sicma_drawer_' + storageKey, this.open ? '1' : '0');
+        } catch {
+            // Abaikan error penyimpanan jika sessionStorage diblokir.
+        }
+        this.$nextTick(() => window.renderIcons?.(this.$el));
     },
 }));
 

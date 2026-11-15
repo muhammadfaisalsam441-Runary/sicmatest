@@ -32,7 +32,7 @@
             @if ($rooms === [])
                 <x-empty-state title="Tidak ada ruangan favorit dengan status ini" message="Ruangan favorit tetap mengikuti ketersediaan saat ini." />
             @else
-                <div class="grid grid-cols-3 gap-3">
+                <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
                     @foreach ($rooms as $room)
                         <x-room-card :name="$room['name']" :badge="$room['badge']" :location="$room['location']" :capacity="$room['capacity']" :facilities="$room['facilities']"
                                      :time-label="$room['time_label']" :time="$room['time']" :note="$room['note']">

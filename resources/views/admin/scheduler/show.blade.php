@@ -41,7 +41,7 @@
     <div class="flex flex-col gap-6"
         @if ($running) x-data="statusPolling({ url: @js(route('admin.scheduler.status', $job)), interval: 3000, job: true, elapsed: {{ $job->started_at ? max(0, (int) $job->started_at->diffInSeconds(now())) : 0 }}, progress: @js($job->result['progress'] ?? ['stage' => $job->status === OptimizationJobStatus::Queued ? 'Menunggu antrean' : 'Menyiapkan kandidat', 'total' => $job->scope['in_scope'] ?? 0, 'placed' => 0]) })" @endif>
         <x-page-header :title="$title" :subtitle="'Pekerjaan '.$code.' • '.$scopeLabel.' • dasar v'.($job->scope['base_version_no'] ?? '?').' • '.Wita::stamp($job->created_at)" />
-        <x-card><x-schedule-steps :current="3" /></x-card>
+        <x-card padding="px-2.5 py-2" class="w-fit max-w-full"><x-schedule-steps :current="3" /></x-card>
         @include('admin.partials.scheduling-tabs')
 
         @if ($state === 'running')
@@ -53,10 +53,9 @@
                 <x-info-box title="Satu permintaan, satu proses">
                     <p>Klik berulang tidak membuat pekerjaan ganda. Jadwal resmi dan sesi terkunci tetap dilindungi. Proses tetap berjalan saat kamu membuka menu lain.</p>
                 </x-info-box>
-                <form method="POST" action="{{ route('admin.scheduler.cancel', $job) }}">
-                    @csrf
-                    <x-button type="submit" variant="danger-outline">Batalkan proses</x-button>
-                </form>
+                <div class="flex flex-wrap items-center gap-3">
+                    <x-button type="button" variant="danger-outline" x-data x-on:click="$dispatch('open-modal', 'cancel-scheduler-job')">Batalkan proses</x-button>
+                </div>
             </x-card>
         @elseif ($state === 'draft')
             <x-alert :variant="($job->result['publishable'] ?? false) ? 'success' : 'info'" :title="'Draf v'.($job->result['draft_version_no'] ?? '').' dibuat • jadwal resmi belum berubah'">
@@ -82,7 +81,7 @@
                     @endforeach
                 </x-card>
             @endif
-            <div class="flex gap-3">
+            <div class="flex flex-wrap gap-3">
                 <x-button :href="route('admin.drafts.inspect', $draftId)">Buka Pemeriksaan</x-button>
                 <x-button variant="secondary" :href="route('admin.drafts.show', $draftId)">Edit Draf</x-button>
                 <x-button variant="secondary" :href="route('admin.drafts.show', [$draftId, 'tinjau' => 'dosen'])">Tinjau per dosen</x-button>
@@ -128,3 +127,15 @@
         @endif
     </div>
 @endsection
+
+@if ($state === 'running')
+    @push('dialogs')
+        <x-confirm-dialog name="cancel-scheduler-job"
+                          title="Batalkan proses penyusunan jadwal?"
+                          message="Pencarian kandidat akan dihentikan. Belum ada draf yang dihasilkan dan jadwal resmi tetap aman."
+                          :action="route('admin.scheduler.cancel', $job)"
+                          confirm="Ya, batalkan proses"
+                          cancel="Lanjutkan proses"
+                          icon="triangle-alert" />
+    @endpush
+@endif

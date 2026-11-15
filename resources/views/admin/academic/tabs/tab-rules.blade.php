@@ -7,7 +7,16 @@
                 <form method="POST" action="{{ route('admin.academic.slots.update', $period) }}" class="flex flex-col gap-4">
                     @csrf
                     @method('PUT')
-                    <div class="grid grid-cols-4 gap-3">
+                    @if ($errors->any())
+                        <x-alert variant="danger" title="Slot waktu belum valid">
+                            <ul class="list-disc pl-4 text-xs">
+                                @foreach ($errors->all() as $error)
+                                    <li>{{ $error }}</li>
+                                @endforeach
+                            </ul>
+                        </x-alert>
+                    @endif
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                         @foreach ($period->timeSlots as $slot)
                             <div class="flex items-center gap-2 rounded-control border border-border px-3 py-2">
                                 <span class="w-10 text-sm font-semibold">{{ $slot->label }}</span>

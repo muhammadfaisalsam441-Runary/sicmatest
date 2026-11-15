@@ -2,12 +2,14 @@
 
 namespace App\Models\Academic;
 
+use App\Enums\RescheduleMode;
 use App\Enums\RescheduleStatus;
 use App\Models\Lecturer\Lecturer;
 use App\Models\Reservation\Reservation;
 use App\Models\Room\Room;
 use App\Models\Scheduling\ScheduleSession;
 use App\Models\User\User;
+use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Database\Factories\SessionRescheduleFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -19,12 +21,30 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 /**
- * Satu pertemuan kuliah yang dipindah Keti ke reservasi "Kuliah Pengganti".
+ * Satu pertemuan kuliah yang dipindah Keti ke reservasi "Kuliah Pengganti" atau dialihkan ke mode Online.
  *
  * Pertemuan asli dikenali lewat penawaran mata kuliah + jam mulai, atau judul + kelas peserta bila
  * sesi tidak terhubung ke penawaran, sehingga tetap berlaku saat jadwal ditetapkan ulang.
  */
-#[Fillable(['schedule_session_id', 'course_offering_id', 'session_title', 'participant_key', 'original_start_at', 'original_end_at', 'original_room_id', 'reservation_id', 'status', 'created_by', 'cancelled_at', 'cancelled_by'])]
+#[Fillable([
+    'schedule_session_id',
+    'course_offering_id',
+    'session_title',
+    'participant_key',
+    'original_start_at',
+    'original_end_at',
+    'original_room_id',
+    'mode',
+    'reservation_id',
+    'target_start_at',
+    'target_end_at',
+    'status',
+    'note',
+    'idempotency_key',
+    'created_by',
+    'cancelled_at',
+    'cancelled_by',
+])]
 class SessionReschedule extends Model
 {
     /** @use HasFactory<SessionRescheduleFactory> */
@@ -36,11 +56,34 @@ class SessionReschedule extends Model
     protected function casts(): array
     {
         return [
+            'mode' => RescheduleMode::class,
             'original_start_at' => 'datetime',
             'original_end_at' => 'datetime',
+            'target_start_at' => 'datetime',
+            'target_end_at' => 'datetime',
             'cancelled_at' => 'datetime',
             'status' => RescheduleStatus::class,
         ];
+    }
+
+    public function isOnline(): bool
+    {
+        return ($this->mode ?? RescheduleMode::Room) === RescheduleMode::Online;
+    }
+
+    public function effectiveStart(): CarbonImmutable
+    {
+        return CarbonImmutable::instance($this->target_start_at ?? $this->reservation?->start_at ?? $this->original_start_at);
+    }
+
+    public function effectiveEnd(): CarbonImmutable
+    {
+        return CarbonImmutable::instance($this->target_end_at ?? $this->reservation?->end_at ?? $this->original_end_at);
+    }
+
+    public function includesClassGroup(int $classGroupId): bool
+    {
+        return in_array((string) $classGroupId, array_filter(explode(',', $this->participant_key), fn (string $id): bool => $id !== ''), true);
     }
 
     /**

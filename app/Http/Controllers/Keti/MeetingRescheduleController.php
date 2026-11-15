@@ -6,9 +6,12 @@ use App\Enums\TeachingRole;
 use App\Exceptions\DomainException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Keti\MoveMeetingRequest;
+use App\Http\Requests\Keti\StoreOnlineMeetingRequest;
+use App\Models\Academic\SessionReschedule;
 use App\Models\Reservation\Reservation;
 use App\Models\Room\Room;
 use App\Models\Scheduling\ScheduleSession;
+use App\Services\Academic\Meeting;
 use App\Services\Academic\MeetingLocator;
 use App\Services\Academic\MeetingRescheduleService;
 use App\Services\Room\AvailabilityService;
@@ -34,6 +37,7 @@ class MeetingRescheduleController extends Controller
             'sesi' => ['required', 'integer'],
             'tanggal' => ['required', 'date_format:Y-m-d'],
             'pengganti' => ['nullable', 'integer'],
+            'pengganti_online' => ['nullable', 'integer'],
             'ke_tanggal' => ['nullable', 'date_format:Y-m-d'],
             'jam' => ['nullable', 'regex:/^([01]\d|2[0-3]):[0-5]\d$/'],
             'dosen' => ['nullable', 'array'],
@@ -49,6 +53,9 @@ class MeetingRescheduleController extends Controller
             // Jika jadwal resmi telah diperbarui (schedule_version baru), cari sesi padanannya di versi resmi saat ini
             $meeting = $this->meetings->meetingsOn($date)->first(function (Meeting $m) use ($session, $filters): bool {
                 if (isset($filters['pengganti']) && $m->reschedule?->reservation_id === (int) $filters['pengganti']) {
+                    return true;
+                }
+                if (isset($filters['pengganti_online']) && $m->reschedule?->id === (int) $filters['pengganti_online']) {
                     return true;
                 }
                 if ($session->course_offering_id !== null && $m->session->course_offering_id === $session->course_offering_id) {
@@ -75,13 +82,23 @@ class MeetingRescheduleController extends Controller
         $replacing = null;
         if (isset($filters['pengganti'])) {
             abort_unless($meeting->reschedule?->reservation_id === (int) $filters['pengganti'], 404);
-            $replacing = $meeting->reschedule;
+            $replacing = $meeting->reschedule->loadMissing('lecturers');
+        } elseif (isset($filters['pengganti_online'])) {
+            abort_unless($meeting->reschedule?->id === (int) $filters['pengganti_online'] && $meeting->reschedule->isOnline(), 404);
+            $replacing = $meeting->reschedule->loadMissing('lecturers');
         } elseif ($meeting->isMoved()) {
+            if ($meeting->reschedule->isOnline()) {
+                return redirect()->route('keti.my-class', ['tanggal' => $meeting->reschedule->effectiveStart()->toDateString()]);
+            }
+
             return redirect()->route('keti.reservations.show', $meeting->reschedule->reservation_id);
         }
 
         $rotation = $this->meetings->rotationLecturerIds($session, $meeting->start);
-        $selected = collect($filters['dosen'] ?? $this->meetings->defaultLecturerIds($session, $meeting->start)->all())->map(fn ($id): int => (int) $id);
+        $defaultLecturers = $replacing && $replacing->lecturers->isNotEmpty()
+            ? $replacing->lecturers->pluck('id')->all()
+            : $this->meetings->defaultLecturerIds($session, $meeting->start)->all();
+        $selected = collect($filters['dosen'] ?? $defaultLecturers)->map(fn ($id): int => (int) $id);
         $duration = (int) $meeting->start->diffInMinutes($meeting->end);
         $start = isset($filters['ke_tanggal'], $filters['jam']) && filled($filters['jam'])
             ? CarbonImmutable::parse($filters['ke_tanggal'].' '.$filters['jam'])
@@ -145,9 +162,11 @@ class MeetingRescheduleController extends Controller
         $lecturerIds = array_map('intval', $data['lecturer_ids'] ?? []);
 
         try {
-            $reschedule = isset($data['replaces_reservation_id'])
-                ? $this->reschedules->moveAgain($request->user(), Reservation::query()->findOrFail($data['replaces_reservation_id']), $start, $room, $lecturerIds, $data['idempotency_key'])
-                : $this->reschedules->move($request->user(), ScheduleSession::query()->findOrFail($data['session_id']), CarbonImmutable::parse($data['original_date']), $start, $room, $lecturerIds, $data['idempotency_key']);
+            $reschedule = match (true) {
+                isset($data['replaces_reschedule_id']) => $this->reschedules->replaceWithRoom($request->user(), SessionReschedule::query()->findOrFail($data['replaces_reschedule_id']), $start, $room, $lecturerIds, $data['idempotency_key']),
+                isset($data['replaces_reservation_id']) => $this->reschedules->moveAgain($request->user(), Reservation::query()->findOrFail($data['replaces_reservation_id']), $start, $room, $lecturerIds, $data['idempotency_key']),
+                default => $this->reschedules->move($request->user(), ScheduleSession::query()->findOrFail($data['session_id']), CarbonImmutable::parse($data['original_date']), $start, $room, $lecturerIds, $data['idempotency_key']),
+            };
         } catch (DomainException $exception) {
             if ($request->expectsJson()) {
                 return response()->json($exception->toArray(), 409);
@@ -157,6 +176,7 @@ class MeetingRescheduleController extends Controller
                 'sesi' => $data['session_id'],
                 'tanggal' => $data['original_date'],
                 'pengganti' => $data['replaces_reservation_id'] ?? null,
+                'pengganti_online' => ! isset($data['replaces_reservation_id']) ? ($data['replaces_reschedule_id'] ?? null) : null,
                 'ke_tanggal' => $start->toDateString(),
                 'jam' => $start->format('H:i'),
                 'dosen' => $lecturerIds,
@@ -173,5 +193,111 @@ class MeetingRescheduleController extends Controller
 
         return redirect()->route('keti.reservations.show', $reschedule->reservation_id)
             ->with('toast', ['type' => 'success', 'title' => 'Pertemuan berhasil dipindahkan', 'message' => 'Ruang asli sudah dilepas untuk kelas lain.']);
+    }
+
+    public function storeOnline(StoreOnlineMeetingRequest $request): RedirectResponse|JsonResponse
+    {
+        $data = $request->validated();
+        $lecturerIds = array_map('intval', $data['lecturer_ids'] ?? []);
+        $note = $data['note'] ?? null;
+        $startAt = isset($data['start_at']) && filled($data['start_at'])
+            ? CarbonImmutable::parse($data['start_at'])
+            : null;
+
+        try {
+            if (isset($data['replaces_reschedule_id'])) {
+                $old = SessionReschedule::query()->findOrFail($data['replaces_reschedule_id']);
+                $reschedule = $this->reschedules->replaceWithOnline(
+                    $request->user(),
+                    $old,
+                    $startAt ?? CarbonImmutable::parse($old->original_start_at),
+                    $lecturerIds,
+                    $note,
+                    $data['idempotency_key'],
+                );
+            } elseif (isset($data['replaces_reservation_id'])) {
+                $old = Reservation::query()->findOrFail($data['replaces_reservation_id'])->sessionReschedule
+                    ?? throw new DomainException('MEETING_NOT_FOUND', 'Reservasi ini bukan pertemuan kuliah yang dipindah.');
+                $reschedule = $this->reschedules->replaceWithOnline(
+                    $request->user(),
+                    $old,
+                    $startAt ?? CarbonImmutable::parse($old->original_start_at),
+                    $lecturerIds,
+                    $note,
+                    $data['idempotency_key'],
+                );
+            } else {
+                $reschedule = $this->reschedules->makeOnline(
+                    $request->user(),
+                    ScheduleSession::query()->findOrFail($data['session_id']),
+                    CarbonImmutable::parse($data['original_date']),
+                    $startAt,
+                    $lecturerIds,
+                    $note,
+                    $data['idempotency_key'],
+                );
+            }
+        } catch (DomainException $exception) {
+            if ($request->expectsJson()) {
+                return response()->json($exception->toArray(), 409);
+            }
+
+            if ($startAt !== null) {
+                return redirect()->route('keti.meetings.reschedule', array_filter([
+                    'sesi' => $data['session_id'],
+                    'tanggal' => $data['original_date'],
+                    'pengganti' => $data['replaces_reservation_id'] ?? null,
+                    'pengganti_online' => ! isset($data['replaces_reservation_id']) ? ($data['replaces_reschedule_id'] ?? null) : null,
+                    'ke_tanggal' => $startAt->toDateString(),
+                    'jam' => $startAt->format('H:i'),
+                    'dosen' => $lecturerIds,
+                ]))->with('reschedule_error', ['code' => $exception->errorCode, 'message' => $exception->getMessage()]);
+            }
+
+            return redirect()->route('keti.my-class', ['tanggal' => $data['original_date']])
+                ->with('online_error', $exception->getMessage());
+        }
+
+        $targetDate = $reschedule->effectiveStart()->toDateString();
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'ok' => true,
+                'reschedule_id' => $reschedule->id,
+                'redirect_url' => route('keti.my-class', ['tanggal' => $targetDate]),
+            ], 201);
+        }
+
+        return redirect()->route('keti.my-class', ['tanggal' => $targetDate])
+            ->with('toast', ['type' => 'success', 'title' => 'Pertemuan dialihkan ke Online', 'message' => 'Ruang terjadwal sudah dikosongkan untuk kelas lain.']);
+    }
+
+    public function cancelOnline(Request $request, SessionReschedule $reschedule): RedirectResponse|JsonResponse
+    {
+        $classGroup = $request->user()->activeClassGroup();
+        abort_unless($classGroup !== null && $reschedule->includesClassGroup($classGroup->id), 403);
+
+        try {
+            $this->reschedules->cancelOnline($reschedule, $request->user());
+        } catch (DomainException $exception) {
+            if ($request->expectsJson()) {
+                return response()->json($exception->toArray(), 409);
+            }
+
+            return back()->with('online_error', $exception->getMessage());
+        }
+
+        $originalDate = CarbonImmutable::instance($reschedule->original_start_at)->toDateString();
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'ok' => true,
+                'reschedule_id' => $reschedule->id,
+                'redirect_url' => route('keti.my-class', ['tanggal' => $originalDate]),
+            ]);
+        }
+
+        return redirect()->route('keti.my-class', ['tanggal' => $originalDate])
+            ->with('toast', ['type' => 'success', 'title' => 'Pertemuan dikembalikan ke ruang luring', 'message' => 'Jadwal ruang asli kembali aktif.']);
     }
 }

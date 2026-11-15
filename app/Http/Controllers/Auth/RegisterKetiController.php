@@ -2,12 +2,10 @@
 
 namespace App\Http\Controllers\Auth;
 
-use App\Enums\KetiStatus;
-use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\RegisterKetiRequest;
 use App\Models\Academic\ClassGroup;
-use App\Models\User\User;
+use App\Models\User\ClassRepresentative;
 use App\Services\Account\KetiApplicationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
@@ -17,10 +15,8 @@ class RegisterKetiController extends Controller
 {
     public function create(): View
     {
-        $takenIds = User::query()
-            ->whereNotNull('class_group_id')
-            ->where('role', UserRole::Keti)
-            ->where('keti_status', KetiStatus::Approved)
+        $takenIds = ClassRepresentative::query()
+            ->activeOn(now())
             ->pluck('class_group_id')
             ->all();
 

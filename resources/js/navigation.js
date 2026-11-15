@@ -75,6 +75,22 @@ export function formActionUrl(form, submitter) {
     return new URL(action || form.ownerDocument.URL, form.ownerDocument.baseURI);
 }
 
+export function notifyToast(detail, win = typeof window !== 'undefined' ? window : undefined) {
+    if (!win || typeof win.dispatchEvent !== 'function' || typeof CustomEvent !== 'function') {
+        return false;
+    }
+    win.dispatchEvent(new CustomEvent('sicma:toast', { detail }));
+    return true;
+}
+
+export function clearToasts(scope = null, win = typeof window !== 'undefined' ? window : undefined) {
+    if (!win || typeof win.dispatchEvent !== 'function' || typeof CustomEvent !== 'function') {
+        return false;
+    }
+    win.dispatchEvent(new CustomEvent('sicma:toast-clear', { detail: { scope } }));
+    return true;
+}
+
 export function installPortalNavigation(Alpine, renderIcons) {
     if (!document.body.dataset.portal) return null;
 
@@ -112,17 +128,32 @@ export function installPortalNavigation(Alpine, renderIcons) {
         history.replaceState({ ...history.state, sicmaScroll: scroll }, '', currentUrl);
     }
 
-    function notice(message, form = null, success = false) {
+    function notice(message, form = null, outcome = false, title = null) {
+        const type = outcome === true ? 'success' : (outcome === 'warning' ? 'warning' : 'error');
+        const resolvedTitle = title || (type === 'success'
+            ? 'Berhasil'
+            : (type === 'warning' ? 'Perhatian' : 'Permintaan belum berhasil'));
+
+        if (document.querySelector('[data-toast-host]') && notifyToast({
+            type,
+            title: resolvedTitle,
+            message,
+            scope: form ? 'form' : 'navigation',
+        })) {
+            document.querySelectorAll('[data-client-notice]').forEach((el) => el.remove());
+            return;
+        }
+
         const target = form && !form.classList?.contains('hidden') ? form : null;
         const root = target || document.querySelector('main') || document.body;
         root.querySelector('[data-client-notice]')?.remove();
         const alert = document.createElement('p');
         alert.dataset.clientNotice = '';
-        alert.setAttribute('role', success ? 'status' : 'alert');
-        alert.className = success
+        alert.setAttribute('role', type === 'success' ? 'status' : 'alert');
+        alert.className = type === 'success'
             ? 'mb-4 rounded-control border border-success bg-success-soft px-4 py-3 text-sm text-success'
             : 'mb-4 rounded-control border border-danger bg-danger-soft px-4 py-3 text-sm text-danger';
-        alert.textContent = message;
+        alert.textContent = message || resolvedTitle;
         root.prepend(alert);
     }
 
@@ -135,11 +166,12 @@ export function installPortalNavigation(Alpine, renderIcons) {
                 field.classList.remove('border-danger');
             }
         }
-        notice(data.message || 'Periksa kembali isian yang ditandai.', form);
+        let firstInvalid = null;
         for (const [name, messages] of Object.entries(data.errors || {})) {
             const field = Array.from(form.elements).find((input) =>
                 input.name.replace(/\[([^\]]+)\]/g, '.$1').replace(/\[\]$/, '') === name);
             if (!field) continue;
+            if (!firstInvalid) firstInvalid = field;
             const error = document.createElement('p');
             error.dataset.clientError = '';
             error.className = 'text-xs font-medium text-danger';
@@ -149,6 +181,8 @@ export function installPortalNavigation(Alpine, renderIcons) {
             field.classList.add('border-danger');
             field.insertAdjacentElement('afterend', error);
         }
+        firstInvalid?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+        notice(data.message || 'Periksa kembali isian yang ditandai.', form, false, 'Data belum sesuai');
     }
 
     function assetKey(doc) {
@@ -375,25 +409,27 @@ export function installPortalNavigation(Alpine, renderIcons) {
                         showErrors(options.form, data);
                         options.form.dispatchEvent(new CustomEvent('sicma:form-error', { bubbles: true, detail: data }));
                     } else if (!options.silent) {
-                        notice(data.message || 'Halaman belum dapat dimuat.');
+                        notice(data.message || '', null, false, 'Halaman belum dapat dimuat');
                     }
                     return;
                 }
                 request = null;
                 const destination = new URL(data.redirect_url || currentUrl, location.href);
                 if (destination.origin !== location.origin || !['http:', 'https:'].includes(destination.protocol)) {
-                    notice('Perubahan tersimpan, tetapi tujuan halaman tidak dapat dibuka.', options.form);
+                    notice('Tujuan halaman tidak dapat dibuka.', options.form, 'warning', 'Perubahan tersimpan');
                     return;
                 }
                 await visit(destination.href, { history: 'replace', keepScroll: true, submitted: options.submitted });
-                notice(data.message || 'Perubahan berhasil disimpan.', null, true);
+                notice('', null, true, data.message || 'Perubahan berhasil disimpan.');
                 return;
             }
             if (!response.ok) {
                 if (!options.silent) {
-                    notice(response.status === 419
-                        ? 'Sesi formulir sudah kedaluwarsa. Muat ulang halaman sebelum mencoba kembali.'
-                        : 'Permintaan belum berhasil. Isian formulirmu tetap tersedia.', options.form);
+                    if (response.status === 419) {
+                        notice('Muat ulang halaman sebelum mencoba kembali.', options.form, false, 'Sesi formulir kedaluwarsa');
+                    } else {
+                        notice('Isian formulirmu tetap tersedia; silakan coba lagi.', options.form, false, 'Permintaan belum berhasil');
+                    }
                 }
                 return;
             }
@@ -407,9 +443,11 @@ export function installPortalNavigation(Alpine, renderIcons) {
             await render(next, response.url || url, options, previous);
         } catch (error) {
             if (error.name !== 'AbortError' && !options.silent) {
-                notice(options.form
-                    ? 'Hasil penyimpanan belum dapat dipastikan. Periksa koneksi dan data sebelum mencoba kembali.'
-                    : 'Halaman belum dapat dimuat. Isianmu tetap tersedia; silakan coba lagi.', options.form);
+                if (options.form) {
+                    notice('Periksa koneksi dan data sebelum mencoba kembali.', options.form, false, 'Hasil penyimpanan belum dapat dipastikan');
+                } else {
+                    notice('Isianmu tetap tersedia; silakan coba lagi.', null, false, 'Halaman belum dapat dimuat');
+                }
             }
         } finally {
             if (request === active) {
@@ -461,6 +499,8 @@ export function installPortalNavigation(Alpine, renderIcons) {
         for (const button of buttons) button.disabled = true;
         form.setAttribute('aria-busy', 'true');
         form.inert = true;
+        clearToasts('form');
+        clearToasts('navigation');
         try {
             await visit(url.href, {
                 method, body: data, form, history: 'replace', keepScroll: true, submitted: formKey(form),

@@ -210,15 +210,12 @@
                 </header>
 
                 <main id="main-content" tabindex="-1" class="flex-1 px-4 py-4 outline-none sm:px-6 sm:py-5 lg:px-10">
-                    @if (session('error'))
-                        <x-alert variant="danger" class="mb-6">{{ session('error') }}</x-alert>
-                    @endif
                     @yield('content')
                 </main>
             </div>
         </div>
 
-        <x-toast />
+        <x-toast fallback-error />
         @stack('dialogs')
     </body>
 </html>

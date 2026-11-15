@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { canBackgroundRefresh, captureFields, restoreFields, hasFormChanges, isEditingField, navigationState, formActionUrl, registerStatusPolling } from '../../resources/js/navigation.js';
+import { canBackgroundRefresh, captureFields, restoreFields, hasFormChanges, isEditingField, navigationState, formActionUrl, registerStatusPolling, notifyToast, clearToasts } from '../../resources/js/navigation.js';
 import { installRealtimePush, parseReverbConfig } from '../../resources/js/realtime.js';
 
 function input(name, value = '', extra = {}) {
@@ -320,4 +320,31 @@ test('statusPolling segera memanggil poll saat sicma:realtime-update diterima da
     } finally {
         Object.assign(globalThis, originals);
     }
+});
+
+test('notifyToast dan clearToasts mengirim event sicma:toast dan sicma:toast-clear', () => {
+    const dispatched = [];
+    const fakeWindow = {
+        dispatchEvent: (event) => {
+            dispatched.push({ type: event.type, detail: event.detail });
+            return true;
+        },
+    };
+
+    assert.equal(
+        notifyToast({ type: 'error', title: 'Halaman belum dapat dimuat', message: 'Silakan coba lagi.', scope: 'navigation' }, fakeWindow),
+        true,
+    );
+    assert.equal(clearToasts('form', fakeWindow), true);
+    assert.deepEqual(dispatched, [
+        {
+            type: 'sicma:toast',
+            detail: { type: 'error', title: 'Halaman belum dapat dimuat', message: 'Silakan coba lagi.', scope: 'navigation' },
+        },
+        {
+            type: 'sicma:toast-clear',
+            detail: { scope: 'form' },
+        },
+    ]);
+    assert.equal(notifyToast({ title: 'Tanpa window' }, null), false);
 });

@@ -255,7 +255,7 @@ class MeetingRescheduleController extends Controller
             }
 
             return redirect()->route('keti.my-class', ['tanggal' => $data['original_date']])
-                ->with('online_error', $exception->getMessage());
+                ->with('toast', ['type' => 'error', 'title' => 'Belum bisa mengalihkan pertemuan', 'message' => $exception->getMessage()]);
         }
 
         $targetDate = $reschedule->effectiveStart()->toDateString();
@@ -284,7 +284,7 @@ class MeetingRescheduleController extends Controller
                 return response()->json($exception->toArray(), 409);
             }
 
-            return back()->with('online_error', $exception->getMessage());
+            return back()->with('toast', ['type' => 'error', 'title' => 'Belum bisa mengembalikan pertemuan', 'message' => $exception->getMessage()]);
         }
 
         $originalDate = CarbonImmutable::instance($reschedule->original_start_at)->toDateString();

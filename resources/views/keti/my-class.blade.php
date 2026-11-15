@@ -8,11 +8,7 @@
     <div class="flex flex-col gap-6">
         <x-page-header title="My Class" :subtitle="'Jadwal dan perkuliahan Kelas '.$classGroup->name.'.'" />
 
-        @if (session('online_error'))
-            <x-info-box title="Belum bisa mengalihkan pertemuan" variant="danger" role="alert">
-                <p>{{ session('online_error') }}</p>
-            </x-info-box>
-        @elseif ($errors->any())
+        @if ($errors->any())
             <x-info-box title="Data belum lengkap" variant="danger" role="alert">
                 <p>{{ $errors->first() }}</p>
             </x-info-box>

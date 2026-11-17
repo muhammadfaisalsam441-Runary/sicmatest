@@ -62,10 +62,18 @@ class RoomController extends Controller
 
         $activeClosures = RoomClosure::query()
             ->with('room')
-            ->where('start_at', '<=', $now)
+            ->activeAt($now)
+            ->orderBy('start_at')
+            ->get();
+
+        $recurringClosures = RoomClosure::query()
+            ->with('room')
+            ->where('is_recurring', true)
             ->where('end_at', '>', $now)
             ->orderBy('start_at')
             ->get();
+
+        $activePeriod = Period::query()->active()->first();
 
         $buildings = Building::query()->orderBy('name')->get();
         $roomsPayload = $rooms->getCollection()->mapWithKeys(fn (Room $r): array => [$r->id => [
@@ -82,7 +90,8 @@ class RoomController extends Controller
             'rooms' => $rooms,
             'roomsPayload' => $roomsPayload,
             'totalRooms' => Room::query()->count(),
-            'periodName' => Period::query()->active()->value('name'),
+            'periodName' => $activePeriod?->name,
+            'activePeriodEnd' => $activePeriod?->end_date?->toDateString(),
             'keyword' => $keyword,
             'filter' => $filter,
             'buildingFilter' => $buildingFilter,
@@ -97,6 +106,7 @@ class RoomController extends Controller
             'buildings' => $buildings,
             'allRooms' => Room::query()->orderBy('name')->pluck('name', 'id'),
             'closures' => $activeClosures,
+            'recurringClosures' => $recurringClosures,
         ]);
     }
 
@@ -206,7 +216,7 @@ class RoomController extends Controller
         CarbonInterface $now,
     ): Builder {
         return Room::query()
-            ->with(['building', 'facilities', 'closures' => fn ($q) => $q->where('start_at', '<=', $now)->where('end_at', '>', $now)])
+            ->with(['building', 'facilities', 'closures' => fn ($q) => $q->activeAt($now)])
             ->when($keyword !== '', fn (Builder $query) => $query->where(fn (Builder $query) => $query
                 ->where('name', 'like', "%{$keyword}%")
                 ->orWhere('code', 'like', "%{$keyword}%")
@@ -214,7 +224,7 @@ class RoomController extends Controller
                 ->orWhereHas('facilities', fn (Builder $query) => $query->where('name', 'like', "%{$keyword}%"))
             ))
             ->when($filter === 'verifikasi', fn (Builder $query) => $query->where(fn (Builder $q) => $q->whereNull('capacity')->orWhereNull('building_id')))
-            ->when($filter === 'ditutup', fn (Builder $query) => $query->whereHas('closures', fn ($q) => $q->where('start_at', '<=', $now)->where('end_at', '>', $now)))
+            ->when($filter === 'ditutup', fn (Builder $query) => $query->whereHas('closures', fn ($q) => $q->activeAt($now)))
             ->when($type !== null, fn (Builder $query) => $query->where('type', $type))
             ->when($buildingFilter !== '', function (Builder $query) use ($buildingFilter) {
                 if ($buildingFilter === 'belum_didata') {

@@ -14,6 +14,7 @@
 @endif
 
 <title>{{ $title ?? null ? $title.' • ' : '' }}{{ config('app.name') }}</title>
+<link rel="icon" href="{{ asset('favicon.svg') }}" type="image/svg+xml">
 <link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any">
 
 @fonts

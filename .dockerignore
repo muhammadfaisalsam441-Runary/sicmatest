@@ -10,7 +10,7 @@
 .env.*
 !.env.example
 auth.json
-vendor
+/vendor
 node_modules
 public/build
 public/hot

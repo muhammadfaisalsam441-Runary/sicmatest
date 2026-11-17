@@ -24,7 +24,10 @@
                 @sicma:navigated.document="mobileMenuOpen = false"
                 class="border-b border-border bg-surface">
             <div class="mx-auto flex min-h-16 w-full max-w-[1168px] items-center justify-between gap-4 px-4 sm:px-6 md:h-[88px] lg:px-8">
-                <a href="{{ route('home') }}" class="rounded text-2xl font-bold tracking-tight text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:text-[28px]">SICMA</a>
+                <a href="{{ route('home') }}" class="inline-flex items-center gap-2.5 rounded-control text-2xl font-bold tracking-tight text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:text-[28px]">
+                    <x-brand-mark size="size-8 sm:size-9" />
+                    <span>SICMA</span>
+                </a>
 
                 <nav class="hidden items-center gap-6 text-[15px] font-medium md:flex lg:gap-10" aria-label="Navigasi utama">
                     @foreach ($navItems as [$label, $routeName, $pattern])
@@ -84,10 +87,20 @@
 
         <footer class="mx-auto flex w-full max-w-[1168px] flex-col items-start justify-between gap-2 px-4 pt-4 pb-8 text-xs text-muted sm:flex-row sm:items-center sm:px-6 sm:pb-10 lg:px-8">
             <span>SICMA • Jurusan Teknik Informatika dan Komputer</span>
-            <span>Ruangan tepat untuk kelasmu.</span>
+            <div class="flex items-center gap-3">
+                <button type="button"
+                        data-replay-splash
+                        title="Putar animasi 3D SICMA"
+                        class="inline-flex cursor-pointer items-center gap-1.5 rounded-control border border-border bg-surface px-2.5 py-1 text-[11px] font-semibold text-primary transition hover:border-primary/40 hover:bg-primary-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+                    <i data-lucide="sparkles" aria-hidden="true" class="size-3.5"></i>
+                    <span>Animasi Logo 3D</span>
+                </button>
+                <span>Ruangan tepat untuk kelasmu.</span>
+            </div>
         </footer>
 
         <x-toast />
+        <x-splash-screen />
         @stack('dialogs')
     </body>
 </html>

@@ -24,9 +24,12 @@
                    :class="{ 'translate-x-0': sidebarOpen, '-translate-x-full': ! sidebarOpen }"
                    class="fixed inset-y-0 left-0 z-50 flex h-screen w-[240px] -translate-x-full flex-col overflow-y-auto border-r border-border bg-surface px-4 py-7 transition-transform duration-200 lg:sticky lg:top-0 lg:z-auto lg:w-auto lg:translate-x-0">
                 <div class="flex items-start justify-between gap-2 px-3">
-                    <a href="{{ Nav::url('admin.dashboard') }}" class="flex flex-col gap-1 rounded-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
-                        <span class="text-xs font-semibold text-primary">SICMA •</span>
-                        <span class="text-xl font-medium text-ink">Panel Admin</span>
+                    <a href="{{ Nav::url('admin.dashboard') }}" class="flex items-center gap-2.5 rounded-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+                        <x-brand-mark size="size-8" />
+                        <span class="flex flex-col gap-0.5">
+                            <span class="text-xs font-semibold text-primary">SICMA •</span>
+                            <span class="text-xl font-medium text-ink">Panel Admin</span>
+                        </span>
                     </a>
                     <button type="button"
                             x-on:click="sidebarOpen = false"
@@ -37,34 +40,39 @@
                 </div>
 
                 <nav class="mt-7 flex flex-col gap-1" aria-label="Menu Panel Admin">
-                    @foreach ([
-                        ['Dashboard', 'layout-grid', 'admin.dashboard', 'admin.dashboard'],
-                        ['Kelola Ruang', 'door-closed', 'admin.rooms.index', 'admin.rooms.*'],
-                        ['Riwayat Reservasi', 'clipboard-list', 'admin.reservations.index', 'admin.reservations.*'],
-                        ['Log Pemakaian', 'clock', 'admin.usage-logs.index', 'admin.usage-logs.*'],
-                    ] as [$label, $icon, $routeName, $pattern])
-                        <x-sidebar-link :href="Nav::url($routeName)" :icon="$icon" :active="Nav::active($pattern)">{{ $label }}</x-sidebar-link>
-                    @endforeach
-
-                    <span class="mt-4 px-3 pb-1 text-xs text-muted">Penyusunan jadwal</span>
+                    <x-sidebar-link :href="Nav::url('admin.dashboard')" icon="layout-grid" :active="Nav::active('admin.dashboard')">Dashboard</x-sidebar-link>
 
                     @foreach ([
-                        ['Data Akademik', 'book-open', 'admin.academic.index', 'admin.academic.*'],
-                        ['Data Dosen', 'user', 'admin.lecturers.index', 'admin.lecturers.*'],
-                        ['Pembagian SKS', 'chart-no-axes-column', 'admin.teaching.index', 'admin.teaching.*'],
-                        ['Penyusunan & Draf', 'calendar-days', 'admin.scheduler.create', 'admin.scheduler.*'],
-                        ['Jadwal Resmi', 'calendar-check', 'admin.schedules.index', 'admin.schedules.*'],
-                    ] as [$label, $icon, $routeName, $pattern])
-                        <x-sidebar-link :href="Nav::url($routeName)" :icon="$icon" :active="Nav::active($pattern) || ($routeName === 'admin.scheduler.create' && Nav::active('admin.drafts.show', 'admin.drafts.inspect*', 'admin.imports.*')) || ($routeName === 'admin.schedules.index' && Nav::active('admin.drafts.published'))">{{ $label }}</x-sidebar-link>
+                        [
+                            'Data Master & Akademik',
+                            [
+                                ['Data Akademik', 'book-open', 'admin.academic.index', ['admin.academic.*']],
+                                ['Data Dosen', 'user', 'admin.lecturers.index', ['admin.lecturers.*']],
+                                ['Kelola Ruang', 'door-closed', 'admin.rooms.index', ['admin.rooms.*']],
+                            ],
+                        ],
+                        [
+                            'Penyusunan Jadwal',
+                            [
+                                ['Pembagian SKS', 'chart-no-axes-column', 'admin.teaching.index', ['admin.teaching.*']],
+                                ['Penyusunan & Draf', 'calendar-days', 'admin.scheduler.create', ['admin.scheduler.*', 'admin.drafts.show', 'admin.drafts.inspect*', 'admin.imports.*']],
+                                ['Jadwal Resmi', 'calendar-check', 'admin.schedules.index', ['admin.schedules.*', 'admin.drafts.published']],
+                            ],
+                        ],
+                        [
+                            'Operasional & Pemantauan',
+                            [
+                                ['Akun Keti', 'users', 'admin.keti-accounts.index', ['admin.keti-accounts.*']],
+                                ['Riwayat Reservasi', 'clipboard-list', 'admin.reservations.index', ['admin.reservations.*']],
+                                ['Log Pemakaian', 'clock', 'admin.usage-logs.index', ['admin.usage-logs.*']],
+                            ],
+                        ],
+                    ] as [$groupLabel, $items])
+                        <div class="mt-3 border-t border-border pt-3"><span class="px-3 pb-1 block text-[11px] font-semibold uppercase tracking-wider text-muted">{{ $groupLabel }}</span></div>
+                        @foreach ($items as [$label, $icon, $routeName, $patterns])
+                            <x-sidebar-link :href="Nav::url($routeName)" :icon="$icon" :active="Nav::active(...$patterns)">{{ $label }}</x-sidebar-link>
+                        @endforeach
                     @endforeach
-
-                    <a href="{{ Nav::url('admin.keti-accounts.index') }}"
-                       @if (Nav::active('admin.keti-accounts.*')) aria-current="page" @endif
-                       @class([
-                           'mt-6 flex items-center justify-center gap-3 rounded-control border px-4 py-3 text-center text-sm font-semibold text-primary transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
-                           'border-primary-soft bg-primary-soft' => Nav::active('admin.keti-accounts.*'),
-                           'border-border hover:bg-primary-soft/60' => ! Nav::active('admin.keti-accounts.*'),
-                       ])><i data-lucide="users" aria-hidden="true" class="size-5 shrink-0"></i><span>Akun Keti</span></a>
                 </nav>
 
                 <form method="POST" action="{{ Nav::url('logout') }}" class="mt-auto pt-4" data-native>
@@ -216,6 +224,7 @@
         </div>
 
         <x-toast fallback-error />
+        <x-splash-screen />
         @stack('dialogs')
     </body>
 </html>

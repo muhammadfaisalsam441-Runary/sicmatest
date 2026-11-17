@@ -26,7 +26,10 @@
                    class="fixed inset-y-0 left-0 z-50 flex h-screen w-[220px] -translate-x-full flex-col gap-10 overflow-y-auto border-r border-border bg-surface px-5 py-9 transition-transform duration-200 lg:sticky lg:top-0 lg:z-auto lg:w-auto lg:translate-x-0">
                 <div class="flex items-start justify-between gap-2">
                     <div class="flex flex-col gap-6">
-                        <a href="{{ Nav::url('keti.search') }}" class="rounded-control text-[28px] font-bold tracking-tight text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">SICMA</a>
+                        <a href="{{ Nav::url('keti.search') }}" class="inline-flex items-center gap-2.5 rounded-control text-[28px] font-bold tracking-tight text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+                            <x-brand-mark size="size-8" />
+                            <span>SICMA</span>
+                        </a>
                         <span class="text-xs text-muted">Ruang kelas JTIK</span>
                     </div>
                     <button type="button"
@@ -210,6 +213,7 @@
         </div>
 
         <x-toast fallback-error />
+        <x-splash-screen />
         @stack('dialogs')
     </body>
 </html>

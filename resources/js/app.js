@@ -384,9 +384,15 @@ Alpine.data('roomManager', (pageRoomIds = [], defaults = {}, initialRooms = {}) 
         batchCapacityConfirming: false,
         batchAction: '',
         batchParams: { building: '', type: '' },
+        closureMode: defaults.closureMode ?? 'once',
         closureRoomId: defaults.closureRoomId ?? '',
         closureStart: defaults.closureStart ?? '',
         closureEnd: defaults.closureEnd ?? '',
+        closureStartDate: defaults.closureStartDate ?? '',
+        closureEndDate: defaults.closureEndDate ?? '',
+        closureStartTime: defaults.closureStartTime ?? '07:30',
+        closureEndTime: defaults.closureEndTime ?? '12:00',
+        closureDays: (defaults.closureDays ?? [1, 2, 3, 4, 5]).map(Number),
         closureReason: defaults.closureReason ?? '',
         roomToDelete: { id: null, name: '' },
         formRoom: {
@@ -491,10 +497,24 @@ Alpine.data('roomManager', (pageRoomIds = [], defaults = {}, initialRooms = {}) 
             this.$nextTick(() => window.renderIcons());
         },
 
-        openClosureModal(roomId) {
+        openClosureModal(roomId, mode = null) {
             if (roomId) this.closureRoomId = roomId;
+            if (mode) this.closureMode = mode;
             this.closureModalOpen = true;
             this.$nextTick(() => window.renderIcons());
+        },
+
+        toggleClosureDay(day) {
+            const target = Number(day);
+            if (this.closureDays.includes(target)) {
+                this.closureDays = this.closureDays.filter((d) => d !== target);
+            } else {
+                this.closureDays = [...this.closureDays, target].sort((a, b) => a - b);
+            }
+        },
+
+        setClosureDays(days) {
+            this.closureDays = [...days].map(Number).sort((a, b) => a - b);
         },
 
         openDeleteModal(id, name) {
@@ -1147,3 +1167,48 @@ Alpine.data('sicmaToast', (initialToast = null) => ({
 }));
 
 Alpine.start();
+
+function shouldAutoPlaySplash() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('splash') === '1') {
+        return true;
+    }
+    try {
+        return window.sessionStorage.getItem('sicma.splash.seen') !== '1';
+    } catch {
+        return false;
+    }
+}
+
+async function launchSicmaSplash(options = {}) {
+    const root = document.getElementById('sicma-splash-root');
+    if (root && root.style.display === 'none') {
+        root.style.display = 'flex';
+        root.style.backgroundColor = '#041022';
+        root.style.opacity = '1';
+    }
+    try {
+        const { playSicmaSplash } = await import('./splash-screen');
+        return playSicmaSplash(options);
+    } catch {
+        if (root) {
+            root.innerHTML = '';
+            root.style.display = 'none';
+            root.setAttribute('aria-hidden', 'true');
+        }
+        return false;
+    }
+}
+
+window.playSicmaSplash = (options = {}) => launchSicmaSplash({ forceFullMotion: true, ...options });
+
+document.addEventListener('click', (event) => {
+    const trigger = event.target.closest?.('[data-replay-splash]');
+    if (!trigger) return;
+    event.preventDefault();
+    void window.playSicmaSplash();
+});
+
+if (document.getElementById('sicma-splash-root') && shouldAutoPlaySplash()) {
+    void launchSicmaSplash();
+}

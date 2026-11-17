@@ -687,3 +687,37 @@ test('akun keti mendukung pencarian, filter kelas, dan persetujuan massal', func
         ->and($appB->fresh()->status)->toBe(KetiApplicationStatus::Approved)
         ->and($appC->fresh()->status)->toBe(KetiApplicationStatus::Pending);
 });
+
+test('sidebar panel admin menampilkan kelompok menu sesuai urutan alur semester dan tautan akun keti reguler', function () {
+    $response = $this->actingAs($this->admin)
+        ->get(route('admin.dashboard'))
+        ->assertOk()
+        ->assertSeeInOrder([
+            'Dashboard',
+            'Data Master & Akademik',
+            'Data Akademik',
+            'Data Dosen',
+            'Kelola Ruang',
+            'Penyusunan Jadwal',
+            'Pembagian SKS',
+            'Penyusunan & Draf',
+            'Jadwal Resmi',
+            'Operasional & Pemantauan',
+            'Akun Keti',
+            'Riwayat Reservasi',
+            'Log Pemakaian',
+        ])
+        ->assertDontSee('mt-6 flex items-center justify-center gap-3 rounded-control border px-4 py-3 text-center', false);
+
+    preg_match(
+        '/<a\b[^>]*href="'.preg_quote(route('admin.keti-accounts.index'), '/').'"[^>]*>(?:(?!<\/a>).)*?<span>Akun Keti<\/span>\s*<\/a>/s',
+        $response->getContent(),
+        $matches
+    );
+
+    expect($matches[0] ?? '')
+        ->toContain('px-3 py-3 text-[15px]')
+        ->not->toContain('mt-6')
+        ->not->toContain('border')
+        ->not->toContain('text-center');
+});

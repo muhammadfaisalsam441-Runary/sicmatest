@@ -111,3 +111,14 @@ test('halaman panduan dan bantuan tampil', function () {
     $this->get(route('public.guide'))->assertOk()->assertSee('Panduan menggunakan SICMA')->assertSee('3. Pesan dan gunakan');
     $this->get(route('public.help'))->assertOk()->assertSee('Bantuan akun dan penggunaan')->assertSee('Apakah status ruang selalu pasti?');
 });
+
+test('portal publik merender container splash screen 3D, tombol putar ulang, dan ikon merek baru', function () {
+    $response = $this->get(route('home'))->assertOk();
+
+    $response->assertSee('id="sicma-splash-root"', false)
+        ->assertSee('data-splash-screen', false)
+        ->assertSee('sicma-logo.glb', false)
+        ->assertSee('data-replay-splash', false)
+        ->assertSee('favicon.svg', false)
+        ->assertSee('#00F0FF', false);
+});

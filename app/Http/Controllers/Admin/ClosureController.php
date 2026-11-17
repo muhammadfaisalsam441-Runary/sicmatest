@@ -20,10 +20,24 @@ class ClosureController extends Controller
     public function store(ClosureRequest $request, RoomClosureService $closures): RedirectResponse
     {
         $room = Room::query()->findOrFail($request->integer('room_id'));
-        $start = CarbonImmutable::parse($request->validated('start_at'));
-        $end = CarbonImmutable::parse($request->validated('end_at'));
+        $isRecurring = $request->validated('mode') === 'recurring';
+        $cancelImpacted = $request->boolean('cancel_impacted');
+        $reason = (string) $request->validated('reason');
 
-        $impact = $closures->impact($room, $start, $end);
+        if ($isRecurring) {
+            $startDate = CarbonImmutable::parse((string) $request->validated('start_date'));
+            $endDate = CarbonImmutable::parse((string) $request->validated('end_date'));
+            $startTime = (string) $request->validated('start_time');
+            $endTime = (string) $request->validated('end_time');
+            $daysOfWeek = array_map('intval', (array) $request->validated('days_of_week'));
+
+            $windows = $closures->buildRecurringWindows($startDate, $endDate, $startTime, $endTime, $daysOfWeek);
+            $impact = $closures->impactForWindows($room, $windows);
+        } else {
+            $start = CarbonImmutable::parse((string) $request->validated('start_at'));
+            $end = CarbonImmutable::parse((string) $request->validated('end_at'));
+            $impact = $closures->impact($room, $start, $end);
+        }
 
         if ($impact->isNotEmpty() && ! $request->boolean('confirm_impact')) {
             return back()
@@ -35,15 +49,20 @@ class ClosureController extends Controller
                 ])->all());
         }
 
-        $cancelImpacted = $request->boolean('cancel_impacted');
-        $closures->create($room, $start, $end, $request->validated('reason'), $request->user(), $cancelImpacted);
+        if ($isRecurring) {
+            $closures->createRecurring($room, $startDate, $endDate, $startTime, $endTime, $daysOfWeek, $reason, $request->user(), $cancelImpacted);
+        } else {
+            $closures->create($room, $start, $end, $reason, $request->user(), $cancelImpacted);
+        }
+
+        $impactNote = $impact->isEmpty()
+            ? 'Tidak ada reservasi yang terdampak.'
+            : ($cancelImpacted ? $impact->count().' reservasi terdampak telah dibatalkan otomatis.' : $impact->count().' kelas terdampak sudah diberi tahu. Reservasinya tidak dibatalkan otomatis.');
 
         return to_route('admin.rooms.index')->with('toast', [
             'type' => 'success',
-            'title' => "Ruang {$room->name} ditutup",
-            'message' => $impact->isEmpty()
-                ? 'Tidak ada reservasi yang terdampak.'
-                : ($cancelImpacted ? $impact->count().' reservasi terdampak telah dibatalkan otomatis.' : $impact->count().' kelas terdampak sudah diberi tahu. Reservasinya tidak dibatalkan otomatis.'),
+            'title' => $isRecurring ? "Aturan penutupan {$room->name} dibuat" : "Ruang {$room->name} ditutup",
+            'message' => $impactNote,
         ]);
     }
 

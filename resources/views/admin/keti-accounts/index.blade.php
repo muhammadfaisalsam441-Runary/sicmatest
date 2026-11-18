@@ -22,6 +22,9 @@
          x-data="{
              selectedIds: [],
              pageIds: @js($tab === 'pending' ? $applications->pluck('id')->all() : []),
+             activeApp: null,
+             declineMode: 'reject',
+             deactivateConfirmed: false,
              isAllSelected() {
                  const curr = this.selectedIds.map(Number);
                  return this.pageIds.length > 0 && this.pageIds.every(id => curr.includes(Number(id)));
@@ -31,8 +34,21 @@
                  const curr = this.selectedIds.map(Number);
                  this.selectedIds = checked ? [...new Set([...curr, ...page])] : curr.filter(id => !page.includes(id));
              },
+             openDetail(payload) {
+                 this.activeApp = payload;
+                 this.deactivateConfirmed = false;
+                 this.$dispatch('open-modal', 'application-detail');
+                 this.$nextTick(() => window.renderIcons?.());
+             },
+             openDecline() {
+                 this.declineMode = 'reject';
+                 this.$dispatch('close-modal', 'application-detail');
+                 this.$dispatch('open-modal', 'application-decline');
+                 this.$nextTick(() => window.renderIcons?.());
+             },
          }"
-         :data-editing="selectedIds.length > 0 ? 'true' : null">
+         :data-editing="selectedIds.length > 0 ? 'true' : null"
+         @keti-open-detail.window="openDetail($event.detail)">
         <x-page-header title="Akun Keti" />
 
         <x-card padding="p-4" class="admin-table-card flex flex-col gap-3">
@@ -118,7 +134,7 @@
                                 <th scope="col" class="px-4 py-3 font-medium">Kelas</th>
                                 <th scope="col" class="px-4 py-3 font-medium">Email</th>
                                 <th scope="col" class="px-4 py-3 font-medium">Status</th>
-                                <th scope="col" class="px-4 py-3 font-medium"><span class="sr-only">Aksi</span></th>
+                                <th scope="col" class="px-4 py-3 text-right font-medium">Aksi</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-border">
@@ -176,9 +192,26 @@
                                         } }}</x-status-badge>
                                     </td>
                                     <td class="px-4 py-3 text-right">
-                                        <x-button size="sm" :variant="$tab === 'pending' ? 'primary' : 'soft'" x-data x-on:click="$dispatch('keti-open-detail', @js($appPayload))">
-                                            {{ $tab === 'pending' ? 'Periksa' : 'Detail' }}
-                                        </x-button>
+                                        <div class="inline-flex items-center justify-end gap-2">
+                                            @if ($tab === 'pending')
+                                                <form method="POST" action="{{ route('admin.keti-accounts.approve', $application) }}" class="inline-flex">
+                                                    @csrf
+                                                    <input type="hidden" name="class_group_id" value="{{ $application->class_group_id }}">
+                                                    <button type="submit"
+                                                            aria-label="Setujui {{ $applicant->name }}"
+                                                            class="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-control bg-success px-3 py-2 text-xs font-semibold text-white shadow-2xs transition hover:bg-success/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50">
+                                                        <i data-lucide="user-check" class="size-3.5" aria-hidden="true"></i>
+                                                        <span>Setujui</span>
+                                                    </button>
+                                                </form>
+                                            @endif
+                                            <x-button size="sm"
+                                                      :variant="$tab === 'pending' ? 'primary' : 'soft'"
+                                                      aria-label="{{ ($tab === 'pending' ? 'Periksa' : 'Detail').' '.$applicant->name }}"
+                                                      x-on:click="openDetail({{ \Illuminate\Support\Js::from($appPayload) }})">
+                                                {{ $tab === 'pending' ? 'Periksa' : 'Detail' }}
+                                            </x-button>
+                                        </div>
                                     </td>
                                 </tr>
                             @endforeach
@@ -220,28 +253,7 @@
                 </button>
             </div>
         @endif
-    </div>
-@endsection
 
-@push('dialogs')
-    <div x-data="{
-        activeApp: null,
-        declineMode: 'reject',
-        deactivateConfirmed: false,
-        openDetail(payload) {
-            this.activeApp = payload;
-            this.deactivateConfirmed = false;
-            this.$dispatch('open-modal', 'application-detail');
-            this.$nextTick(() => window.renderIcons());
-        },
-        openDecline() {
-            this.declineMode = 'reject';
-            this.$dispatch('close-modal', 'application-detail');
-            this.$dispatch('open-modal', 'application-decline');
-            this.$nextTick(() => window.renderIcons());
-        }
-    }"
-    @keti-open-detail.window="openDetail($event.detail)">
         <x-modal name="application-detail" aria-label="Detail pengajuan akun Keti" width="max-w-[480px]">
             <template x-if="activeApp">
                 <div class="flex flex-col gap-4">
@@ -349,4 +361,4 @@
             </template>
         </x-modal>
     </div>
-@endpush
+@endsection

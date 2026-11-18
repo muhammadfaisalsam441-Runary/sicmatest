@@ -721,3 +721,46 @@ test('sidebar panel admin menampilkan kelompok menu sesuai urutan alur semester 
         ->not->toContain('border')
         ->not->toContain('text-center');
 });
+
+test('halaman akun keti tab menunggu merender form setujui langsung dan tombol periksa tanpa @js mentah', function () {
+    $classGroup = ClassGroup::factory()->create(['name' => 'PTIK A']);
+    $applicant = User::factory()->pendingKeti($classGroup)->create(['name' => 'Andi Saputra']);
+    $application = $applicant->latestKetiApplication;
+
+    $this->actingAs($this->admin)
+        ->get(route('admin.keti-accounts.index'))
+        ->assertOk()
+        ->assertDontSee('@js(', false)
+        ->assertSee('>Aksi</th>', false)
+        ->assertSee('action="'.route('admin.keti-accounts.approve', $application).'"', false)
+        ->assertSee('name="class_group_id" value="'.$application->class_group_id.'"', false)
+        ->assertSee('aria-label="Setujui '.$applicant->name.'"', false)
+        ->assertSee('Setujui')
+        ->assertSee('aria-label="Periksa '.$applicant->name.'"', false)
+        ->assertSee('x-on:click="openDetail(JSON.parse(', false)
+        ->assertSee('Periksa');
+});
+
+test('halaman akun keti tab aktif merender tombol detail tanpa tombol setujui langsung dan tanpa @js mentah', function () {
+    $classGroup = ClassGroup::factory()->create(['name' => 'PTIK B']);
+    $approved = User::factory()->approvedKeti($classGroup)->create(['name' => 'Dimas Pratama']);
+
+    $this->actingAs($this->admin)
+        ->get(route('admin.keti-accounts.index', ['status' => 'approved']))
+        ->assertOk()
+        ->assertDontSee('@js(', false)
+        ->assertDontSee('aria-label="Setujui '.$approved->name.'"', false)
+        ->assertSee('aria-label="Detail '.$approved->name.'"', false)
+        ->assertSee('x-on:click="openDetail(JSON.parse(', false)
+        ->assertSee('Detail');
+});
+
+test('dashboard admin merender tombol lipat untuk informasi penyusunan jadwal', function () {
+    $this->actingAs($this->admin)
+        ->get(route('admin.dashboard'))
+        ->assertOk()
+        ->assertSee("filterDrawer('dashboard-schedule-progress', false)", false)
+        ->assertSee('aria-controls="dashboard-schedule-progress-panel"', false)
+        ->assertSee('id="dashboard-schedule-progress-panel"', false)
+        ->assertSee('Tampilkan informasi');
+});

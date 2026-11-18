@@ -79,8 +79,6 @@ class ReservationController extends Controller
         $start = null;
         $duration = null;
 
-        // Saran ruang lain yang kosong sepanjang durasi yang sama (status dihitung ulang, bukan dari cache).
-        // Tidak ditawarkan bila kelasnya sendiri sudah punya pesanan di jam itu: ruang mana pun akan ditolak.
         if (is_array($request)) {
             $start = CarbonImmutable::parse($request['start_at']);
             $duration = (int) $request['duration'];
@@ -135,9 +133,6 @@ class ReservationController extends Controller
         ]);
     }
 
-    /**
-     * Status ringkas untuk polling 30 detik di halaman penggunaan aktif.
-     */
     public function status(Reservation $reservation): JsonResponse
     {
         Gate::authorize('view', $reservation);

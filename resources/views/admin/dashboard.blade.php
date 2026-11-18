@@ -45,12 +45,41 @@
             </x-card>
         @endif
 
-        <x-card padding="p-4" class="flex flex-col gap-3">
+        <x-card padding="p-4" x-data="filterDrawer('dashboard-schedule-progress', false)" class="flex flex-col gap-3">
             <div class="flex flex-wrap items-center justify-between gap-2">
-                <h2 class="text-base font-semibold">Penyusunan jadwal {{ $period?->name ?? 'semester aktif' }}</h2>
-                <a href="{{ Nav::url('admin.scheduler.create') }}" class="text-xs font-semibold text-primary hover:underline">Buka Susun Jadwal</a>
+                <div class="flex flex-wrap items-center gap-2">
+                    <h2 class="text-base font-semibold">Penyusunan jadwal {{ $period?->name ?? 'semester aktif' }}</h2>
+                    <span x-show="!open" class="inline-flex items-center gap-1.5 rounded-full border border-border bg-page px-2.5 py-0.5 text-xs font-medium text-muted">
+                        @if ($progress['official'])
+                            <span class="font-semibold text-success">Resmi v{{ $progress['official']->version_no }}</span>
+                        @else
+                            <span>Belum ada jadwal resmi</span>
+                        @endif
+                        <span>•</span>
+                        @if ($progress['draft'])
+                            <span class="font-semibold text-primary">Draf v{{ $progress['draft']->version_no }}</span>
+                        @else
+                            <span>Tanpa draf</span>
+                        @endif
+                        @if ($progress['blocking_count'] > 0)
+                            <span>•</span>
+                            <span class="font-semibold text-danger">{{ $progress['blocking_count'] }} masalah wajib</span>
+                        @endif
+                    </span>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <a href="{{ Nav::url('admin.scheduler.create') }}" class="text-xs font-semibold text-primary hover:underline">Buka Susun Jadwal</a>
+                    <button type="button"
+                            @click="toggle()"
+                            :aria-expanded="open.toString()"
+                            aria-controls="dashboard-schedule-progress-panel"
+                            class="inline-flex cursor-pointer items-center gap-1.5 rounded-control border border-border bg-page px-2.5 py-1 text-xs font-semibold text-ink transition hover:bg-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+                        <span x-text="open ? 'Tutup informasi' : 'Tampilkan informasi'">Tampilkan informasi</span>
+                        <i data-lucide="chevron-down" class="size-3.5 text-muted transition-transform duration-200" :class="open ? 'rotate-180' : ''" aria-hidden="true"></i>
+                    </button>
+                </div>
             </div>
-            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div id="dashboard-schedule-progress-panel" x-show="open" x-cloak class="grid grid-cols-1 gap-3 border-t border-border pt-3 sm:grid-cols-2 lg:grid-cols-4">
                 <div class="flex flex-col gap-0.5 rounded-card border border-border px-4 py-3">
                     <span class="text-xs text-muted">Jadwal resmi</span>
                     @if ($progress['official'])

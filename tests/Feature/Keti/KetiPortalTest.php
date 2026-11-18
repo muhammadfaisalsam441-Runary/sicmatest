@@ -258,3 +258,13 @@ test('halaman detail ruangan keti tidak merender @js mentah di kartu ubah waktu'
         ->assertDontSee('@js(', false)
         ->assertSee('x-data="{ editing: false }"', false);
 });
+
+test('portal keti merender latar belakang animasi dan tombol jeda animasi', function () {
+    $this->actingAs($this->keti)
+        ->get(route('keti.search'))
+        ->assertOk()
+        ->assertSee('data-ambient-backdrop="portal"', false)
+        ->assertSee('sicma-schedule-cell', false)
+        ->assertSee('data-toggle-bg-motion', false)
+        ->assertDontSee('data-toggle-bg-motion" aria-pressed', false);
+});

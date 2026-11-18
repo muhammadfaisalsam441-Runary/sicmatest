@@ -117,8 +117,35 @@ test('portal publik merender container splash screen 3D, tombol putar ulang, dan
 
     $response->assertSee('id="sicma-splash-root"', false)
         ->assertSee('data-splash-screen', false)
-        ->assertSee('sicma-logo.glb', false)
+        ->assertSee('sicma-splash-3d.mp4', false)
+        ->assertSee('sicma-splash-3d.webm', false)
+        ->assertSee('sicma-splash-poster.webp', false)
         ->assertSee('data-replay-splash', false)
         ->assertSee('favicon.svg', false)
         ->assertSee('#00F0FF', false);
+});
+
+test('portal publik dan halaman masuk merender latar belakang ambient serta tombol jeda animasi tanpa aria-pressed', function () {
+    Room::factory()->create(['name' => 'AE 107']);
+
+    $home = $this->get(route('home'))->assertOk();
+    $home->assertSee('data-ambient-backdrop="public"', false)
+        ->assertSee('Space+Grotesk', false)
+        ->assertSee('Plus+Jakarta+Sans', false)
+        ->assertSee('data-prefetch', false)
+        ->assertSee('data-room-card', false)
+        ->assertSee('sicma-card-spotlight', false)
+        ->assertSee('sicma-animated-btn', false)
+        ->assertSee('sicma-animated-btn__circle', false)
+        ->assertSee('data-toggle-bg-motion', false)
+        ->assertDontSee('data-toggle-bg-motion" aria-pressed', false);
+
+    $rooms = $this->get(route('public.rooms'))->assertOk();
+    $rooms->assertSee('sicma-btn-outline', false);
+
+    $login = $this->get(route('login'))->assertOk();
+    $login->assertSee('data-ambient-backdrop="auth"', false)
+        ->assertSee('data-ambient-backdrop="portal"', false)
+        ->assertSee('sicma-btn-solid', false)
+        ->assertSee('data-toggle-bg-motion', false);
 });

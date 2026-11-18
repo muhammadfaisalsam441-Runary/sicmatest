@@ -10,8 +10,8 @@
             <h1 class="max-w-3xl text-[clamp(2rem,4.5vw,3.5rem)] leading-[1.15] font-bold tracking-tight text-primary">Temukan ruangan yang tepat untuk kelasmu.</h1>
             <p class="max-w-xl text-base leading-relaxed text-muted sm:text-lg">Lihat ketersediaan ruang kelas JTIK tanpa akun. Masuk sebagai Keti untuk memesan dan mengelola penggunaan.</p>
             <div class="flex w-full flex-col items-center justify-center gap-3 sm:w-auto sm:flex-row">
-                <x-button :href="Nav::url('login')" class="w-full py-4 sm:w-52">Masuk ke SICMA</x-button>
-                <x-button variant="secondary" :href="route('public.rooms', ['status' => 'tersedia'])" class="w-full py-4 sm:w-52">Lihat ruang tersedia</x-button>
+                <x-button :href="Nav::url('login')" animated class="w-full sm:w-auto sm:min-w-52">Masuk ke SICMA</x-button>
+                <x-button variant="secondary" :href="route('public.rooms', ['status' => 'tersedia'])" animated data-prefetch class="w-full sm:w-auto sm:min-w-52">Lihat ruang tersedia</x-button>
             </div>
             <p class="text-xs text-muted">Terbuka untuk semua • Pemesanan khusus ketua tingkat yang terdaftar</p>
         </section>
@@ -32,14 +32,15 @@
                 <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                     @foreach ($preview as $room)
                         <x-room-card :name="$room['name']" :badge="$room['badge']" :location="$room['location']" :capacity="$room['capacity']"
-                                     :time-label="$room['time_label']" :time="$room['time']" :note="$room['note']" />
+                                     :time-label="$room['time_label']" :time="$room['time']" :note="$room['note']"
+                                     style="--stagger: {{ $loop->index }}" />
                     @endforeach
                 </div>
             @endif
 
             <div class="flex flex-col items-start justify-between gap-4 pt-2 sm:flex-row sm:items-center sm:gap-6">
                 <p class="text-sm text-ink">Lihat daftar lengkap untuk mencari ruangan, memilih gedung, dan memeriksa status lainnya.</p>
-                <x-button variant="secondary" :href="route('public.rooms')" class="w-full shrink-0 px-10 sm:w-auto">Lihat semua ruangan</x-button>
+                <x-button variant="secondary" :href="route('public.rooms')" animated data-prefetch class="w-full shrink-0 sm:w-auto">Lihat semua ruangan</x-button>
             </div>
         </section>
 
@@ -48,7 +49,7 @@
                 <h2 class="text-lg font-semibold text-ink">Mau menggunakan ruangan untuk kelasmu?</h2>
                 <p class="text-sm text-ink">Masuk dengan akun Keti yang terdaftar untuk memesan dan mengelola penggunaan ruangan.</p>
             </div>
-            <x-button :href="Nav::url('login')" class="w-full shrink-0 px-6 sm:w-auto sm:px-9">Masuk sebagai Keti untuk memesan</x-button>
+            <x-button :href="Nav::url('login')" animated class="w-full shrink-0 sm:w-auto">Masuk sebagai Keti untuk memesan</x-button>
         </section>
     </div>
 @endsection

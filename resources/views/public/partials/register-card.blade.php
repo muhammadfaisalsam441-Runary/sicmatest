@@ -4,5 +4,5 @@
         <h2 class="text-lg font-semibold text-ink">Belum punya akun? Daftar sebagai Keti.</h2>
         <p class="text-sm text-ink">Admin JTIK membantu aktivasi akun Keti dan kendala akses.</p>
     </div>
-    <x-button variant="secondary" :href="Nav::url('register')" class="shrink-0 px-8">Daftar sebagai Keti</x-button>
+    <x-button variant="secondary" :href="Nav::url('register')" animated class="shrink-0">Daftar sebagai Keti</x-button>
 </section>

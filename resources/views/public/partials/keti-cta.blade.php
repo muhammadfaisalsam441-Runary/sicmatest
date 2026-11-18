@@ -4,5 +4,5 @@
         <h2 class="text-lg font-semibold text-ink">Mau menggunakan ruangan untuk kelasmu?</h2>
         <p class="text-sm text-ink">Pemesanan, mulai/selesai, dan riwayat penggunaan tersedia bagi Keti yang terdaftar.</p>
     </div>
-    <x-button :href="Nav::url('login')" class="shrink-0 px-9">Masuk sebagai Keti untuk memesan</x-button>
+    <x-button :href="Nav::url('login')" animated class="shrink-0">Masuk sebagai Keti untuk memesan</x-button>
 </section>

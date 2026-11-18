@@ -91,6 +91,7 @@
                     @foreach ($rooms as $room)
                         <x-room-card size="large" :name="$room['name']" :badge="$room['badge']" :location="$room['location']" :capacity="$room['capacity']"
                                      :facilities="$room['facilities']" :time-label="$room['time_label']" :time="$room['time']" :remaining="$room['remaining']"
+                                     style="--stagger: {{ $loop->index }}"
                                      :href="route('keti.rooms.show', array_filter(['room' => $room['id'], 'mulai' => $isNow ? null : $start->format('Y-m-d H:i'), 'durasi' => $duration, 'orang' => $filters['orang'] ?? null]))"
                                      :booking="BookingPayload::make($room['id'], $room['name'], $room['location'], $room['capacity'], $start, $duration, isset($filters['orang']) && filled($filters['orang']) ? (int) $filters['orang'] : null)" />
                     @endforeach

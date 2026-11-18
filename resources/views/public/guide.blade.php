@@ -16,7 +16,7 @@
                 ['02', '2. Temukan ruangan', 'Cari ruang tersedia atau lihat jadwal kelas melalui My Class.'],
                 ['03', '3. Pesan dan gunakan', 'Pesan ruang, mulai penggunaan, lalu tekan selesai setelah dipakai.'],
             ] as [$number, $heading, $text])
-                <li class="flex flex-col gap-4 rounded-card border border-border bg-surface px-6 py-6">
+                <li class="sicma-card-enter sicma-card-interactive flex flex-col gap-4 rounded-card border border-border bg-surface px-6 py-6 hover:border-primary/40 hover:shadow-xs" style="--stagger: {{ $loop->index }}">
                     <span class="self-start rounded-control bg-primary-soft px-3 py-1.5 text-xs font-semibold text-primary">{{ $number }}</span>
                     <h2 class="text-lg font-medium text-ink">{{ $heading }}</h2>
                     <p class="text-sm leading-relaxed text-muted">{{ $text }}</p>

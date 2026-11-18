@@ -26,19 +26,23 @@
     $extraFacilities = max(0, count($facilities) - 3);
 @endphp
 
-<article {{ $attributes->merge(['class' => 'sicma-card-interactive sicma-card-enter flex flex-col gap-3.5 rounded-card border border-border bg-surface hover:border-primary/40 hover:shadow-xs '.($size === 'large' ? 'p-5 sm:p-6' : 'p-4')]) }}>
+<article data-room-card
+         data-status-tone="{{ $variant }}"
+         {{ $attributes->merge(['class' => 'sicma-room-card sicma-card-interactive sicma-card-enter relative flex flex-col gap-3.5 overflow-hidden rounded-card border border-border bg-surface '.($size === 'large' ? 'p-5 sm:p-6' : 'p-4')]) }}>
+    <span aria-hidden="true" class="sicma-card-spotlight"></span>
+    <span aria-hidden="true" class="sicma-card-accent"></span>
     <div class="flex items-start justify-between gap-3">
         <div class="flex min-w-0 flex-col gap-1">
-            <h3 class="{{ $size === 'large' ? 'text-xl' : 'text-lg' }} font-semibold leading-snug text-ink">{{ $name }}</h3>
+            <h3 class="sicma-card-title {{ $size === 'large' ? 'text-xl' : 'text-lg' }} font-semibold leading-snug text-ink transition-colors duration-200">{{ $name }}</h3>
             <p class="inline-flex items-center gap-1.5 text-xs text-muted">
-                <i data-lucide="map-pin" aria-hidden="true" class="size-3.5 shrink-0"></i>
+                <i data-lucide="map-pin" aria-hidden="true" class="sicma-card-pin size-3.5 shrink-0 transition-colors duration-200"></i>
                 <span class="truncate">{{ $location }}</span>
             </p>
         </div>
         <x-status-badge :variant="$variant" :pulse="$isBusy">{{ $badge }}</x-status-badge>
     </div>
 
-    <dl class="grid grid-cols-2 items-start gap-3 rounded-control bg-page px-3.5 py-2.5 text-sm">
+    <dl class="sicma-card-meta-box grid grid-cols-2 items-start gap-3 rounded-control border border-transparent bg-page px-3.5 py-2.5 text-sm transition-colors duration-200">
         <div class="flex flex-col gap-0.5">
             <dt class="text-[11px] font-medium text-muted">Kapasitas</dt>
             <dd class="inline-flex items-center gap-1.5 font-semibold text-ink tabular-nums">

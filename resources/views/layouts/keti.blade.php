@@ -23,7 +23,7 @@
 
             <aside id="keti-sidebar"
                    :class="{ 'translate-x-0': sidebarOpen, '-translate-x-full': ! sidebarOpen }"
-                   class="fixed inset-y-0 left-0 z-50 flex h-screen w-[220px] -translate-x-full flex-col gap-10 overflow-y-auto border-r border-border bg-surface px-5 py-9 transition-transform duration-200 lg:sticky lg:top-0 lg:z-auto lg:w-auto lg:translate-x-0">
+                   class="fixed inset-y-0 left-0 z-50 flex h-screen w-[220px] -translate-x-full flex-col gap-10 overflow-y-auto border-r border-border bg-surface/90 px-5 py-9 backdrop-blur-md transition-transform duration-200 lg:sticky lg:top-0 lg:z-auto lg:w-auto lg:translate-x-0">
                 <div class="flex items-start justify-between gap-2">
                     <div class="flex flex-col gap-6">
                         <a href="{{ Nav::url('keti.search') }}" class="inline-flex items-center gap-2.5 rounded-control text-[28px] font-bold tracking-tight text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
@@ -59,8 +59,9 @@
                 </nav>
             </aside>
 
-            <div class="flex min-w-0 flex-col">
-                <header class="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between gap-4 border-b border-border bg-surface px-4 shadow-xs sm:px-6 lg:px-8">
+            <div class="relative isolate flex min-w-0 flex-col">
+                <x-ambient-backdrop variant="portal" />
+                <header class="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between gap-4 border-b border-border bg-surface/85 px-4 shadow-xs backdrop-blur-md sm:px-6 lg:px-8">
                     {{-- Sisi Kiri: Toggle Mobile & Breadcrumb / Halaman Aktif --}}
                     <div class="flex min-w-0 items-center gap-3">
                         <button type="button"
@@ -102,8 +103,24 @@
                     @yield('content')
                 </main>
 
-                <footer class="flex items-center gap-6 px-4 pb-6 text-xs text-muted sm:gap-24 sm:px-6 lg:px-8">
+                <footer class="flex flex-wrap items-center justify-between gap-4 px-4 pb-6 text-xs text-muted sm:px-6 lg:px-8">
                     <span>JTIK • SICMA</span>
+                    <div class="flex flex-wrap items-center gap-2.5">
+                        <button type="button"
+                                data-toggle-bg-motion
+                                aria-label="Jeda animasi latar"
+                                class="inline-flex cursor-pointer items-center gap-1.5 rounded-control border border-border bg-surface px-2.5 py-1 text-[11px] font-semibold text-muted transition hover:border-primary/40 hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+                            <i data-lucide="sparkles" aria-hidden="true" class="size-3.5 text-primary"></i>
+                            <span data-bg-motion-label>Jeda animasi latar</span>
+                        </button>
+                        <button type="button"
+                                data-replay-splash
+                                title="Putar animasi 3D SICMA"
+                                class="inline-flex cursor-pointer items-center gap-1.5 rounded-control border border-border bg-surface px-2.5 py-1 text-[11px] font-semibold text-primary transition hover:border-primary/40 hover:bg-primary-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+                            <i data-lucide="sparkles" aria-hidden="true" class="size-3.5"></i>
+                            <span>Animasi Logo 3D</span>
+                        </button>
+                    </div>
                 </footer>
             </div>
         </div>

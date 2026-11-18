@@ -84,7 +84,8 @@
                 </form>
             </aside>
 
-            <div class="flex min-w-0 flex-col">
+            <div class="relative isolate flex min-w-0 flex-col">
+                <x-ambient-backdrop variant="portal" />
                 <header class="sticky top-0 z-30 flex h-14 shrink-0 items-center justify-between gap-4 border-b border-border bg-surface px-4 shadow-xs sm:px-6 lg:px-8">
                     {{-- Sisi Kiri: Toggle Mobile & Breadcrumb / Halaman Aktif --}}
                     <div class="flex min-w-0 items-center gap-3">

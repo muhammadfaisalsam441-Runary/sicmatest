@@ -35,7 +35,8 @@
                 <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
                     @foreach ($rooms as $room)
                         <x-room-card :name="$room['name']" :badge="$room['badge']" :location="$room['location']" :capacity="$room['capacity']" :facilities="$room['facilities']"
-                                     :time-label="$room['time_label']" :time="$room['time']" :note="$room['note']">
+                                     :time-label="$room['time_label']" :time="$room['time']" :note="$room['note']"
+                                     style="--stagger: {{ $loop->index }}">
                             <div class="flex w-full gap-2">
                                 <x-button variant="secondary" :href="route('keti.rooms.show', $room['id'])" class="flex-1">Detail</x-button>
                                 @if ($room['badge'] === 'Tersedia')

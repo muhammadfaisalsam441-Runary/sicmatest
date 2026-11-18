@@ -33,7 +33,9 @@ export {
 export function installPortalNavigation(Alpine, renderIcons) {
     if (!document.body.dataset.portal) return null;
 
+    const PUBLIC_ROUTE_ORDER = ['/', '/ruangan', '/panduan', '/bantuan'];
     const pages = new Map();
+    const prefetched = new Map();
     let currentUrl = location.href;
     let request = null;
     let rendering = false;
@@ -41,6 +43,53 @@ export function installPortalNavigation(Alpine, renderIcons) {
     let pendingRealtimeRefresh = false;
     let realtimeTimer = null;
     history.scrollRestoration = 'manual';
+
+    function resolveTransitionDirection(fromUrl, toUrl, options) {
+        if (options.keepScroll || options.silent) return null;
+        if (options.history === 'pop') return 'backward';
+        try {
+            const fromPath = new URL(fromUrl, location.href).pathname;
+            const toPath = new URL(toUrl, location.href).pathname;
+            const fromIdx = PUBLIC_ROUTE_ORDER.indexOf(fromPath);
+            const toIdx = PUBLIC_ROUTE_ORDER.indexOf(toPath);
+            if (fromIdx !== -1 && toIdx !== -1 && fromIdx !== toIdx) {
+                return toIdx > fromIdx ? 'forward' : 'backward';
+            }
+        } catch {
+            return null;
+        }
+        return 'forward';
+    }
+
+    function prefetchPage(rawHref) {
+        if (!rawHref || navigator.connection?.saveData) return;
+        let url;
+        try {
+            url = new URL(rawHref, location.href);
+        } catch {
+            return;
+        }
+        if (url.origin !== location.origin || !['http:', 'https:'].includes(url.protocol)) return;
+        if (url.href === currentUrl) return;
+        const cached = prefetched.get(url.href);
+        if (cached && Date.now() - cached.time < 8000) return;
+
+        const promise = fetch(url.href, {
+            method: 'GET',
+            credentials: 'same-origin',
+            headers: { Accept: 'text/html' },
+        })
+            .then(async (res) => {
+                const type = res.headers.get('Content-Type') || '';
+                if (!res.ok || !type.includes('text/html')) return null;
+                return { html: await res.text(), finalUrl: res.url || url.href };
+            })
+            .catch(() => null);
+
+        prefetched.delete(url.href);
+        prefetched.set(url.href, { time: Date.now(), promise });
+        if (prefetched.size > 8) prefetched.delete(prefetched.keys().next().value);
+    }
 
     function formKey(form) {
         const action = formActionUrl(form).href;
@@ -210,7 +259,17 @@ export function installPortalNavigation(Alpine, renderIcons) {
 
         const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
         if (typeof document.startViewTransition === 'function' && !reduceMotion && !document.querySelector('dialog[open]')) {
-            const transition = document.startViewTransition(applyDomUpdate);
+            const direction = resolveTransitionDirection(currentUrl, url, options);
+            let transition;
+            if (direction) {
+                try {
+                    transition = document.startViewTransition({ update: applyDomUpdate, types: [direction] });
+                } catch {
+                    transition = document.startViewTransition(applyDomUpdate);
+                }
+            } else {
+                transition = document.startViewTransition(applyDomUpdate);
+            }
             await transition.updateCallbackDone;
             void transition.finished.finally(focusViewTarget);
         } else {
@@ -226,6 +285,20 @@ export function installPortalNavigation(Alpine, renderIcons) {
         const active = { controller: new AbortController(), method: options.method || 'GET', silent: Boolean(options.silent) };
         request = active;
         try {
+            if (!options.silent && !options.form && active.method === 'GET') {
+                const cached = prefetched.get(url);
+                if (cached && Date.now() - cached.time < 8000) {
+                    const resolved = await cached.promise;
+                    if (request !== active) return;
+                    if (resolved) {
+                        prefetched.delete(url);
+                        const next = new DOMParser().parseFromString(resolved.html, 'text/html');
+                        await render(next, resolved.finalUrl, options, previous);
+                        return;
+                    }
+                }
+            }
+
             const response = await fetch(url, {
                 method: active.method, body: options.body,
                 credentials: 'same-origin', signal: active.controller.signal,
@@ -292,6 +365,16 @@ export function installPortalNavigation(Alpine, renderIcons) {
             }
         }
     }
+
+    document.addEventListener('pointerenter', (event) => {
+        const link = event.target.closest?.('a[data-prefetch][href]');
+        if (link) prefetchPage(link.href);
+    }, true);
+
+    document.addEventListener('focusin', (event) => {
+        const link = event.target.closest?.('a[data-prefetch][href]');
+        if (link) prefetchPage(link.href);
+    });
 
     document.addEventListener('click', (event) => {
         const link = event.target.closest('a[href]');

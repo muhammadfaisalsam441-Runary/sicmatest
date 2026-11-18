@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { canBackgroundRefresh, captureFields, restoreFields, hasFormChanges, isEditingField, navigationState, formActionUrl, registerStatusPolling, notifyToast, clearToasts } from '../../resources/js/navigation.js';
+import { morphNode } from '../../resources/js/navigation/dom-morph.js';
 import { installRealtimePush, parseReverbConfig } from '../../resources/js/realtime.js';
 
 function input(name, value = '', extra = {}) {
@@ -347,4 +348,28 @@ test('notifyToast dan clearToasts mengirim event sicma:toast dan sicma:toast-cle
         },
     ]);
     assert.equal(notifyToast({ title: 'Tanpa window' }, null), false);
+});
+
+test('morphNode mempertahankan backdrop ambient yang memiliki varian sama agar animasi latar tidak terputus', () => {
+    let replaced = false;
+    const current = {
+        nodeType: 1,
+        tagName: 'DIV',
+        id: '',
+        dataset: {},
+        hasAttribute: (name) => name === 'data-ambient-backdrop',
+        getAttribute: (name) => (name === 'data-ambient-backdrop' ? 'public' : null),
+        replaceWith: () => { replaced = true; },
+    };
+    const next = {
+        nodeType: 1,
+        tagName: 'DIV',
+        id: '',
+        dataset: {},
+        hasAttribute: (name) => name === 'data-ambient-backdrop',
+        getAttribute: (name) => (name === 'data-ambient-backdrop' ? 'public' : null),
+    };
+
+    morphNode(current, next, false, null);
+    assert.equal(replaced, false);
 });

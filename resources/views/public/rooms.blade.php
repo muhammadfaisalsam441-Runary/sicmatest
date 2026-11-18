@@ -11,7 +11,7 @@
 @section('content')
     <div class="flex flex-col gap-6">
         <div class="flex flex-wrap items-center gap-3 sm:gap-4">
-            <x-button variant="secondary" :href="route('home')" class="w-full sm:w-52">Kembali ke beranda</x-button>
+            <x-button variant="secondary" :href="route('home')" data-prefetch class="w-full sm:w-52">Kembali ke beranda</x-button>
             <x-status-badge variant="primary">Akses publik • Hanya lihat</x-status-badge>
         </div>
 
@@ -75,7 +75,8 @@
             <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
                 @foreach ($rooms as $room)
                     <x-room-card :name="$room['name']" :badge="$room['badge']" :location="$room['location']" :capacity="$room['capacity']"
-                                 :time-label="$room['time_label']" :time="$room['time']" :note="$room['note']" />
+                                 :time-label="$room['time_label']" :time="$room['time']" :note="$room['note']"
+                                 style="--stagger: {{ $loop->index }}" />
                 @endforeach
             </div>
         @endif
@@ -87,9 +88,9 @@
                 <button type="button" x-data x-on:click="$dispatch('open-modal', 'bantuan-akun-keti')" class="cursor-pointer rounded font-semibold text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">Bantuan akun Keti</button>
             </p>
             @auth
-                <x-button :href="HomeRoute::for(auth()->user())" class="w-full shrink-0 px-6 sm:w-auto sm:px-9">Buka SICMA</x-button>
+                <x-button :href="HomeRoute::for(auth()->user())" animated class="w-full shrink-0 sm:w-auto">Buka SICMA</x-button>
             @else
-                <x-button :href="Nav::url('login')" class="w-full shrink-0 px-6 sm:w-auto sm:px-9">Masuk sebagai Keti untuk memesan</x-button>
+                <x-button :href="Nav::url('login')" animated class="w-full shrink-0 sm:w-auto">Masuk sebagai Keti untuk memesan</x-button>
             @endauth
         </section>
     </div>

@@ -3,29 +3,46 @@
 @section('title', 'Masuk')
 
 @section('content')
-    <form method="POST" action="{{ route('login.store') }}" class="flex flex-col gap-5" novalidate>
+    <form method="POST" action="{{ route('login.store') }}" class="flex flex-col gap-4" novalidate>
         @csrf
         <x-auth-heading title="Masuk ke SICMA"
                         :subtitle="$errors->has('identity') ? $errors->first('identity') : 'Gunakan email atau NIM dan kata sandi yang terdaftar.'"
                         :danger="$errors->has('identity')" />
 
         <x-field label="Email atau NIM" name="identity">
-            <x-input name="identity" autocomplete="username" autofocus required />
+            <x-input name="identity" placeholder="Email atau NIM" autocomplete="username" autofocus required />
         </x-field>
         <x-field label="Kata sandi" name="password">
-            <x-input name="password" type="password" autocomplete="current-password" required />
+            <x-input name="password" type="password" placeholder="Kata sandi" autocomplete="current-password" required />
         </x-field>
 
-        <x-button type="submit" class="w-full">Masuk</x-button>
-        <x-button variant="secondary" :href="route('password.request')" class="w-full">Lupa kata sandi?</x-button>
-        <x-button variant="secondary" :href="route('register')" class="w-full">Daftar sebagai Keti</x-button>
-
-        <p class="text-xs text-muted">
-            Belum punya akun? Daftar sebagai Keti. Akun admin diberikan oleh pengelola.
-            <button type="button" x-data x-on:click="$dispatch('open-modal', 'bantuan-akun')" class="font-semibold text-primary hover:underline">Bantuan akun</button>
+        <p class="-mt-1 text-right">
+            <a href="{{ route('password.request') }}" class="text-xs font-bold text-muted underline decoration-muted/70 underline-offset-2 transition hover:text-ink hover:decoration-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+                Lupa kata sandi?
+            </a>
         </p>
 
-        <x-button variant="secondary" :href="route('home')" class="w-full">Kembali ke beranda</x-button>
+        <x-button type="submit" class="sicma-auth-submit w-full !rounded-[20px]">Masuk</x-button>
+
+        <p class="mt-2 text-center text-xs text-muted">
+            Belum punya akun?
+            <a href="{{ route('register') }}" class="ml-1 font-extrabold text-primary underline decoration-primary underline-offset-2 hover:text-primary/80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">Daftar sebagai Keti</a>
+        </p>
+
+        <div class="mt-3 flex flex-col gap-3">
+            <button type="button"
+                    x-data
+                    x-on:click="$dispatch('open-modal', 'bantuan-akun')"
+                    class="sicma-auth-pill-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+                <i data-lucide="circle-help" aria-hidden="true" class="size-4"></i>
+                <span>Bantuan akun</span>
+            </button>
+            <a href="{{ route('home') }}"
+               class="sicma-auth-pill-outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+                <i data-lucide="arrow-left" aria-hidden="true" class="size-4"></i>
+                <span>Kembali ke beranda</span>
+            </a>
+        </div>
     </form>
 @endsection
 

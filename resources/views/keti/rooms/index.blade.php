@@ -44,7 +44,8 @@
                 @foreach ($rooms as $room)
                     <a href="{{ route('keti.rooms.show', $room['id']) }}" class="block rounded-card transition hover:ring-2 hover:ring-primary/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
                         <x-room-card :name="$room['name']" :badge="$room['badge']" :location="$room['location']" :capacity="$room['capacity']"
-                                     :time-label="$room['time_label']" :time="$room['time']" :note="$room['note']" class="h-full" />
+                                     :time-label="$room['time_label']" :time="$room['time']" :note="$room['note']"
+                                     style="--stagger: {{ $loop->index }}" class="h-full" />
                     </a>
                 @endforeach
             </div>

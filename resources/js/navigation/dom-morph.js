@@ -65,6 +65,11 @@ export function morphNode(current, next, silent = false, Alpine = globalThis.Alp
 
     if (silent && current.hasAttribute('data-modal-name')) return;
 
+    if (current.hasAttribute('data-ambient-backdrop')
+        && current.getAttribute('data-ambient-backdrop') === next.getAttribute('data-ambient-backdrop')) {
+        return;
+    }
+
     const hasAlpine = current.hasAttribute('x-data') || next.hasAttribute('x-data');
     if (hasAlpine) {
         if (!silent || current.outerHTML !== next.outerHTML) {

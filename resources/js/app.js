@@ -155,3 +155,112 @@ document.addEventListener('click', (event) => {
 if (document.getElementById('sicma-splash-root') && shouldAutoPlaySplash()) {
     void launchSicmaSplash();
 }
+
+const BG_MOTION_STORAGE_KEY = 'sicma.bgMotion';
+
+function isBgMotionPaused() {
+    return document.documentElement?.dataset.bgMotion === 'paused';
+}
+
+function syncBgMotionButtons(root = document) {
+    const paused = isBgMotionPaused();
+    const nextLabel = paused ? 'Putar animasi latar' : 'Jeda animasi latar';
+
+    for (const button of root.querySelectorAll('[data-toggle-bg-motion]')) {
+        button.setAttribute('aria-label', nextLabel);
+        const labelNode = button.querySelector('[data-bg-motion-label]');
+        if (labelNode) {
+            labelNode.textContent = nextLabel;
+        }
+    }
+}
+
+try {
+    if (window.localStorage.getItem(BG_MOTION_STORAGE_KEY) === 'paused') {
+        document.documentElement.dataset.bgMotion = 'paused';
+    }
+} catch {
+    // Abaikan error penyimpanan jika localStorage diblokir.
+}
+
+syncBgMotionButtons();
+document.addEventListener('sicma:navigated', () => syncBgMotionButtons());
+
+document.addEventListener('click', (event) => {
+    const trigger = event.target.closest?.('[data-toggle-bg-motion]');
+    if (!trigger) return;
+
+    const nextPaused = !isBgMotionPaused();
+    if (nextPaused) {
+        document.documentElement.dataset.bgMotion = 'paused';
+    } else {
+        delete document.documentElement.dataset.bgMotion;
+    }
+
+    try {
+        window.localStorage.setItem(BG_MOTION_STORAGE_KEY, nextPaused ? 'paused' : 'playing');
+    } catch {
+        // Abaikan error penyimpanan jika localStorage diblokir.
+    }
+
+    syncBgMotionButtons();
+});
+
+// Mouse-tracking spotlight pada grid kartu ruangan (berjalan mulus lintas navigasi SPA).
+let spotFrame = 0;
+let spotEvent = null;
+let activeSpotGrid = null;
+
+function clearGridSpotlight(grid) {
+    if (!grid) return;
+    for (const card of grid.querySelectorAll('[data-room-card]')) {
+        card.removeAttribute('data-spot-active');
+        card.style.setProperty('--spot-x', '-999px');
+        card.style.setProperty('--spot-y', '-999px');
+    }
+}
+
+document.addEventListener('pointermove', (event) => {
+    if (event.pointerType === 'touch') return;
+    const card = event.target?.closest?.('[data-room-card]');
+    if (!card) {
+        if (activeSpotGrid) {
+            clearGridSpotlight(activeSpotGrid);
+            activeSpotGrid = null;
+        }
+        return;
+    }
+
+    const grid = card.closest('.grid') || card.parentElement;
+    if (activeSpotGrid && activeSpotGrid !== grid) {
+        clearGridSpotlight(activeSpotGrid);
+    }
+    activeSpotGrid = grid;
+    spotEvent = { x: event.clientX, y: event.clientY, grid, card };
+
+    if (spotFrame) return;
+    spotFrame = window.requestAnimationFrame(() => {
+        spotFrame = 0;
+        const current = spotEvent;
+        if (!current) return;
+        const cards = current.grid ? current.grid.querySelectorAll('[data-room-card]') : [current.card];
+        for (const item of cards) {
+            const rect = item.getBoundingClientRect();
+            item.style.setProperty('--spot-x', `${current.x - rect.left}px`);
+            item.style.setProperty('--spot-y', `${current.y - rect.top}px`);
+            item.setAttribute('data-spot-active', 'true');
+        }
+    });
+}, { passive: true });
+
+document.addEventListener('pointerleave', (event) => {
+    if (event.target === document || event.target === document.documentElement) {
+        clearGridSpotlight(activeSpotGrid);
+        activeSpotGrid = null;
+    }
+});
+
+document.addEventListener('sicma:navigated', () => {
+    clearGridSpotlight(activeSpotGrid);
+    activeSpotGrid = null;
+});

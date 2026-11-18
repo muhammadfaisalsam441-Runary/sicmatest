@@ -248,3 +248,13 @@ test('aktivitas menampilkan semua pengguna atau hanya kelas sendiri', function (
     $this->actingAs($this->keti)->get(route('keti.activity', ['cakupan' => 'saya']))
         ->assertSee('AE 107')->assertDontSee('AE 215');
 });
+
+test('halaman detail ruangan keti tidak merender @js mentah di kartu ubah waktu', function () {
+    $room = Room::factory()->create(['name' => 'AE 107']);
+
+    $this->actingAs($this->keti)
+        ->get(route('keti.rooms.show', $room))
+        ->assertOk()
+        ->assertDontSee('@js(', false)
+        ->assertSee('x-data="{ editing: false }"', false);
+});

@@ -361,14 +361,14 @@
                                                   variant="secondary"
                                                   size="sm"
                                                   icon="pencil"
-                                                  @click="openEditAssignment(@js($offeringPayload), @js($leadPayload))"
+                                                  @click="openEditAssignment({{ \Illuminate\Support\Js::from($offeringPayload) }}, {{ \Illuminate\Support\Js::from($leadPayload) }})"
                                                   title="Kelola tim pengajar kelas ini">Atur Tim</x-button>
                                     @else
                                         <x-button type="button"
                                                   variant="danger-outline"
                                                   size="sm"
                                                   icon="user-plus"
-                                                  @click="openQuickAssign({{ $offering->id }}, @js($offering->course->name), @js($offering->classGroup->name), 'lead', {{ $offering->course->sks }}, @js($teamPayload))"
+                                                  @click="openQuickAssign({{ $offering->id }}, {{ \Illuminate\Support\Js::from($offering->course->name) }}, {{ \Illuminate\Support\Js::from($offering->classGroup->name) }}, 'lead', {{ $offering->course->sks }}, {{ \Illuminate\Support\Js::from($teamPayload) }})"
                                                   title="Tugaskan pengampu kelas ini">Tugaskan</x-button>
                                     @endif
                                 </td>

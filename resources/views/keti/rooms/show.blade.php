@@ -124,7 +124,7 @@
             </div>
 
             {{-- Panel pemesanan: waktu dipilih + tombol Pesan; ubah waktu dibuka bila diperlukan. --}}
-            <x-card class="flex flex-col gap-4" x-data="{ editing: @js(! $canBook && $suggestedStart === null) }">
+            <x-card class="flex flex-col gap-4" x-data="{ editing: {{ \Illuminate\Support\Js::from(! $canBook && $suggestedStart === null) }} }">
                 <h2 class="text-xl font-semibold">{{ $canBook ? 'Gunakan untuk kelasmu' : 'Waktu pilihan belum bisa dipesan' }}</h2>
                 <p class="font-semibold text-primary">Kelas {{ $classGroup->name }}</p>
                 @if ($suggestedStart !== null)

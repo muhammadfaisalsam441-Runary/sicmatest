@@ -1311,3 +1311,24 @@ test('halaman operasional reservasi, log pemakaian, dan akun keti mempertahankan
         ->assertSee('Perluas')
         ->assertDontSee('Scroll di dalam tabel untuk melihat semua baris');
 });
+
+test('tombol Atur Tim dan Tugaskan pada pembagian SKS tidak merender @js mentah', function () {
+    $classGroup = ClassGroup::factory()->create(['name' => 'PTIK A 2026']);
+    $courseA = Course::factory()->create(['name' => 'Algoritma', 'sks' => 3]);
+    $courseB = Course::factory()->create(['name' => 'Basis Data', 'sks' => 3]);
+    $lecturer = Lecturer::factory()->create(['name' => 'Alifya NFH']);
+
+    $assignedOffering = CourseOffering::factory()->for($this->period)->for($courseA)->for($classGroup)->create();
+    TeachingAssignment::factory()->for($assignedOffering, 'courseOffering')->for($lecturer)->create(['role' => TeachingRole::Lead]);
+
+    $unassignedOffering = CourseOffering::factory()->for($this->period)->for($courseB)->for($classGroup)->create();
+
+    $this->actingAs($this->admin)
+        ->get(route('admin.teaching.index'))
+        ->assertOk()
+        ->assertDontSee('@js(', false)
+        ->assertSee('openEditAssignment(JSON.parse(', false)
+        ->assertSee('openQuickAssign('.$unassignedOffering->id.',', false)
+        ->assertSee('Atur Tim')
+        ->assertSee('Tugaskan');
+});

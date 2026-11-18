@@ -169,6 +169,7 @@
                                 <div class="relative flex-1 min-w-[220px]">
                                     <i data-lucide="search" class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" aria-hidden="true"></i>
                                     <input id="offering-search" type="search" x-model="search" data-table-search
+                                           autocorrect="off" autocapitalize="none" spellcheck="false"
                                            aria-label="Cari Mata Kuliah, Kode, Kelas, atau Dosen"
                                            placeholder="Cari mata kuliah, kode, kelas, atau dosen..."
                                            class="w-full rounded-control border border-border bg-surface py-2 pl-9 pr-8 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs">
@@ -417,87 +418,13 @@
                     </x-card>
 
                     {{-- FLOATING BATCH ACTION BAR --}}
-                    <div x-show="selectedIds.length > 0"
-                        x-cloak
-                        x-transition:enter="transition ease-out duration-200"
-                        x-transition:enter-start="opacity-0 translate-y-4"
-                        x-transition:enter-end="opacity-100 translate-y-0"
-                        x-transition:leave="transition ease-in duration-150"
-                        x-transition:leave-start="opacity-100 translate-y-0"
-                        x-transition:leave-end="opacity-0 translate-y-4"
-                        class="fixed bottom-6 left-1/2 z-40 flex w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 flex-wrap items-center gap-3 rounded-xl border border-primary/30 bg-ink px-6 py-3.5 text-surface shadow-2xl">
-                        <div class="flex items-center gap-2">
-                            <i data-lucide="circle-check" class="size-5 text-success" aria-hidden="true"></i>
-                            <span class="text-sm font-semibold"><span x-text="selectedIds.length"></span> penawaran dipilih</span>
-                            <button type="button"
-                                    x-show="!isAllSelected()"
-                                    @click="toggleSelectAll(true)"
-                                    class="ml-1 rounded-md border border-surface/20 bg-surface/10 px-2 py-0.5 text-[11px] font-semibold text-surface hover:bg-surface/20 transition cursor-pointer">
-                                Pilih Semua Tampil
-                            </button>
-                        </div>
-                        <div class="h-4 w-px bg-surface/20"></div>
-
-                        <button type="button" @click="batchDeleteModalOpen = true" class="inline-flex items-center gap-1.5 rounded-lg bg-danger px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-danger/90 transition cursor-pointer">
+                    <x-batch-action-bar unit="penawaran">
+                        <button type="button" @click="batchDeleteModalOpen = true" class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-danger px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:bg-danger/90">
                             <i data-lucide="trash-2" class="size-3.5" aria-hidden="true"></i>
                             Hapus Penawaran Terpilih
                         </button>
+                    </x-batch-action-bar>
 
-                        <button type="button" @click="selectedIds = []" class="text-xs text-surface/70 hover:text-white transition ml-2 cursor-pointer">
-                            Batalkan Pilihan
-                        </button>
-                    </div>
-
-                    {{-- MODAL KONFIRMASI HAPUS SATUAN --}}
-                    <div x-show="deleteModalOpen" x-cloak role="dialog" aria-modal="true" aria-labelledby="delete-offering-modal-title" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-                        <div class="absolute inset-0 bg-ink/80 backdrop-blur-sm" @click="deleteModalOpen = false"></div>
-                        <div class="relative w-full max-w-md rounded-2xl bg-surface p-6 shadow-2xl">
-                            <div class="flex items-start justify-between border-b border-border pb-3">
-                                <h3 id="delete-offering-modal-title" class="text-lg font-bold text-ink">Hapus Penawaran Kuliah?</h3>
-                                <button type="button" @click="deleteModalOpen = false" aria-label="Tutup dialog" class="cursor-pointer rounded-md p-1 text-muted hover:bg-slate-100 hover:text-ink">
-                                    <i data-lucide="x" class="size-5" aria-hidden="true"></i>
-                                </button>
-                            </div>
-                            <p class="mt-3 text-xs text-muted">
-                                Apakah Anda yakin ingin menghapus penawaran <strong class="text-ink" x-text="offeringToDelete.name"></strong>?
-                                Pembagian SKS dosen pada penawaran ini juga akan ikut dihapus.
-                            </p>
-                            <form method="POST" :action="offeringToDelete.deleteUrl" class="mt-5 flex justify-end gap-2">
-                                @csrf
-                                @method('DELETE')
-                                <x-button variant="secondary" type="button" @click="deleteModalOpen = false">Batal</x-button>
-                                <x-button variant="danger" type="submit" icon="trash-2">Hapus Penawaran</x-button>
-                            </form>
-                        </div>
-                    </div>
-
-                    {{-- MODAL KONFIRMASI HAPUS BATCH --}}
-                    <div x-show="batchDeleteModalOpen" x-cloak role="dialog" aria-modal="true" aria-labelledby="batch-delete-offering-modal-title" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-                        <div class="absolute inset-0 bg-ink/80 backdrop-blur-sm" @click="batchDeleteModalOpen = false"></div>
-                        <div class="relative w-full max-w-md rounded-2xl bg-surface p-6 shadow-2xl">
-                            <div class="flex items-start justify-between border-b border-border pb-3">
-                                <div>
-                                    <span class="text-xs font-semibold text-danger">Penyesuaian Massal</span>
-                                    <h3 id="batch-delete-offering-modal-title" class="text-lg font-bold text-ink">Hapus (<span x-text="selectedIds.length"></span> Penawaran Terpilih)?</h3>
-                                </div>
-                                <button type="button" @click="batchDeleteModalOpen = false" aria-label="Tutup dialog" class="cursor-pointer rounded-md p-1 text-muted hover:bg-slate-100 hover:text-ink">
-                                    <i data-lucide="x" class="size-5" aria-hidden="true"></i>
-                                </button>
-                            </div>
-                            <div class="mt-4 rounded-lg border border-danger/20 bg-danger-soft/40 p-3 text-xs text-ink">
-                                Seluruh <strong x-text="selectedIds.length"></strong> penawaran yang sedang dicentang akan dihapus beserta pembagian SKS dosennya. Penawaran yang telah memiliki sesi jadwal di draf otomatis dilindungi dan tidak akan dihapus.
-                            </div>
-                            <form method="POST" action="{{ route('admin.academic.offerings.batch-delete') }}" class="mt-5">
-                                @csrf
-                                <template x-for="id in selectedIds" :key="id">
-                                    <input type="hidden" name="offering_ids[]" :value="id">
-                                </template>
-                                <div class="flex justify-end gap-2">
-                                    <x-button variant="secondary" type="button" @click="batchDeleteModalOpen = false">Batal</x-button>
-                                    <x-button variant="danger" type="submit" icon="trash-2">Terapkan Hapus ke Penawaran Terpilih</x-button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
+                    @include('admin.academic.modals.offering-delete-modals')
                 </div>
             @endif

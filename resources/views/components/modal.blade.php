@@ -37,17 +37,30 @@
                     }
                 }
             },
+            onBackdropClick(event) {
+                if ('closedBy' in HTMLDialogElement.prototype) {
+                    return;
+                }
+                if (event.target && event.target !== this.$refs.dialog) {
+                    return;
+                }
+                const rect = this.$refs.dialog.getBoundingClientRect();
+                if (rect.top <= event.clientY && event.clientY <= rect.top + rect.height
+                    && rect.left <= event.clientX && event.clientX <= rect.left + rect.width) {
+                    return;
+                }
+                this.close();
+            },
         }"
         x-ref="dialog"
         x-on:open-modal.window="if ($event.detail === '{{ $name }}') show()"
         x-on:close-modal.window="if ($event.detail === '{{ $name }}') close()"
         x-on:cancel.prevent="close()"
         x-on:close="open = false"
-        x-on:click="if ($event.target === $refs.dialog) close()"
+        x-on:click="onBackdropClick($event)"
         closedby="any"
         data-modal-name="{{ $name }}"
         :data-modal-open="open ? 'true' : 'false'"
-        role="dialog"
         @if ($labelledBy)
             aria-labelledby="{{ $labelledBy }}"
         @elseif ($title)

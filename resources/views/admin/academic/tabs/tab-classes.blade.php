@@ -49,6 +49,7 @@
                         <div class="relative flex-1 min-w-[200px]">
                             <i data-lucide="search" class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" aria-hidden="true"></i>
                             <input id="class-search" type="search" x-model="search" data-table-search
+                                   autocorrect="off" autocapitalize="none" spellcheck="false"
                                    aria-label="Cari Nama Kelas, Kode, atau Program Studi"
                                    placeholder="Cari nama kelas, kode, atau prodi..."
                                    class="w-full rounded-control border border-border bg-surface pl-9 pr-8 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary">
@@ -81,32 +82,15 @@
                     </div>
 
                     {{-- Bar Bantuan Cepat saat Mode Edit Massal Aktif --}}
-                    <div x-show="editMode" x-cloak class="rounded-xl border border-primary/30 bg-primary-soft/30 p-3 flex flex-wrap items-center justify-between gap-3 animate-in fade-in duration-200">
-                        <div class="flex flex-wrap items-center gap-2 text-xs">
-                            <span class="font-bold text-primary flex items-center gap-1.5">
-                                <i data-lucide="pencil" class="size-4" aria-hidden="true"></i> Mode Edit Massal Aktif
-                            </span>
-                            <span class="text-muted">| Set jumlah mahasiswa cepat:</span>
-                            <div class="flex flex-wrap items-center gap-1.5 ml-1">
-                                <input type="number" min="1" max="500" x-model="fillEmptyValue" aria-label="Jumlah mahasiswa cepat" class="w-16 rounded border border-border bg-surface px-2 py-1 text-center text-xs font-semibold text-ink focus:border-primary focus:outline-none">
-                                <button type="button" @click="applyFillEmpty()" class="rounded bg-surface px-2.5 py-1 text-xs font-semibold text-primary border border-primary/40 hover:bg-primary hover:text-white transition shadow-xs cursor-pointer">
-                                    Isi yang Kosong
-                                </button>
-                                <button type="button" @click="applyFillAll()" class="rounded bg-primary/15 px-2.5 py-1 text-xs font-semibold text-primary border border-primary/40 hover:bg-primary hover:text-white transition shadow-xs cursor-pointer"
-                                        x-text="selectedIds.length > 0 ? 'Terapkan ke ' + selectedIds.length + ' Kelas Terpilih' : 'Terapkan ke Semua Tampil (' + visibleIds.length + ')'">
-                                </button>
-                            </div>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <button type="button" @click="cancelEditMode()" class="rounded-control border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-muted hover:text-ink transition cursor-pointer">
-                                Batal
-                            </button>
-                            <button type="submit" form="bulkClassForm" class="inline-flex items-center gap-1.5 rounded-control bg-primary px-4 py-1.5 text-xs font-bold text-white hover:bg-primary/90 transition shadow-sm cursor-pointer">
-                                <i data-lucide="check" class="size-4" aria-hidden="true"></i>
-                                Simpan Semua Perubahan
-                            </button>
-                        </div>
-                    </div>
+                    <x-bulk-edit-bar form="bulkClassForm" label="Set jumlah mahasiswa cepat:">
+                        <input type="number" min="1" max="500" x-model="fillEmptyValue" aria-label="Jumlah mahasiswa cepat" class="w-16 rounded border border-border bg-surface px-2 py-1 text-center text-xs font-semibold text-ink focus:border-primary focus:outline-none">
+                        <button type="button" @click="applyFillEmpty()" class="cursor-pointer rounded border border-primary/40 bg-surface px-2.5 py-1 text-xs font-semibold text-primary shadow-xs transition hover:bg-primary hover:text-white">
+                            Isi yang Kosong
+                        </button>
+                        <button type="button" @click="applyFillAll()" class="cursor-pointer rounded border border-primary/40 bg-primary/15 px-2.5 py-1 text-xs font-semibold text-primary shadow-xs transition hover:bg-primary hover:text-white"
+                                x-text="selectedIds.length > 0 ? 'Terapkan ke ' + selectedIds.length + ' Kelas Terpilih' : 'Terapkan ke Semua Tampil (' + visibleIds.length + ')'">
+                        </button>
+                    </x-bulk-edit-bar>
 
                     {{-- TABEL KELAS --}}
                     <x-table-scroll>
@@ -344,61 +328,37 @@
                 </x-card>
 
                 {{-- FLOATING BATCH ACTION BAR --}}
-                <div x-show="selectedIds.length > 0 && !editMode"
-                     x-cloak
-                     x-transition:enter="transition ease-out duration-200"
-                     x-transition:enter-start="opacity-0 translate-y-4"
-                     x-transition:enter-end="opacity-100 translate-y-0"
-                     x-transition:leave="transition ease-in duration-150"
-                     x-transition:leave-start="opacity-100 translate-y-0"
-                     x-transition:leave-end="opacity-0 translate-y-4"
-                     class="fixed bottom-6 left-1/2 z-40 flex w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 flex-wrap items-center gap-3 rounded-xl border border-primary/30 bg-ink px-6 py-3.5 text-surface shadow-2xl">
-                    <div class="flex items-center gap-2">
-                        <i data-lucide="circle-check" class="size-5 text-success" aria-hidden="true"></i>
-                        <span class="text-sm font-semibold"><span x-text="selectedIds.length"></span> kelas dipilih</span>
-                        <button type="button"
-                                x-show="!isAllSelected()"
-                                @click="toggleSelectAll(true)"
-                                class="ml-1 rounded-md bg-surface/10 px-2 py-1 text-[11px] font-semibold text-surface/90 hover:bg-surface/20 hover:text-white transition cursor-pointer">
-                            Pilih Semua Tampil
-                        </button>
-                    </div>
-                    <div class="h-4 w-px bg-surface/20"></div>
-
+                <x-batch-action-bar unit="kelas" show="selectedIds.length > 0 && !editMode">
                     {{-- 1. Atur Mahasiswa Modal --}}
-                    <button type="button" @click="openBatchModal('set_student_count', 'Atur Jumlah Mahasiswa')" class="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-primary/90 transition cursor-pointer">
+                    <button type="button" @click="openBatchModal('set_student_count', 'Atur Jumlah Mahasiswa')" class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:bg-primary/90">
                         <i data-lucide="users" class="size-3.5" aria-hidden="true"></i>
                         Set Mahasiswa
                     </button>
 
                     {{-- 2. Set Angkatan Modal --}}
-                    <button type="button" @click="openBatchModal('set_cohort_year', 'Set Tahun Angkatan')" class="inline-flex items-center gap-1.5 rounded-lg bg-surface/10 px-3 py-1.5 text-xs font-semibold text-surface hover:bg-surface/20 transition cursor-pointer">
+                    <button type="button" @click="openBatchModal('set_cohort_year', 'Set Tahun Angkatan')" class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-surface/10 px-3 py-1.5 text-xs font-semibold text-surface transition hover:bg-surface/20">
                         <i data-lucide="calendar" class="size-3.5" aria-hidden="true"></i>
                         Set Angkatan
                     </button>
 
                     {{-- 3. Set Prodi Modal --}}
-                    <button type="button" @click="openBatchModal('set_study_program', 'Set Program Studi')" class="inline-flex items-center gap-1.5 rounded-lg bg-surface/10 px-3 py-1.5 text-xs font-semibold text-surface hover:bg-surface/20 transition cursor-pointer">
+                    <button type="button" @click="openBatchModal('set_study_program', 'Set Program Studi')" class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-surface/10 px-3 py-1.5 text-xs font-semibold text-surface transition hover:bg-surface/20">
                         <i data-lucide="building-2" class="size-3.5" aria-hidden="true"></i>
                         Set Prodi
                     </button>
 
                     {{-- 4. Aktifkan --}}
-                    <button type="button" @click="submitBatch('activate')" class="inline-flex items-center gap-1.5 rounded-lg bg-success px-3 py-1.5 text-xs font-semibold text-white hover:bg-success/90 transition cursor-pointer">
+                    <button type="button" @click="submitBatch('activate')" class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-success px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-success/90">
                         <i data-lucide="check" class="size-3.5" aria-hidden="true"></i>
                         Aktifkan
                     </button>
 
                     {{-- 5. Arsipkan --}}
-                    <button type="button" @click="archiveConfirmModalOpen = true" class="inline-flex items-center gap-1.5 rounded-lg bg-danger/85 px-3 py-1.5 text-xs font-semibold text-white hover:bg-danger transition cursor-pointer">
+                    <button type="button" @click="archiveConfirmModalOpen = true" class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-danger/85 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-danger">
                         <i data-lucide="lock" class="size-3.5" aria-hidden="true"></i>
                         Arsipkan
                     </button>
-
-                    <button type="button" @click="selectedIds = []" class="ml-2 text-xs font-medium text-surface/70 hover:text-white transition cursor-pointer">
-                        Batalkan Pilihan
-                    </button>
-                </div>
+                </x-batch-action-bar>
 
                 {{-- FORM TERSEMBUNYI UNTUK BATCH ACTION --}}
                 <form x-ref="batchForm" method="POST" action="{{ route('admin.academic.classes.batch') }}" class="hidden">
@@ -418,99 +378,7 @@
                     @method('PUT')
                 </form>
 
-                {{-- MODAL BATCH ATUR NILAI --}}
-                <div x-show="batchModalOpen" x-cloak role="dialog" aria-modal="true" aria-labelledby="batch-class-modal-title" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-                    <div class="absolute inset-0 bg-ink/80 backdrop-blur-sm" @click="batchModalOpen = false"></div>
-                    <div class="relative w-full max-w-md rounded-2xl bg-surface p-6 shadow-2xl">
-                        <div class="flex items-start justify-between border-b border-border pb-3">
-                            <div>
-                                <span class="text-xs font-semibold text-primary">Penyesuaian Massal</span>
-                                <h3 id="batch-class-modal-title" class="text-lg font-bold text-ink" x-text="batchLabel + ' (' + selectedIds.length + ' Kelas Terpilih)'"></h3>
-                            </div>
-                            <button type="button" @click="batchModalOpen = false" aria-label="Tutup dialog" class="cursor-pointer rounded-md p-1 text-muted hover:bg-slate-100 hover:text-ink">
-                                <i data-lucide="x" class="size-5" aria-hidden="true"></i>
-                            </button>
-                        </div>
-
-                        <div class="mt-4 flex flex-col gap-4">
-                            <template x-if="batchAction === 'set_student_count'">
-                                <div>
-                                    <label for="batch-class-student-count" class="mb-1 block text-xs font-medium text-muted">Jumlah Mahasiswa per Kelas</label>
-                                    <input id="batch-class-student-count" type="number" min="1" max="500" x-model="batchValue" @keydown.enter.prevent="if (batchValue) { submitBatch(); batchModalOpen = false; }" placeholder="Misal: 40" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
-                                </div>
-                            </template>
-
-                            <template x-if="batchAction === 'set_cohort_year'">
-                                <div>
-                                    <label for="batch-class-cohort-year" class="mb-1 block text-xs font-medium text-muted">Tahun Angkatan</label>
-                                    <input id="batch-class-cohort-year" type="number" min="2000" max="2100" x-model="batchValue" @keydown.enter.prevent="if (batchValue) { submitBatch(); batchModalOpen = false; }" placeholder="Misal: 2026" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
-                                </div>
-                            </template>
-
-                            <template x-if="batchAction === 'set_study_program'">
-                                <div>
-                                    <label for="batch-class-study-program" class="mb-1 block text-xs font-medium text-muted">Nama Program Studi</label>
-                                    <input id="batch-class-study-program" type="text" x-model="batchValue" @keydown.enter.prevent="if (String(batchValue).trim() !== '') { submitBatch(); batchModalOpen = false; }" list="prodi-options-batch" placeholder="Misal: Pendidikan Teknik Informatika dan Komputer" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
-                                </div>
-                            </template>
-
-                            <div class="rounded-lg border border-primary/20 bg-primary-soft/40 p-3 text-xs text-ink">
-                                Perubahan ini akan diterapkan serentak ke <strong x-text="selectedIds.length"></strong> kelas yang sedang dicentang.
-                            </div>
-
-                            <div class="mt-1 flex items-center justify-end gap-2 border-t border-border pt-4">
-                                <x-button variant="secondary" type="button" @click="batchModalOpen = false">Batal</x-button>
-                                <x-button variant="primary" type="button" icon="check"
-                                          x-bind:disabled="String(batchValue ?? '').trim() === ''"
-                                          @click="if (String(batchValue ?? '').trim() !== '') { submitBatch(); batchModalOpen = false; }">
-                                    Terapkan ke Kelas Terpilih
-                                </x-button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {{-- MODAL KONFIRMASI ARSIP BATCH --}}
-                <div x-show="archiveConfirmModalOpen" x-cloak role="dialog" aria-modal="true" aria-labelledby="archive-class-modal-title" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-                    <div class="absolute inset-0 bg-ink/80 backdrop-blur-sm" @click="archiveConfirmModalOpen = false"></div>
-                    <div class="relative w-full max-w-md rounded-2xl bg-surface p-6 shadow-2xl">
-                        <div class="flex items-start justify-between border-b border-border pb-3">
-                            <h3 id="archive-class-modal-title" class="text-base font-bold text-ink">Arsipkan kelas terpilih?</h3>
-                            <button type="button" @click="archiveConfirmModalOpen = false" aria-label="Tutup dialog" class="cursor-pointer rounded-md p-1 text-muted hover:bg-slate-100 hover:text-ink">
-                                <i data-lucide="x" class="size-4" aria-hidden="true"></i>
-                            </button>
-                        </div>
-                        <p class="mt-3 text-sm text-muted">
-                            Sebanyak <strong class="text-ink" x-text="selectedIds.length"></strong> kelas terpilih akan dinonaktifkan (diarsipkan) dan tidak ikut dalam penjadwalan aktif.
-                        </p>
-                        <div class="mt-5 flex justify-end gap-2">
-                            <x-button type="button" variant="ghost" @click="archiveConfirmModalOpen = false">Batal</x-button>
-                            <x-button type="button" variant="danger" icon="lock" @click="submitBatch('archive'); archiveConfirmModalOpen = false">Arsipkan</x-button>
-                        </div>
-                    </div>
-                </div>
-
-                {{-- MODAL KONFIRMASI HAPUS KELAS --}}
-                <div x-show="deleteClassModalOpen" x-cloak role="dialog" aria-modal="true" aria-labelledby="delete-class-modal-title" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-                    <div class="absolute inset-0 bg-ink/80 backdrop-blur-sm" @click="deleteClassModalOpen = false"></div>
-                    <div class="relative w-full max-w-md rounded-2xl bg-surface p-6 shadow-2xl">
-                        <div class="flex items-start justify-between border-b border-border pb-3">
-                            <h3 id="delete-class-modal-title" class="text-base font-bold text-ink">Hapus kelas?</h3>
-                            <button type="button" @click="deleteClassModalOpen = false" aria-label="Tutup dialog" class="cursor-pointer rounded-md p-1 text-muted hover:bg-slate-100 hover:text-ink">
-                                <i data-lucide="x" class="size-4" aria-hidden="true"></i>
-                            </button>
-                        </div>
-                        <p class="mt-3 text-sm text-muted">
-                            Kelas <strong class="text-ink" x-text="deleteClassName"></strong> akan dihapus permanen jika belum memiliki data terkait.
-                        </p>
-                        <form method="POST" :action="deleteClassUrl" class="mt-5 flex justify-end gap-2">
-                            @csrf
-                            @method('DELETE')
-                            <x-button type="button" variant="ghost" @click="deleteClassModalOpen = false">Batal</x-button>
-                            <x-button type="submit" variant="danger" icon="trash-2">Hapus Kelas</x-button>
-                        </form>
-                    </div>
-                </div>
+                @include('admin.academic.modals.class-batch-modals')
 
                 {{-- Datalist options untuk prodi --}}
                 <datalist id="prodi-options-grid">

@@ -18,6 +18,7 @@ use App\Services\Academic\TeachingLoadService;
 use App\Services\Academic\TeachingPhasePlanner;
 use App\Services\Account\AuditLogger;
 use App\Services\Scheduling\ScheduleDraftService;
+use App\Support\CsvStream;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -120,35 +121,10 @@ class TeachingAssignmentController extends Controller
             ->orderBy('study_program')
             ->pluck('study_program')
             ->mapWithKeys(fn (string $name): array => [
-                $name => match ($name) {
-                    'PTIK', 'Pendidikan Teknik Informatika dan Komputer' => 'PTIK (Pend. Teknik Informatika dan Komputer)',
-                    'TEKOM', 'Teknik Komputer' => 'TEKOM (Teknik Komputer)',
-                    default => $name,
-                },
+                $name => ClassGroup::studyProgramLabel($name),
             ]);
 
-        $baseCountQuery = CourseOffering::query()
-            ->when($period, fn ($q) => $q->whereBelongsTo($period))
-            ->when($prodi !== '', fn ($q) => $q->whereHas('classGroup', function ($gq) use ($prodi) {
-                if (in_array($prodi, ['PTIK', 'Pendidikan Teknik Informatika dan Komputer'], true)) {
-                    $gq->whereIn('study_program', ['PTIK', 'Pendidikan Teknik Informatika dan Komputer']);
-                } elseif (in_array($prodi, ['TEKOM', 'Teknik Komputer'], true)) {
-                    $gq->whereIn('study_program', ['TEKOM', 'Teknik Komputer']);
-                } else {
-                    $gq->where('study_program', $prodi)->orWhere('study_program', 'like', "%{$prodi}%");
-                }
-            }))
-            ->when($semester !== '', function ($q) use ($semesterOptions, $semester, $periodYear, $isGanjil) {
-                $matchedOpt = $semesterOptions->firstWhere('value', $semester);
-                if ($matchedOpt) {
-                    $q->whereHas('classGroup', fn ($gq) => $gq->where('cohort_year', $matchedOpt['cohort']));
-                } elseif (is_numeric($semester) && (int) $semester >= 2000) {
-                    $q->whereHas('classGroup', fn ($gq) => $gq->where('cohort_year', (int) $semester));
-                } elseif (is_numeric($semester)) {
-                    $cohort = $periodYear - intdiv((int) $semester - ($isGanjil ? 1 : 2), 2);
-                    $q->whereHas('classGroup', fn ($gq) => $gq->where('cohort_year', $cohort));
-                }
-            });
+        $baseCountQuery = $this->filteredOfferingsQuery($period, '', $prodi, $semester, $semesterOptions, 'semua', $periodYear, $isGanjil);
         $totalCount = (clone $baseCountQuery)->count();
         $withoutLeadCount = (clone $baseCountQuery)->whereDoesntHave('teachingAssignments', fn ($aq) => $aq->where('role', TeachingRole::Lead))->count();
         $withLeadCount = $totalCount - $withoutLeadCount;
@@ -210,9 +186,31 @@ class TeachingAssignmentController extends Controller
             $dir,
         )->get();
 
-        return response()->streamDownload(function () use ($offerings): void {
-            $handle = fopen('php://output', 'w');
-            fputcsv($handle, [
+        $rows = $offerings->map(function (CourseOffering $offering): array {
+            $lead = $offering->teachingAssignments->firstWhere('role', TeachingRole::Lead);
+            $partners = $offering->teachingAssignments->where('role', TeachingRole::Partner);
+            $schema = match (true) {
+                ! $lead && $partners->isEmpty() => 'Kosong',
+                $partners->isNotEmpty() => 'Team ('.($partners->count() + 1).')',
+                default => 'Tunggal',
+            };
+
+            return [
+                $offering->classGroup->name,
+                $offering->classGroup->study_program ?? '',
+                $offering->classGroup->cohort_year ?? '',
+                $offering->course->code ?? '',
+                $offering->course->name,
+                $offering->course->sks,
+                $lead?->lecturer?->name ?? '',
+                $partners->map(fn ($p) => $p->lecturer->name)->implode('; '),
+                $schema,
+            ];
+        });
+
+        return CsvStream::download(
+            'pembagian-mengajar-'.now()->toDateString().'.csv',
+            [
                 'Kelas',
                 'Program Studi',
                 'Angkatan',
@@ -222,32 +220,9 @@ class TeachingAssignmentController extends Controller
                 'Dosen Pengampu',
                 'Dosen Mitra',
                 'Skema',
-            ]);
-
-            foreach ($offerings as $offering) {
-                $lead = $offering->teachingAssignments->firstWhere('role', TeachingRole::Lead);
-                $partners = $offering->teachingAssignments->where('role', TeachingRole::Partner);
-                $schema = match (true) {
-                    ! $lead && $partners->isEmpty() => 'Kosong',
-                    $partners->isNotEmpty() => 'Team ('.($partners->count() + 1).')',
-                    default => 'Tunggal',
-                };
-
-                fputcsv($handle, [
-                    $offering->classGroup->name,
-                    $offering->classGroup->study_program ?? '',
-                    $offering->classGroup->cohort_year ?? '',
-                    $offering->course->code ?? '',
-                    $offering->course->name,
-                    $offering->course->sks,
-                    $lead?->lecturer?->name ?? '',
-                    $partners->map(fn ($p) => $p->lecturer->name)->implode('; '),
-                    $schema,
-                ]);
-            }
-
-            fclose($handle);
-        }, 'pembagian-mengajar-'.now()->toDateString().'.csv', ['Content-Type' => 'text/csv']);
+            ],
+            $rows,
+        );
     }
 
     public function previewAllocation(TeachingAllocationService $allocator): View
@@ -544,15 +519,7 @@ class TeachingAssignmentController extends Controller
         }
 
         if ($prodi !== '') {
-            $query->whereHas('classGroup', function ($gq) use ($prodi) {
-                if (in_array($prodi, ['PTIK', 'Pendidikan Teknik Informatika dan Komputer'], true)) {
-                    $gq->whereIn('study_program', ['PTIK', 'Pendidikan Teknik Informatika dan Komputer']);
-                } elseif (in_array($prodi, ['TEKOM', 'Teknik Komputer'], true)) {
-                    $gq->whereIn('study_program', ['TEKOM', 'Teknik Komputer']);
-                } else {
-                    $gq->where('study_program', $prodi)->orWhere('study_program', 'like', "%{$prodi}%");
-                }
-            });
+            $query->whereHas('classGroup', fn (Builder $gq) => $gq->whereStudyProgramMatches($prodi));
         }
 
         if ($semester !== '') {

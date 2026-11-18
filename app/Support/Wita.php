@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 
 /**
@@ -127,6 +128,14 @@ class Wita
         $rest = $minutes % 60;
 
         return trim(($hours > 0 ? "{$hours} jam " : '').($rest > 0 || $hours === 0 ? "{$rest} menit" : ''));
+    }
+
+    /**
+     * Normalisasi waktu ke zona waktu aplikasi dengan presisi menit.
+     */
+    public static function normalize(CarbonInterface $time): CarbonImmutable
+    {
+        return CarbonImmutable::instance($time)->setTimezone(config('app.timezone'))->second(0)->microsecond(0);
     }
 
     private static function local(CarbonInterface $time): CarbonInterface

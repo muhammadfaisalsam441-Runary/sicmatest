@@ -36,6 +36,14 @@ class PhpScheduleSolver
 
     private int $bestPlaced = 0;
 
+    public function __construct(
+        private ?SolverPayloadValidator $validator = null,
+        private ?SolverCostCalculator $costCalculator = null,
+    ) {
+        $this->validator ??= new SolverPayloadValidator;
+        $this->costCalculator ??= new SolverCostCalculator;
+    }
+
     /**
      * @param  array<string, mixed>  $input
      * @return array<string, mixed>
@@ -51,7 +59,7 @@ class PhpScheduleSolver
         $this->onProgress = $onProgress;
         $this->stage = 'Menyiapkan kandidat';
         $this->bestPlaced = 0;
-        if (! $this->validInput($input)) {
+        if (! $this->validator->validInput($input)) {
             return $this->result('MODEL_INVALID', $started, 'Data sesi, slot, hari, ruang, atau ketersediaan tidak valid.');
         }
         $this->deadline = $started + (float) ($input['time_limit'] ?? 15);
@@ -115,7 +123,7 @@ class PhpScheduleSolver
                         if ($shortage > 0 && ($input['capacity_blocks_publish'] ?? false)) {
                             continue;
                         }
-                        $candidate = [$day, $start, $end, $room['id'], $this->cost($session, $day, $start, $room['id']) + $shortage];
+                        $candidate = [$day, $start, $end, $room['id'], $this->costCalculator->cost($session, $day, $start, $room['id']) + $shortage];
                         if ($this->blockers($id, $candidate) === [] && ! $this->roomBlocked($session, $candidate, $input)) {
                             $options[] = $candidate;
                         }
@@ -186,7 +194,7 @@ class PhpScheduleSolver
     }
 
     /** @param list<array<string, mixed>> $slots */
-    private function resolveEnd(array $slots, int $start, int $duration): int
+    public function resolveEnd(array $slots, int $start, int $duration): int
     {
         if ($duration < 95) {
             return $start + $duration;
@@ -211,7 +219,7 @@ class PhpScheduleSolver
     }
 
     /** @param list<array<string, mixed>> $slots */
-    private function covered(array $slots, int $start, int $end): bool
+    public function covered(array $slots, int $start, int $end): bool
     {
         $slotEnds = array_column($slots, 'end');
         $reach = null;
@@ -230,7 +238,7 @@ class PhpScheduleSolver
     }
 
     /** @param array<string, mixed> $input */
-    private function overlapsFridayBreak(int $day, int $start, int $end, array $input): bool
+    public function overlapsFridayBreak(int $day, int $start, int $end, array $input): bool
     {
         if ($day !== 5) {
             return false;
@@ -273,7 +281,7 @@ class PhpScheduleSolver
     }
 
     /** @param array<string, mixed> $session @param array<int, mixed> $candidate @param array<string, mixed> $input */
-    private function roomBlocked(array $session, array $candidate, array $input): bool
+    public function roomBlocked(array $session, array $candidate, array $input): bool
     {
         foreach ($input['room_blocks'] ?? [] as $block) {
             if ($candidate[3] === null || $block['room'] !== $candidate[3] || $block['day'] !== $candidate[0]
@@ -294,7 +302,7 @@ class PhpScheduleSolver
     }
 
     /** @param array<string, mixed> $session @return list<string> */
-    private function resources(array $session, ?int $room): array
+    public function resources(array $session, ?int $room): array
     {
         $worlds = match ($session['phase']) {
             'before_uts' => ['before'],
@@ -315,6 +323,17 @@ class PhpScheduleSolver
         }
 
         return $keys;
+    }
+
+    /**
+     * Pemeriksaan keluaran tidak mempercayai status FEASIBLE dari mesin pencari.
+     *
+     * @param  array<string, mixed>  $input
+     * @param  list<array<string, mixed>>  $assignments
+     */
+    public function accepts(array $input, array $assignments): bool
+    {
+        return $this->validator->accepts($input, $assignments, $this);
     }
 
     /** @param array<int, mixed> $candidate @return list<int> */
@@ -407,51 +426,6 @@ class PhpScheduleSolver
         }
     }
 
-    /** @param array<string, mixed> $session */
-    private function cost(array $session, int $day, int $start, ?int $room): int
-    {
-        $preferred = $session['preferred'] ?? null;
-        $pattern = ($preferred === null || $preferred['start'] !== $start)
-            ? $this->slotPatternCost((int) ($session['duration'] ?? 0), $day, $start)
-                + $this->cohortPatternCost($session['cohort_profile'] ?? null, $start)
-            : 0;
-
-        return ($preferred === null ? $day : (int) ($preferred['day'] !== $day) * 6
-            + (int) ($preferred['start'] !== $start) * 3 + (int) ($preferred['room'] !== $room) * 2) + $pattern;
-    }
-
-    private function cohortPatternCost(?string $cohortProfile, int $start): int
-    {
-        return match ($cohortProfile) {
-            'ulang_senior' => $start < 720 ? 0 : ($start < 890 ? 2 : 5),
-            'maba' => $start < 890 ? 0 : 4,
-            default => 0,
-        };
-    }
-
-    private function slotPatternCost(int $duration, int $day, int $start): int
-    {
-        if ($duration >= 190) {
-            return match ($start) {
-                450 => 0,
-                790 => 1,
-                default => 6,
-            };
-        }
-        if ($duration >= 140) {
-            $primary = $day === 5 ? [450, 550, 555, 890] : [450, 605, 890];
-
-            return in_array($start, $primary, true) ? 0 : ($start === 790 ? 2 : 6);
-        }
-        if ($duration >= 90) {
-            $primary = $day === 5 ? [450, 605, 790] : [450, 550, 555, 660, 790];
-
-            return in_array($start, $primary, true) ? 0 : (in_array($start, [890, 940], true) ? 2 : 6);
-        }
-
-        return 0;
-    }
-
     private function clock(): float
     {
         return hrtime(true) / 1_000_000_000;
@@ -473,172 +447,6 @@ class PhpScheduleSolver
         }
 
         return $this->cancelled || $now >= $this->deadline;
-    }
-
-    /**
-     * Pemeriksaan keluaran tidak mempercayai status FEASIBLE dari mesin pencari.
-     *
-     * @param  array<string, mixed>  $input
-     * @param  list<array<string, mixed>>  $assignments
-     */
-    public function accepts(array $input, array $assignments): bool
-    {
-        if (! $this->validInput($input)) {
-            return false;
-        }
-        $sessions = array_column($input['sessions'], null, 'id');
-        $rooms = array_column($input['rooms'] ?? [], null, 'id');
-        $slots = $input['slots'];
-        usort($slots, fn (array $a, array $b): int => $a['start'] <=> $b['start']);
-        $busy = [];
-        $seen = [];
-        $fixed = $input['fixed'] ?? [];
-        $assignedIds = array_column($assignments, 'id');
-        foreach ($sessions as $id => $session) {
-            if (isset($session['locked']) && ! in_array($id, $assignedIds, true)) {
-                $fixed[] = [...$session, 'day' => $session['locked']['day'], 'start' => $session['locked']['start'],
-                    'end' => $session['locked']['start'] + $session['duration'], 'room' => $session['mode'] === 'online' ? null : $session['locked']['room']];
-            }
-        }
-        foreach ($fixed as $row) {
-            foreach ($this->resources($row, $row['room']) as $resource) {
-                $busy[$resource][$row['day']][] = [$row['start'], $row['end']];
-            }
-        }
-        foreach ($assignments as $row) {
-            if (! is_array($row) || ! is_int($row['id'] ?? null) || ! isset($sessions[$row['id']]) || isset($seen[$row['id']])
-                || ! $this->validInterval($row['start_minute'] ?? null, $row['end_minute'] ?? null)
-                || ! in_array($row['day'] ?? null, $input['days'], true) || ! array_key_exists('room_id', $row)) {
-                return false;
-            }
-            $session = $sessions[$row['id']];
-            $room = $row['room_id'];
-            $expectedEnd = isset($session['locked']) ? $row['start_minute'] + $session['duration'] : $this->resolveEnd($slots, $row['start_minute'], $session['duration']);
-            if (($session['mode'] === 'online' ? $room !== null : ! is_int($room) || ! isset($rooms[$room]))
-                || ($row['end_minute'] !== $expectedEnd && $session['duration'] !== $row['end_minute'] - $row['start_minute'])
-                || $this->overlapsFridayBreak($row['day'], $row['start_minute'], $row['end_minute'], $input)
-                || ! $this->covered($slots, $row['start_minute'], $row['end_minute'])
-                || ! $this->available($session, $row['day'], $row['start_minute'], $row['end_minute'], $input)
-                || ($row['day'] === 4 && array_intersect($session['lecturers'], $input['leaders'] ?? []) !== [])
-                || (isset($session['locked']) && [$row['day'], $row['start_minute'], $room] !== [$session['locked']['day'], $session['locked']['start'], $session['mode'] === 'online' ? null : $session['locked']['room']])
-                || (($input['capacity_blocks_publish'] ?? false) && $room !== null && ($session['students'] ?? null) !== null
-                    && $rooms[$room]['capacity'] !== null && $session['students'] > $rooms[$room]['capacity'])
-                || $this->roomBlocked($session, [$row['day'], $row['start_minute'], $row['end_minute'], $room, 0], $input)) {
-                return false;
-            }
-            foreach ($this->resources($session, $room) as $resource) {
-                foreach ($busy[$resource][$row['day']] ?? [] as [$start, $end]) {
-                    if ($row['start_minute'] < $end && $start < $row['end_minute']) {
-                        return false;
-                    }
-                }
-                $busy[$resource][$row['day']][] = [$row['start_minute'], $row['end_minute']];
-            }
-            $seen[$row['id']] = true;
-        }
-
-        return true;
-    }
-
-    /** @param array<string, mixed> $input */
-    private function validInput(array $input): bool
-    {
-        if (isset($input['time_limit']) && ((! is_int($input['time_limit']) && ! is_float($input['time_limit']))
-            || ! is_finite((float) $input['time_limit']) || $input['time_limit'] < 0)) {
-            return false;
-        }
-        foreach (['sessions', 'slots', 'days'] as $key) {
-            if (! is_array($input[$key] ?? null) || $input[$key] === []) {
-                return false;
-            }
-        }
-        foreach (['fixed', 'rooms', 'leaders', 'availability', 'unavailable', 'room_blocks', 'friday_break'] as $key) {
-            if (isset($input[$key]) && ! is_array($input[$key])) {
-                return false;
-            }
-        }
-        if (isset($input['friday_break']) && ! $this->validInterval($input['friday_break']['start'] ?? null, $input['friday_break']['end'] ?? null)) {
-            return false;
-        }
-        if (! $this->ids($input['days']) || array_any($input['days'], fn (int $day): bool => $day > 7)
-            || ! $this->ids($input['leaders'] ?? [])) {
-            return false;
-        }
-        foreach ($input['slots'] as $slot) {
-            if (! is_array($slot) || ! $this->validInterval($slot['start'] ?? null, $slot['end'] ?? null)) {
-                return false;
-            }
-        }
-        $roomIds = [];
-        foreach ($input['rooms'] ?? [] as $room) {
-            if (! is_array($room) || ! $this->ids([$room['id'] ?? null]) || isset($roomIds[$room['id']])
-                || ! array_key_exists('capacity', $room) || ($room['capacity'] !== null && (! is_int($room['capacity']) || $room['capacity'] < 0))) {
-                return false;
-            }
-            $roomIds[$room['id']] = true;
-        }
-        $ids = [];
-        foreach ($input['sessions'] as $session) {
-            if (! is_array($session) || ! $this->ids([$session['id'] ?? null]) || isset($ids[$session['id']])
-                || ! is_int($session['duration'] ?? null) || $session['duration'] <= 0 || $session['duration'] > 1440
-                || ! in_array($session['mode'] ?? null, ['online', 'offline'], true) || ! $this->validResources($session)
-                || (isset($session['students']) && (! is_int($session['students']) || $session['students'] < 0))
-                || (isset($session['cohort_profile']) && ! in_array($session['cohort_profile'], ['maba', 'ulang_senior', 'reguler'], true))) {
-                return false;
-            }
-            foreach (['locked', 'preferred'] as $key) {
-                if (isset($session[$key]) && (! is_array($session[$key]) || ! $this->validDay($session[$key]['day'] ?? null)
-                    || ! is_int($session[$key]['start'] ?? null) || $session[$key]['start'] < 0 || $session[$key]['start'] >= 1440
-                    || ! array_key_exists('room', $session[$key]) || ($session[$key]['room'] !== null && ! $this->ids([$session[$key]['room']])))) {
-                    return false;
-                }
-            }
-            $ids[$session['id']] = true;
-        }
-        foreach ($input['fixed'] ?? [] as $fixed) {
-            if (! is_array($fixed) || ! $this->validResources($fixed) || ! $this->validDay($fixed['day'] ?? null)
-                || ! $this->validInterval($fixed['start'] ?? null, $fixed['end'] ?? null) || ! array_key_exists('room', $fixed)
-                || ($fixed['room'] !== null && ! $this->ids([$fixed['room']]))) {
-                return false;
-            }
-        }
-        foreach ($input['availability'] ?? $input['unavailable'] ?? [] as $entry) {
-            if (! is_array($entry) || ! $this->ids([$entry['lecturer'] ?? null]) || ! $this->validDay($entry['day'] ?? null)
-                || ! $this->validInterval($entry['start'] ?? null, $entry['end'] ?? null)
-                || ! in_array($entry['type'] ?? 'unavailable', ['available', 'unavailable'], true)) {
-                return false;
-            }
-        }
-        foreach ($input['room_blocks'] ?? [] as $block) {
-            if (! is_array($block) || ! $this->ids([$block['room'] ?? null]) || ! $this->validDay($block['day'] ?? null)
-                || ! $this->validInterval($block['start'] ?? null, $block['end'] ?? null) || ! is_string($block['date'] ?? null)) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    /** @param array<string, mixed> $session */
-    private function validResources(array $session): bool
-    {
-        return in_array($session['phase'] ?? null, ['full', 'before_uts', 'after_uts'], true)
-            && $this->ids($session['lecturers'] ?? null) && $this->ids($session['classes'] ?? null);
-    }
-
-    private function ids(mixed $ids): bool
-    {
-        return is_array($ids) && array_all($ids, fn (mixed $id): bool => is_int($id) && $id > 0) && count($ids) === count(array_unique($ids));
-    }
-
-    private function validDay(mixed $day): bool
-    {
-        return is_int($day) && $day >= 1 && $day <= 7;
-    }
-
-    private function validInterval(mixed $start, mixed $end): bool
-    {
-        return is_int($start) && is_int($end) && $start >= 0 && $end <= 1440 && $end > $start;
     }
 
     /** @return array<string, mixed> */

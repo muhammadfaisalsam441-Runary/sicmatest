@@ -8,6 +8,7 @@ use App\Models\User\ClassRepresentative;
 use App\Models\User\KetiApplication;
 use Database\Factories\ClassGroupFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -55,6 +56,42 @@ class ClassGroup extends Model
         }
 
         return $code;
+    }
+
+    /**
+     * Format label tampilan program studi dari nama atau kode tersimpan.
+     */
+    public static function studyProgramLabel(string $name): string
+    {
+        return match ($name) {
+            'PTIK', 'Pendidikan Teknik Informatika dan Komputer' => 'PTIK (Pend. Teknik Informatika dan Komputer)',
+            'TEKOM', 'Teknik Komputer' => 'TEKOM (Teknik Komputer)',
+            default => $name,
+        };
+    }
+
+    /**
+     * Cocokkan program studi termasuk padanan singkatan dan nama lengkapnya.
+     *
+     * @param  Builder<ClassGroup>  $query
+     * @return Builder<ClassGroup>
+     */
+    public function scopeWhereStudyProgramMatches(Builder $query, string $prodi): Builder
+    {
+        $ptik = ['PTIK', 'Pendidikan Teknik Informatika dan Komputer'];
+        $tekom = ['TEKOM', 'Teknik Komputer'];
+
+        if (in_array($prodi, $ptik, true)) {
+            return $query->whereIn('study_program', $ptik);
+        }
+
+        if (in_array($prodi, $tekom, true)) {
+            return $query->whereIn('study_program', $tekom);
+        }
+
+        return $query->where(fn (Builder $q): Builder => $q
+            ->where('study_program', $prodi)
+            ->orWhere('study_program', 'like', "%{$prodi}%"));
     }
 
     /**

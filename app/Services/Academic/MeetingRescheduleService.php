@@ -19,12 +19,11 @@ use App\Services\Account\AuditLogger;
 use App\Services\Account\NotificationService;
 use App\Services\Room\AvailabilityService;
 use App\Services\Room\ReservationService;
-use App\Services\Room\SearchCriteria;
 use App\Support\AvailabilityCache;
-use App\Support\RoomCardPresenter;
 use App\Support\Wita;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -46,7 +45,23 @@ class MeetingRescheduleService
         private ClassScheduleService $schedules,
         private AuditLogger $audit,
         private NotificationService $notifications,
-    ) {}
+        private ?MeetingMoveValidator $validator = null,
+        private ?MeetingRecommendationFinder $recommendationFinder = null,
+    ) {
+        $this->validator ??= new MeetingMoveValidator(
+            $this->meetings,
+            $this->lecturers,
+            $this->reservations,
+            $this->availability,
+            $this->schedules,
+        );
+        $this->recommendationFinder ??= new MeetingRecommendationFinder(
+            $this->meetings,
+            $this->availability,
+            $this->schedules,
+            $this->validator,
+        );
+    }
 
     /**
      * @param  list<int>  $lecturerIds
@@ -60,7 +75,7 @@ class MeetingRescheduleService
         }
 
         $session->loadMissing(['participants', 'lecturers']);
-        $newStart = $this->normalize($newStart);
+        $newStart = Wita::normalize($newStart);
 
         try {
             return DB::transaction(function () use ($keti, $session, $originalDate, $newStart, $room, $lecturerIds, $idempotencyKey): SessionReschedule {
@@ -124,7 +139,7 @@ class MeetingRescheduleService
         }
 
         $session->loadMissing(['participants', 'lecturers']);
-        $normalizedStart = $newStart !== null ? $this->normalize($newStart) : null;
+        $normalizedStart = $newStart !== null ? Wita::normalize($newStart) : null;
 
         try {
             return DB::transaction(function () use ($keti, $session, $originalDate, $normalizedStart, $lecturerIds, $note, $idempotencyKey): SessionReschedule {
@@ -169,7 +184,7 @@ class MeetingRescheduleService
         }
 
         $session = $meeting->session;
-        $newStart = $this->normalize($newStart);
+        $newStart = Wita::normalize($newStart);
 
         try {
             return DB::transaction(function () use ($keti, $session, $old, $newStart, $room, $lecturerIds, $idempotencyKey): SessionReschedule {
@@ -221,7 +236,7 @@ class MeetingRescheduleService
         }
 
         $session = $meeting->session;
-        $newStart = $this->normalize($newStart);
+        $newStart = Wita::normalize($newStart);
 
         try {
             return DB::transaction(function () use ($keti, $session, $old, $newStart, $lecturerIds, $note, $idempotencyKey): SessionReschedule {
@@ -288,7 +303,7 @@ class MeetingRescheduleService
             $meeting = $this->meetings->find($session, $start) ?? new Meeting($session, $start, $end, $locked);
 
             try {
-                $this->assertClassesFree($meeting, $start, $end, replacing: $locked);
+                $this->validator->assertClassesFree($meeting, $start, $end, replacing: $locked);
                 $this->lecturers->assertFree($session->lecturers, $start, $end, excludeMeeting: $meeting, ignoreRescheduleId: $locked->id);
             } catch (DomainException $exception) {
                 throw new DomainException('RESTORE_NOT_POSSIBLE', $exception->getMessage(), $exception->context);
@@ -331,7 +346,7 @@ class MeetingRescheduleService
     public function finishEarly(User $keti, ScheduleSession $session, CarbonInterface $originalDate): RoomBlock
     {
         $session->loadMissing(['participants', 'room']);
-        $classGroup = $this->assertParticipant($keti, $session);
+        $classGroup = $this->validator->assertParticipant($keti, $session);
 
         $meeting = $this->meetings->find($session, $originalDate)
             ?? throw new DomainException('MEETING_NOT_FOUND', 'Pertemuan ini tidak ada di jadwal resmi pada tanggal tersebut.');
@@ -340,7 +355,7 @@ class MeetingRescheduleService
             throw new DomainException('MEETING_ALREADY_MOVED', 'Pertemuan ini sudah dipindahkan.');
         }
 
-        $now = $this->normalize(CarbonImmutable::now());
+        $now = Wita::normalize(CarbonImmutable::now());
 
         if ($now->lessThan($meeting->start)) {
             throw new DomainException('MEETING_NOT_STARTED', 'Pertemuan belum dimulai sehingga belum bisa diselesaikan.');
@@ -437,7 +452,7 @@ class MeetingRescheduleService
             $meeting = $this->meetings->find($session, $start) ?? new Meeting($session, $start, $end, $reschedule);
 
             try {
-                $this->assertClassesFree($meeting, $start, $end, replacing: null);
+                $this->validator->assertClassesFree($meeting, $start, $end, replacing: null);
                 $this->lecturers->assertFree($session->lecturers, $start, $end, excludeMeeting: $meeting, ignoreRescheduleId: $reschedule->id);
             } catch (DomainException $exception) {
                 throw new DomainException('RESTORE_NOT_POSSIBLE', $exception->getMessage(), $exception->context);
@@ -471,6 +486,47 @@ class MeetingRescheduleService
 
             return $locked->fresh(['block']);
         });
+    }
+
+    /**
+     * Aturan pemindahan selain ruang (aturan 1–7, 9–11), tanpa menyimpan. Dipakai halaman Pindahkan untuk
+     * memberi tahu bentrok kelas/dosen sebelum Keti memilih ruang atau mode online.
+     *
+     * @param  list<int>  $lecturerIds
+     *
+     * @throws DomainException
+     */
+    public function check(User $keti, ScheduleSession $session, CarbonInterface $originalDate, CarbonInterface $newStart, array $lecturerIds, ?SessionReschedule $replacing = null): Meeting
+    {
+        $session->loadMissing(['participants', 'lecturers']);
+
+        return $this->validator->validateMove($keti, $session, $originalDate, Wita::normalize($newStart), $lecturerIds, $replacing)['meeting'];
+    }
+
+    /**
+     * Rekomendasi slot waktu dan ruangan kosong untuk memindahkan pertemuan kuliah pada tanggal target.
+     *
+     * @param  list<int>  $lecturerIds
+     * @return Collection<int, array{slot: string, start: CarbonImmutable, end: CarbonImmutable, time_range: string, rooms: list<array<string, mixed>>, rooms_count: int}>
+     */
+    public function recommendations(
+        User $keti,
+        ScheduleSession $session,
+        CarbonInterface $originalDate,
+        CarbonInterface $targetDate,
+        array $lecturerIds,
+        ?SessionReschedule $replacing = null,
+        ?int $manualStartMinute = null,
+    ): Collection {
+        return $this->recommendationFinder->recommendations(
+            $keti,
+            $session,
+            $originalDate,
+            $targetDate,
+            $lecturerIds,
+            $replacing,
+            $manualStartMinute,
+        );
     }
 
     private function assertReplaceable(Reservation $reservation, SessionReschedule $reschedule): void
@@ -514,8 +570,10 @@ class MeetingRescheduleService
 
     /**
      * Blok jadwal pertemuan asli pada versi resmi yang berlaku di tanggal itu (tetap ditemukan setelah jadwal ditetapkan ulang).
+     *
+     * @return Builder<RoomBlock>
      */
-    private function originalBlocks(SessionReschedule $reschedule)
+    private function originalBlocks(SessionReschedule $reschedule): Builder
     {
         $version = $this->schedules->officialVersionOn($reschedule->original_start_at);
 
@@ -527,196 +585,13 @@ class MeetingRescheduleService
     }
 
     /**
-     * Aturan pemindahan selain ruang (aturan 1–7, 9–11), tanpa menyimpan. Dipakai halaman Pindahkan untuk
-     * memberi tahu bentrok kelas/dosen sebelum Keti memilih ruang atau mode online.
-     *
-     * @param  list<int>  $lecturerIds
-     *
-     * @throws DomainException
-     */
-    public function check(User $keti, ScheduleSession $session, CarbonInterface $originalDate, CarbonInterface $newStart, array $lecturerIds, ?SessionReschedule $replacing = null): Meeting
-    {
-        $session->loadMissing(['participants', 'lecturers']);
-
-        return $this->validateMove($keti, $session, $originalDate, $this->normalize($newStart), $lecturerIds, $replacing)['meeting'];
-    }
-
-    /**
-     * Rekomendasi slot waktu dan ruangan kosong untuk memindahkan pertemuan kuliah pada tanggal target.
-     *
-     * Memindai setiap slot standar akademik (1 SKS = 50 menit):
-     * 1. Dosen pengajar bebas dari jadwal mengajar lain, reservasi lain, dan pembatasan hari pimpinan.
-     * 2. Kelas peserta bebas dari kuliah lain dan reservasi lain.
-     * 3. Sesuai jam operasional & bukan hari libur / istirahat salat Jumat.
-     * 4. Ruangan kosong dicari untuk setiap slot yang bebas bentrok.
-     *
-     * @param  list<int>  $lecturerIds
-     * @return Collection<int, array{slot: string, start: CarbonImmutable, end: CarbonImmutable, time_range: string, rooms: list<array>, rooms_count: int}>
-     */
-    public function recommendations(
-        User $keti,
-        ScheduleSession $session,
-        CarbonInterface $originalDate,
-        CarbonInterface $targetDate,
-        array $lecturerIds,
-        ?SessionReschedule $replacing = null,
-        ?int $manualStartMinute = null,
-    ): Collection {
-        $session->loadMissing(['participants', 'lecturers', 'version.period.timeSlots']);
-        $meeting = $this->meetings->find($session, $originalDate);
-
-        if ($meeting === null) {
-            return collect();
-        }
-
-        $duration = (int) $meeting->start->diffInMinutes($meeting->end);
-        if ($duration <= 0) {
-            $duration = 100;
-        }
-
-        $targetDay = CarbonImmutable::instance($targetDate)->setTimezone(config('app.timezone'))->startOfDay();
-        $period = $session->version->period;
-
-        if (! in_array($targetDay->dayOfWeekIso, config('sicma.scheduler.days', [1, 2, 3, 4, 5]), true)
-            || ! $this->schedules->hasClassesOn($period->loadMissing('calendarExceptions'), $targetDay)) {
-            return collect();
-        }
-
-        $timeSlots = $period->timeSlots->sortBy('start_minute')->values();
-        $defaultStarts = [450, 500, 555, 600, 605, 660, 710, 790, 840, 890, 940];
-
-        $candidateMinutes = $timeSlots->isNotEmpty()
-            ? $timeSlots->pluck('start_minute')->unique()->values()
-            : collect($defaultStarts);
-
-        if ($manualStartMinute !== null && ! $candidateMinutes->contains($manualStartMinute)) {
-            $candidateMinutes->push($manualStartMinute);
-        }
-
-        $candidateMinutes = $candidateMinutes->sort()->values();
-        $recommendations = collect();
-
-        foreach ($candidateMinutes as $startMinute) {
-            $candidateStart = $targetDay->addMinutes((int) $startMinute);
-            $candidateEnd = $candidateStart->addMinutes($duration);
-
-            try {
-                $this->check($keti, $session, $originalDate, $candidateStart, $lecturerIds, $replacing);
-            } catch (DomainException) {
-                continue;
-            }
-
-            $criteria = new SearchCriteria(
-                start: $candidateStart,
-                durationMinutes: $duration,
-                status: 'available',
-                sort: SearchCriteria::SORT_NAME,
-            );
-
-            $availableRooms = $this->availability->search($criteria)
-                ->map(RoomCardPresenter::card(...))
-                ->sortBy(fn (array $room): int => $room['id'] === $session->room_id ? 0 : 1)
-                ->values()
-                ->all();
-
-            $slotLabel = $this->formatSlotLabel($timeSlots, $candidateStart, $candidateEnd);
-
-            $recommendations->push([
-                'slot' => $slotLabel,
-                'start' => $candidateStart,
-                'end' => $candidateEnd,
-                'time_range' => Wita::range($candidateStart, $candidateEnd),
-                'rooms' => $availableRooms,
-                'rooms_count' => count($availableRooms),
-            ]);
-        }
-
-        return $recommendations;
-    }
-
-    private function formatSlotLabel(Collection $timeSlots, CarbonImmutable $start, CarbonImmutable $end): string
-    {
-        $startMinute = $start->hour * 60 + $start->minute;
-        $endMinute = $startMinute + (int) $start->diffInMinutes($end);
-
-        $slots = $timeSlots->isNotEmpty() ? $timeSlots : collect([
-            ['label' => 'I', 'start_minute' => 450, 'end_minute' => 500],
-            ['label' => 'II', 'start_minute' => 500, 'end_minute' => 550],
-            ['label' => 'III', 'start_minute' => 555, 'end_minute' => 605],
-            ['label' => 'IV', 'start_minute' => 605, 'end_minute' => 655],
-            ['label' => 'V', 'start_minute' => 660, 'end_minute' => 710],
-            ['label' => 'VI', 'start_minute' => 710, 'end_minute' => 760],
-            ['label' => 'VII', 'start_minute' => 790, 'end_minute' => 840],
-            ['label' => 'VIII', 'start_minute' => 840, 'end_minute' => 890],
-            ['label' => 'IX', 'start_minute' => 890, 'end_minute' => 940],
-            ['label' => 'X', 'start_minute' => 940, 'end_minute' => 995],
-            ['label' => 'XI', 'start_minute' => 995, 'end_minute' => 1050],
-        ]);
-
-        $overlapping = $slots->filter(function ($slot) use ($startMinute, $endMinute): bool {
-            $slotStart = is_array($slot) ? $slot['start_minute'] : $slot->start_minute;
-            $slotEnd = is_array($slot) ? $slot['end_minute'] : $slot->end_minute;
-
-            return $slotStart < $endMinute && $slotEnd > $startMinute;
-        })->values();
-
-        if ($overlapping->isNotEmpty()) {
-            $first = $overlapping->first();
-            $last = $overlapping->last();
-            $firstLabel = is_array($first) ? $first['label'] : $first->label;
-            $lastLabel = is_array($last) ? $last['label'] : $last->label;
-
-            $name = $firstLabel === $lastLabel ? "Slot {$firstLabel}" : "Slot {$firstLabel}–{$lastLabel}";
-
-            return "{$name} (".Wita::range($start, $end).')';
-        }
-
-        return Wita::range($start, $end);
-    }
-
-    /**
-     * @param  list<int>  $lecturerIds
-     * @return array{classGroup: ClassGroup, meeting: Meeting, end: CarbonImmutable, lecturers: Collection<int, Lecturer>}
-     */
-    private function validateMove(User $keti, ScheduleSession $session, CarbonInterface $originalDate, CarbonImmutable $newStart, array $lecturerIds, ?SessionReschedule $replacing, bool $online = false): array
-    {
-        $classGroup = $this->assertParticipant($keti, $session);
-
-        $meeting = $this->meetings->find($session, $originalDate)
-            ?? throw new DomainException('MEETING_NOT_FOUND', 'Pertemuan ini tidak ada di jadwal resmi pada tanggal tersebut.');
-
-        if ($meeting->isMoved() && $meeting->reschedule->id !== $replacing?->id) {
-            throw new DomainException('MEETING_ALREADY_MOVED', 'Pertemuan ini sudah dipindah. Buka pertemuan penggantinya untuk memindahkan lagi.', [
-                'reservation_id' => $meeting->reschedule->reservation_id,
-                'reschedule_id' => $meeting->reschedule->id,
-            ]);
-        }
-
-        if ($replacing === null && $meeting->start->lessThanOrEqualTo(CarbonImmutable::now())) {
-            throw new DomainException('MEETING_STARTED', 'Pertemuan yang sudah dimulai tidak bisa diubah atau dipindah.');
-        }
-
-        $newEnd = $newStart->addMinutes((int) $meeting->start->diffInMinutes($meeting->end));
-
-        if (! $online || ! $newStart->equalTo($meeting->start)) {
-            $this->assertTeachingSlot($session, $newStart, $newEnd, $online);
-        }
-
-        $lecturers = $this->assertLecturers($session, $lecturerIds);
-        $this->assertClassesFree($meeting, $newStart, $newEnd, $replacing);
-        $this->lecturers->assertFree($lecturers, $newStart, $newEnd, $meeting, $replacing?->id);
-
-        return ['classGroup' => $classGroup, 'meeting' => $meeting, 'end' => $newEnd, 'lecturers' => $lecturers];
-    }
-
-    /**
      * Aturan 1–11 lalu simpan. $replacing = pemindahan aktif yang sedang diganti (Pindahkan lagi).
      *
      * @param  list<int>  $lecturerIds
      */
     private function createMove(User $keti, ScheduleSession $session, CarbonInterface $originalDate, CarbonImmutable $newStart, Room $lockedRoom, array $lecturerIds, string $idempotencyKey, ?SessionReschedule $replacing = null): SessionReschedule
     {
-        ['classGroup' => $classGroup, 'meeting' => $meeting, 'end' => $newEnd, 'lecturers' => $lecturers] = $this->validateMove($keti, $session, $originalDate, $newStart, $lecturerIds, $replacing);
+        ['classGroup' => $classGroup, 'meeting' => $meeting, 'end' => $newEnd, 'lecturers' => $lecturers] = $this->validator->validateMove($keti, $session, $originalDate, $newStart, $lecturerIds, $replacing);
 
         $reservation = $this->reservations->createForReschedule($keti, $classGroup, $lockedRoom, $newStart, $newEnd, $idempotencyKey);
 
@@ -743,7 +618,7 @@ class MeetingRescheduleService
 
         $reservation->forceFill(['session_reschedule_id' => $reschedule->id])->save();
 
-        $this->scheduleBlock($session, $meeting->start)->update(['is_active' => false]);
+        $this->validator->scheduleBlock($session, $meeting->start)->update(['is_active' => false]);
         AvailabilityCache::bust();
 
         $this->audit->log('meeting.rescheduled', $reschedule, null, [
@@ -784,7 +659,7 @@ class MeetingRescheduleService
     ): SessionReschedule {
         $targetStart = $newStart ?? CarbonImmutable::instance($originalDate)->setTimezone(config('app.timezone'))->startOfDay()->addMinutes($session->start_minute);
 
-        ['classGroup' => $classGroup, 'meeting' => $meeting, 'end' => $targetEnd, 'lecturers' => $lecturers] = $this->validateMove(
+        ['classGroup' => $classGroup, 'meeting' => $meeting, 'end' => $targetEnd, 'lecturers' => $lecturers] = $this->validator->validateMove(
             $keti,
             $session,
             $originalDate,
@@ -818,7 +693,7 @@ class MeetingRescheduleService
             $lecturer->id => ['role' => $session->lecturers->firstWhere('id', $lecturer->id)->pivot->role],
         ])->all());
 
-        $this->scheduleBlock($session, $meeting->start)->update(['is_active' => false]);
+        $this->validator->scheduleBlock($session, $meeting->start)->update(['is_active' => false]);
         AvailabilityCache::bust();
 
         $this->audit->log('meeting.switched_online', $reschedule, null, [
@@ -848,97 +723,6 @@ class MeetingRescheduleService
         return $reschedule->fresh(['originalRoom', 'lecturers']);
     }
 
-    private function assertParticipant(User $keti, ScheduleSession $session): ClassGroup
-    {
-        $classGroup = $keti->isApprovedKeti() ? $keti->activeClassGroup() : null;
-
-        if ($classGroup === null || ! $session->participants->contains('id', $classGroup->id)) {
-            throw new DomainException('NOT_CLASS_REPRESENTATIVE', 'Hanya Keti kelas peserta yang dapat memindahkan pertemuan ini.');
-        }
-
-        return $classGroup;
-    }
-
-    /**
-     * Hari kuliah di semester, bukan libur, tidak menyentuh istirahat Jumat, dalam jam operasional, belum lewat.
-     */
-    private function assertTeachingSlot(ScheduleSession $session, CarbonImmutable $start, CarbonImmutable $end, bool $online = false): void
-    {
-        $period = $session->version->period;
-        $day = $start->startOfDay();
-        $break = config('sicma.scheduler.friday_break', ['start' => 720, 'end' => 790]);
-        $startMinute = $start->hour * 60 + $start->minute;
-        $endMinute = $startMinute + (int) $start->diffInMinutes($end);
-
-        $touchesFridayBreak = $start->dayOfWeekIso === 5 && $startMinute < $break['end'] && $endMinute > $break['start'];
-
-        if (! in_array($start->dayOfWeekIso, config('sicma.scheduler.days'), true)
-            || ! $this->schedules->hasClassesOn($period->loadMissing('calendarExceptions'), $day)
-            || $touchesFridayBreak) {
-            throw new DomainException('INVALID_TEACHING_DAY', 'Pertemuan pengganti hanya bisa Senin–Jumat di dalam semester, bukan hari libur dan bukan istirahat Jumat 12.00–13.10.');
-        }
-
-        [$open, $close] = $this->availability->operatingWindow($start);
-
-        if ($start->lessThan($open) || $end->greaterThan($close)) {
-            $subject = $online ? 'Perkuliahan pengganti' : 'Ruangan';
-
-            throw new DomainException('OUTSIDE_OPERATING_HOURS', "{$subject} hanya bisa dipakai pukul ".Wita::clock($open, false).'–'.Wita::clock($close).'.');
-        }
-
-        if ($start->lessThan(CarbonImmutable::now())) {
-            throw new DomainException('INVALID_TIME', 'Waktu mulai sudah lewat. Pilih waktu lain.');
-        }
-    }
-
-    /**
-     * @param  list<int>  $lecturerIds
-     * @return Collection<int, Lecturer>
-     */
-    private function assertLecturers(ScheduleSession $session, array $lecturerIds): Collection
-    {
-        $ids = collect($lecturerIds)->map(fn ($id): int => (int) $id)->unique();
-        $team = $session->lecturers->modelKeys();
-
-        if ($ids->isEmpty() || $ids->diff($team)->isNotEmpty()) {
-            throw new DomainException('INVALID_LECTURER', 'Pilih minimal satu dosen dari tim pengajar mata kuliah ini.');
-        }
-
-        return Lecturer::query()->whereKey($ids->all())->with('leadershipTerms')->get();
-    }
-
-    /**
-     * Semua kelas peserta tidak sedang kuliah resmi lain maupun punya reservasi aktif di slot baru.
-     */
-    private function assertClassesFree(Meeting $meeting, CarbonImmutable $start, CarbonImmutable $end, ?SessionReschedule $replacing): void
-    {
-        $classIds = $meeting->session->participants->modelKeys();
-
-        $clash = $this->meetings->meetingsOn($start)->first(fn (Meeting $other): bool => $other->start->lessThan($end)
-            && $other->end->greaterThan($start)
-            && ! $other->isMoved()
-            && ! $other->is($meeting)
-            && $other->session->participants->pluck('id')->intersect($classIds)->isNotEmpty());
-
-        if ($clash !== null) {
-            $class = $clash->session->participants->first(fn (ClassGroup $group): bool => in_array($group->id, $classIds, true));
-
-            throw new DomainException('CLASS_TIME_CONFLICT', "Kelas {$class->name} sedang kuliah {$clash->session->title} pukul ".Wita::range($clash->start, $clash->end).'. Pilih jam lain.');
-        }
-
-        foreach ($meeting->session->participants as $classGroup) {
-            $this->reservations->assertClassFree($classGroup, $start, $end, ignoreReservationId: $replacing?->reservation_id, hint: 'Pilih jam lain.', ignoreRescheduleId: $replacing?->id);
-        }
-    }
-
-    private function scheduleBlock(ScheduleSession $session, CarbonImmutable $start)
-    {
-        return RoomBlock::query()
-            ->where('source_type', RoomBlockSource::Schedule)
-            ->where('source_id', $session->id)
-            ->where('start_at', $start);
-    }
-
     private function findByKey(User $keti, string $idempotencyKey): ?SessionReschedule
     {
         $direct = SessionReschedule::query()
@@ -959,10 +743,5 @@ class MeetingRescheduleService
             ?->sessionReschedule()
             ->with(['reservation.block', 'lecturers', 'originalRoom'])
             ->first();
-    }
-
-    private function normalize(CarbonInterface $time): CarbonImmutable
-    {
-        return CarbonImmutable::instance($time)->setTimezone(config('app.timezone'))->startOfMinute();
     }
 }

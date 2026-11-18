@@ -16,6 +16,7 @@ use App\Models\Lecturer\LecturerExpertise;
 use App\Models\Lecturer\LecturerLoadTarget;
 use App\Models\Lecturer\TeachingAssignment;
 use App\Services\Academic\LecturerService;
+use App\Support\CsvStream;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -133,9 +134,28 @@ class LecturerController extends Controller
 
         $lecturers = $this->filteredQuery($period, $filter, $keyword, $sort, $dir)->get();
 
-        return response()->streamDownload(function () use ($lecturers): void {
-            $handle = fopen('php://output', 'w');
-            fputcsv($handle, [
+        $rows = $lecturers->map(function (Lecturer $lecturer): array {
+            $term = $lecturer->leadershipTerms->first(fn ($t) => $t->isActiveOn(now()));
+            $target = $lecturer->loadTargets->first();
+
+            return [
+                $lecturer->name,
+                $lecturer->nip ?? '',
+                $lecturer->nidn ?? '',
+                $lecturer->homebase?->label() ?? 'Belum diatur',
+                $lecturer->functional_position ?? '',
+                $lecturer->rank ?? '',
+                $lecturer->grade ?? '',
+                $lecturer->profile_status->label(),
+                $term?->position ?? '',
+                $target?->target_sks ?? '',
+                $target?->max_sks ?? '',
+            ];
+        });
+
+        return CsvStream::download(
+            'data-dosen-'.now()->toDateString().'.csv',
+            [
                 'Nama',
                 'NIP',
                 'NIDN',
@@ -147,29 +167,9 @@ class LecturerController extends Controller
                 'Jabatan Pimpinan',
                 'Target SKS',
                 'Maks SKS',
-            ]);
-
-            foreach ($lecturers as $lecturer) {
-                $term = $lecturer->leadershipTerms->first(fn ($t) => $t->isActiveOn(now()));
-                $target = $lecturer->loadTargets->first();
-
-                fputcsv($handle, [
-                    $lecturer->name,
-                    $lecturer->nip ?? '',
-                    $lecturer->nidn ?? '',
-                    $lecturer->homebase?->label() ?? 'Belum diatur',
-                    $lecturer->functional_position ?? '',
-                    $lecturer->rank ?? '',
-                    $lecturer->grade ?? '',
-                    $lecturer->profile_status->label(),
-                    $term?->position ?? '',
-                    $target?->target_sks ?? '',
-                    $target?->max_sks ?? '',
-                ]);
-            }
-
-            fclose($handle);
-        }, 'data-dosen-'.now()->toDateString().'.csv', ['Content-Type' => 'text/csv']);
+            ],
+            $rows,
+        );
     }
 
     public function bulkUpdate(Request $request, LecturerService $lecturers): RedirectResponse

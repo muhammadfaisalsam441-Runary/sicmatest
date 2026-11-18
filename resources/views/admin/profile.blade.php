@@ -50,13 +50,13 @@
                         @csrf
                         @method('PUT')
                         <x-field label="Kata sandi saat ini" name="current_password">
-                            <x-input type="password" name="current_password" autocomplete="current-password" placeholder="Masukkan kata sandi saat ini" required />
+                            <x-password-input name="current_password" autocomplete="current-password" placeholder="Masukkan kata sandi saat ini" required />
                         </x-field>
                         <x-field label="Kata sandi baru" name="password" hint="Gunakan kombinasi huruf dan angka agar sulit ditebak.">
-                            <x-input type="password" name="password" autocomplete="new-password" placeholder="Minimal 8 karakter" required />
+                            <x-password-input name="password" autocomplete="new-password" placeholder="Minimal 8 karakter" required />
                         </x-field>
                         <x-field label="Ulangi kata sandi baru" name="password_confirmation">
-                            <x-input type="password" name="password_confirmation" autocomplete="new-password" placeholder="Ketik ulang kata sandi baru" required />
+                            <x-password-input name="password_confirmation" autocomplete="new-password" placeholder="Ketik ulang kata sandi baru" required />
                         </x-field>
                         <x-button type="submit">Perbarui kata sandi</x-button>
                     </form>

@@ -55,8 +55,8 @@ class ReservationService
      */
     public function create(User $keti, Room $room, CarbonInterface $start, CarbonInterface $end, string $purpose, ?int $participants, string $idempotencyKey): Reservation
     {
-        $start = $this->normalize($start);
-        $end = $this->normalize($end);
+        $start = Wita::normalize($start);
+        $end = Wita::normalize($end);
 
         if ($existing = $this->findByIdempotencyKey($keti, $idempotencyKey)) {
             return $existing;
@@ -606,10 +606,5 @@ class ReservationService
             ->where('created_by', $keti->id)
             ->where('idempotency_key', $key)
             ->first();
-    }
-
-    private function normalize(CarbonInterface $time): CarbonImmutable
-    {
-        return CarbonImmutable::instance($time)->setTimezone(config('app.timezone'))->startOfMinute();
     }
 }

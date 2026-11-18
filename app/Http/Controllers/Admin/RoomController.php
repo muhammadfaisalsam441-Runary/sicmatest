@@ -11,6 +11,7 @@ use App\Models\Room\Building;
 use App\Models\Room\Room;
 use App\Models\Room\RoomClosure;
 use App\Services\Room\RoomService;
+use App\Support\CsvStream;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -181,26 +182,22 @@ class RoomController extends Controller
 
         $rooms = $this->filteredQuery($keyword, $filter, $buildingFilter, $type, $sort, $dir, $now)->get();
 
-        return response()->streamDownload(function () use ($rooms): void {
-            $handle = fopen('php://output', 'w');
-            fputcsv($handle, ['Kode', 'Nama Ruang', 'Gedung', 'Lantai', 'Tipe', 'Kapasitas', 'Fasilitas', 'Status']);
+        $rows = $rooms->map(fn (Room $room): array => [
+            $room->code,
+            $room->name,
+            $room->building?->name ?? 'Belum didata',
+            $room->floor ?? '',
+            $room->type->label(),
+            $room->capacity ?? '',
+            $room->facilities->pluck('name')->implode(', '),
+            $room->closures->isNotEmpty() ? 'Ditutup' : 'Tersedia',
+        ]);
 
-            foreach ($rooms as $room) {
-                $status = $room->closures->isNotEmpty() ? 'Ditutup' : 'Tersedia';
-                fputcsv($handle, [
-                    $room->code,
-                    $room->name,
-                    $room->building?->name ?? 'Belum didata',
-                    $room->floor ?? '',
-                    $room->type->label(),
-                    $room->capacity ?? '',
-                    $room->facilities->pluck('name')->implode(', '),
-                    $status,
-                ]);
-            }
-
-            fclose($handle);
-        }, 'data-ruang-'.now()->toDateString().'.csv', ['Content-Type' => 'text/csv']);
+        return CsvStream::download(
+            'data-ruang-'.now()->toDateString().'.csv',
+            ['Kode', 'Nama Ruang', 'Gedung', 'Lantai', 'Tipe', 'Kapasitas', 'Fasilitas', 'Status'],
+            $rows,
+        );
     }
 
     /**

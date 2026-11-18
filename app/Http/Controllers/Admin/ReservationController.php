@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\AdminCancelReservationRequest;
 use App\Models\Reservation\Reservation;
 use App\Services\Room\ReservationService;
+use App\Support\CsvStream;
 use App\Support\Wita;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -53,9 +54,27 @@ class ReservationController extends Controller
 
         $reservations = $this->filteredQuery($filter, $keyword, $sort, $dir)->get();
 
-        return response()->streamDownload(function () use ($reservations): void {
-            $handle = fopen('php://output', 'w');
-            fputcsv($handle, [
+        $rows = $reservations->map(function (Reservation $reservation): array {
+            $statusLabel = $reservation->status === ReservationStatus::Booked
+                ? 'Akan datang'
+                : $reservation->status->label();
+
+            return [
+                $reservation->room->name,
+                $reservation->classGroup->name,
+                $reservation->creator->name,
+                Wita::date($reservation->start_at),
+                Wita::clock($reservation->start_at, false),
+                Wita::clock($reservation->end_at, false),
+                $reservation->purpose,
+                $statusLabel,
+                $reservation->cancel_reason ?? '',
+            ];
+        });
+
+        return CsvStream::download(
+            'riwayat-reservasi-'.now()->toDateString().'.csv',
+            [
                 'Ruang',
                 'Kelas',
                 'Pemesan',
@@ -65,28 +84,9 @@ class ReservationController extends Controller
                 'Keperluan',
                 'Status',
                 'Alasan Batal',
-            ]);
-
-            foreach ($reservations as $reservation) {
-                $statusLabel = $reservation->status === ReservationStatus::Booked
-                    ? 'Akan datang'
-                    : $reservation->status->label();
-
-                fputcsv($handle, [
-                    $reservation->room->name,
-                    $reservation->classGroup->name,
-                    $reservation->creator->name,
-                    Wita::date($reservation->start_at),
-                    Wita::clock($reservation->start_at, false),
-                    Wita::clock($reservation->end_at, false),
-                    $reservation->purpose,
-                    $statusLabel,
-                    $reservation->cancel_reason ?? '',
-                ]);
-            }
-
-            fclose($handle);
-        }, 'riwayat-reservasi-'.now()->toDateString().'.csv', ['Content-Type' => 'text/csv']);
+            ],
+            $rows,
+        );
     }
 
     public function cancel(AdminCancelReservationRequest $request, Reservation $reservation, ReservationService $service): RedirectResponse

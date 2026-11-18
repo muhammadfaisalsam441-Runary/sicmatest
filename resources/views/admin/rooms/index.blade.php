@@ -146,6 +146,7 @@
                 <div class="relative flex-1 min-w-[220px]">
                     <i data-lucide="search" class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" aria-hidden="true"></i>
                     <input id="room-search" type="search" name="q" value="{{ $keyword }}" data-table-search
+                           autocorrect="off" autocapitalize="none" spellcheck="false"
                            aria-label="Cari nama ruang, kode, atau fasilitas"
                            @input.debounce.400ms="$el.form.requestSubmit()"
                            placeholder="Cari nama ruang, kode, atau fasilitas (tekan /)..."
@@ -172,32 +173,15 @@
             </form>
 
             {{-- Bar Bantuan Cepat saat Mode Edit Massal Aktif --}}
-            <div x-show="editMode" x-cloak class="rounded-xl border border-primary/30 bg-primary-soft/30 p-3.5 flex flex-wrap items-center justify-between gap-3 animate-in fade-in duration-200">
-                <div class="flex flex-wrap items-center gap-2 text-xs">
-                    <span class="font-bold text-primary flex items-center gap-1.5">
-                        <i data-lucide="pencil" class="size-4"></i> Mode Edit Massal Aktif
-                    </span>
-                    <span class="text-muted">| Set kapasitas kursi cepat:</span>
-                    <div class="flex flex-wrap items-center gap-1.5 ml-1">
-                        <input type="number" min="1" max="1000" x-model="fillEmptyValue" class="w-16 rounded border border-border bg-surface px-2 py-1 text-center text-xs font-semibold text-ink focus:border-primary focus:outline-none">
-                        <button type="button" @click="applyFillEmpty()" class="rounded bg-surface px-2.5 py-1 text-xs font-semibold text-primary border border-primary/40 hover:bg-primary hover:text-white transition shadow-xs cursor-pointer">
-                            Isi yang Kosong
-                        </button>
-                        <button type="button" @click="applyFillAll()" class="rounded bg-primary/15 px-2.5 py-1 text-xs font-semibold text-primary border border-primary/40 hover:bg-primary hover:text-white transition shadow-xs cursor-pointer"
-                                x-text="selectedIds.length > 0 ? 'Terapkan ke ' + selectedIds.length + ' Ruang Terpilih' : 'Terapkan ke Semua Tampil (' + visibleIds.length + ')'">
-                        </button>
-                    </div>
-                </div>
-                <div class="flex items-center gap-2">
-                    <button type="button" @click="cancelEditMode()" class="rounded-control border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-muted hover:text-ink transition cursor-pointer">
-                        Batal
-                    </button>
-                    <button type="submit" form="bulkRoomForm" class="inline-flex items-center gap-1.5 rounded-control bg-primary px-4 py-1.5 text-xs font-bold text-white hover:bg-primary/90 transition shadow-sm cursor-pointer">
-                        <i data-lucide="check" class="size-4"></i>
-                        Simpan Semua Perubahan
-                    </button>
-                </div>
-            </div>
+            <x-bulk-edit-bar form="bulkRoomForm" label="Set kapasitas kursi cepat:">
+                <input type="number" min="1" max="1000" x-model="fillEmptyValue" aria-label="Kapasitas kursi cepat" class="w-16 rounded border border-border bg-surface px-2 py-1 text-center text-xs font-semibold text-ink focus:border-primary focus:outline-none">
+                <button type="button" @click="applyFillEmpty()" class="cursor-pointer rounded border border-primary/40 bg-surface px-2.5 py-1 text-xs font-semibold text-primary shadow-xs transition hover:bg-primary hover:text-white">
+                    Isi yang Kosong
+                </button>
+                <button type="button" @click="applyFillAll()" class="cursor-pointer rounded border border-primary/40 bg-primary/15 px-2.5 py-1 text-xs font-semibold text-primary shadow-xs transition hover:bg-primary hover:text-white"
+                        x-text="selectedIds.length > 0 ? 'Terapkan ke ' + selectedIds.length + ' Ruang Terpilih' : 'Terapkan ke Semua Tampil (' + visibleIds.length + ')'">
+                </button>
+            </x-bulk-edit-bar>
             {{-- TABEL DATA RUANG (MENYATU DENGAN FILTER) --}}
             <x-table-scroll>
                 <x-slot:title>Menampilkan {{ $rooms->total() }} ruangan</x-slot:title>
@@ -448,41 +432,13 @@
             </x-table-scroll>
 
             {{-- Pagination & Data Summary Footer --}}
-            @if ($rooms->total() > 0)
-                <div class="border-t border-border pt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div class="flex items-center gap-2 text-xs text-muted">
-                        @if ($rooms->hasPages())
-                            <span>
-                                Menampilkan <span class="font-semibold text-ink">{{ $rooms->firstItem() }}–{{ $rooms->lastItem() }}</span> dari <span class="font-semibold text-ink">{{ number_format($rooms->total()) }}</span> data ruang
-                            </span>
-                        @else
-                            <span>
-                                Menampilkan <span class="font-semibold text-ink">1</span> sampai <span class="font-semibold text-ink">{{ $rooms->total() }}</span> dari <span class="font-semibold text-ink">{{ number_format($rooms->total()) }}</span> data ruang
-                            </span>
-                        @endif
-                    </div>
-
-                    <div class="flex flex-wrap items-center justify-between sm:justify-end gap-3">
-                        <div class="flex items-center gap-1.5 text-xs text-muted">
-                            <label for="room-per-page" class="whitespace-nowrap">Baris:</label>
-                            <select id="room-per-page" name="per_page" form="room-filter-form" @change="$el.form.requestSubmit()" aria-label="Baris per halaman"
-                                    class="rounded-control border border-border bg-surface px-2 py-1 text-xs text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary">
-                                @foreach ([15, 30, 50, 100] as $n)
-                                    <option value="{{ $n }}" @selected($perPage == $n)>{{ $n }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        @if ($rooms->hasPages())
-                            {{ $rooms->links() }}
-                        @else
-                            <span class="inline-flex items-center justify-center min-w-[32px] h-7 px-2.5 rounded-control border border-border bg-surface text-ink text-xs font-semibold">
-                                Halaman 1 dari 1
-                            </span>
-                        @endif
-                    </div>
-                </div>
-            @endif
+            <x-table-pagination :paginator="$rooms"
+                                form="room-filter-form"
+                                :per-page="$perPage"
+                                :options="[15, 30, 50, 100]"
+                                unit="data ruang"
+                                select-id="room-per-page"
+                                aria-label="Baris per halaman" />
 
             {{-- Footer jika dalam editMode --}}
             <div x-show="editMode" x-cloak class="flex items-center justify-between border-t border-border pt-4">
@@ -499,101 +455,42 @@
             </div>
         </x-card>
 
-        @if ($recurringClosures->isNotEmpty())
-            <x-card padding="p-4" class="admin-table-card flex flex-col gap-3 shadow-xs">
-                <div class="flex flex-wrap items-center justify-between gap-2">
-                    <div class="flex items-center gap-2">
-                        <span class="flex size-7 items-center justify-center rounded-control bg-danger-soft text-danger">
-                            <i data-lucide="calendar-x" class="size-4" aria-hidden="true"></i>
-                        </span>
-                        <div>
-                            <h2 class="text-sm font-bold text-ink">Aturan Pembatasan Jam Ruang Berulang</h2>
-                            <p class="text-xs text-muted">Ruangan otomatis diblokir pada jam &amp; hari tertentu tanpa menutup jam lainnya.</p>
-                        </div>
-                    </div>
-                    <x-button size="sm" variant="secondary" icon="plus" @click="openClosureModal(null, 'recurring')">Tambah Aturan</x-button>
-                </div>
-
-                <div class="divide-y divide-border rounded-control border border-border">
-                    @foreach ($recurringClosures as $rule)
-                        <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 text-xs">
-                            <div class="flex flex-col gap-0.5">
-                                <div class="flex flex-wrap items-center gap-2">
-                                    <span class="font-bold text-ink">{{ $rule->room?->name ?? 'Ruang' }}</span>
-                                    <span class="rounded-full bg-danger-soft px-2 py-0.5 text-[11px] font-semibold text-danger">{{ $rule->scheduleSummary() }}</span>
-                                </div>
-                                <span class="text-muted">Alasan: {{ $rule->reason }}</span>
-                            </div>
-                            <button type="button"
-                                    @click="openReopenClosureModal(@js($rule->room?->name ?? 'Ruang'), @js(route('admin.closures.destroy', $rule)))"
-                                    class="inline-flex items-center gap-1 rounded-control border border-danger/30 bg-danger-soft/30 px-2.5 py-1 text-xs font-semibold text-danger transition hover:bg-danger hover:text-white cursor-pointer">
-                                <i data-lucide="trash-2" class="size-3.5" aria-hidden="true"></i>
-                                <span>Hapus Aturan</span>
-                            </button>
-                        </div>
-                    @endforeach
-                </div>
-            </x-card>
-        @endif
+        @include('admin.rooms.partials.recurring-closures')
 
         {{-- FLOATING BATCH ACTION BAR --}}
-        <div x-show="selectedIds.length > 0 && !editMode"
-             x-cloak
-             x-transition:enter="transition ease-out duration-200"
-             x-transition:enter-start="opacity-0 translate-y-4"
-             x-transition:enter-end="opacity-100 translate-y-0"
-             x-transition:leave="transition ease-in duration-150"
-             x-transition:leave-start="opacity-100 translate-y-0"
-             x-transition:leave-end="opacity-0 translate-y-4"
-             class="fixed bottom-6 left-1/2 z-40 flex w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 flex-wrap items-center gap-3 rounded-xl border border-primary/30 bg-ink px-6 py-3.5 text-surface shadow-2xl">
-            <div class="flex items-center gap-2">
-                <i data-lucide="circle-check" class="size-5 text-success" aria-hidden="true"></i>
-                <span class="text-sm font-semibold"><span x-text="selectedIds.length"></span> ruang dipilih</span>
-                <button type="button"
-                        x-show="!isAllSelected()"
-                        @click="toggleSelectAll(true)"
-                        class="ml-1 rounded-md bg-surface/10 px-2 py-1 text-[11px] font-semibold text-surface/90 hover:bg-surface/20 hover:text-white transition cursor-pointer">
-                    Pilih Semua Tampil
-                </button>
-            </div>
-            <div class="h-4 w-px bg-surface/20"></div>
-
+        <x-batch-action-bar unit="ruang" show="selectedIds.length > 0 && !editMode">
             {{-- 1. Atur Kapasitas Modal --}}
-            <button type="button" @click="openBatchCapacityModal()" class="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-primary/90 transition cursor-pointer">
+            <button type="button" @click="openBatchCapacityModal()" class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:bg-primary/90">
                 <i data-lucide="users" class="size-3.5" aria-hidden="true"></i>
                 Atur Kapasitas
             </button>
 
             {{-- 2. Batch Tambah Fasilitas Modal --}}
-            <button type="button" @click="batchFacilityModalOpen = true; $nextTick(() => window.renderIcons())" class="inline-flex items-center gap-1.5 rounded-lg bg-surface/10 px-3 py-1.5 text-xs font-semibold text-surface hover:bg-surface/20 transition cursor-pointer">
+            <button type="button" @click="batchFacilityModalOpen = true; $nextTick(() => window.renderIcons())" class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-surface/10 px-3 py-1.5 text-xs font-semibold text-surface transition hover:bg-surface/20">
                 <i data-lucide="plus" class="size-3.5" aria-hidden="true"></i>
                 Tambah Fasilitas
             </button>
 
             {{-- 3. Batch Set Gedung Dinamis --}}
             @foreach ($buildings as $b)
-                <button type="button" @click="submitBatch('set_building', { building: @js($b->name) })" class="inline-flex items-center gap-1.5 rounded-lg bg-surface/10 px-3 py-1.5 text-xs font-semibold text-surface hover:bg-surface/20 transition cursor-pointer">
+                <button type="button" @click="submitBatch('set_building', { building: @js($b->name) })" class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-surface/10 px-3 py-1.5 text-xs font-semibold text-surface transition hover:bg-surface/20">
                     <i data-lucide="building-2" class="size-3.5" aria-hidden="true"></i>
                     Set Gedung {{ $b->name }}
                 </button>
             @endforeach
 
             {{-- 4. Batch Set Ruang Kuliah --}}
-            <button type="button" @click="submitBatch('set_type', { type: 'classroom' })" class="inline-flex items-center gap-1.5 rounded-lg bg-surface/10 px-3 py-1.5 text-xs font-semibold text-surface hover:bg-surface/20 transition cursor-pointer">
+            <button type="button" @click="submitBatch('set_type', { type: 'classroom' })" class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-surface/10 px-3 py-1.5 text-xs font-semibold text-surface transition hover:bg-surface/20">
                 <i data-lucide="door-closed" class="size-3.5" aria-hidden="true"></i>
                 Jadikan Ruang Kuliah
             </button>
 
             {{-- 5. Batch Set Laboratorium --}}
-            <button type="button" @click="submitBatch('set_type', { type: 'lab' })" class="inline-flex items-center gap-1.5 rounded-lg bg-surface/10 px-3 py-1.5 text-xs font-semibold text-surface hover:bg-surface/20 transition cursor-pointer">
+            <button type="button" @click="submitBatch('set_type', { type: 'lab' })" class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-surface/10 px-3 py-1.5 text-xs font-semibold text-surface transition hover:bg-surface/20">
                 <i data-lucide="wrench" class="size-3.5" aria-hidden="true"></i>
                 Jadikan Lab
             </button>
-
-            <button type="button" @click="selectedIds = []" class="ml-2 text-xs font-medium text-surface/70 hover:text-white transition cursor-pointer">
-                Batalkan Pilihan
-            </button>
-        </div>
+        </x-batch-action-bar>
 
         {{-- FORM TERSEMBUNYI UNTUK BATCH ACTION STANDARD --}}
         <form x-ref="batchForm" method="POST" action="{{ route('admin.rooms.batch') }}" class="hidden">
@@ -612,442 +509,8 @@
             @method('PUT')
         </form>
 
-        {{-- MODAL 1: EDIT / TAMBAH RUANG DINAMIS TUNGGAL --}}
-        <div x-show="formModalOpen" x-cloak data-modal-name="room-form"
-             role="dialog" aria-modal="true" aria-labelledby="room-form-title"
-             @keydown.escape.window="if (formModalOpen) formModalOpen = false"
-             class="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div class="absolute inset-0 bg-ink/80 backdrop-blur-sm" @click="formModalOpen = false"></div>
-            <div class="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-surface p-6 shadow-2xl">
-                <div class="flex items-start justify-between border-b border-border pb-3">
-                    <div>
-                        <span class="text-xs font-semibold text-primary" x-text="formRoom.id ? 'Perbarui Data Ruangan' : 'Ruang Baru'"></span>
-                        <h3 id="room-form-title" class="text-lg font-bold text-ink" x-text="formRoom.id ? 'Ubah Ruang: ' + formRoom.name : 'Tambah Ruang Baru'"></h3>
-                    </div>
-                    <button type="button" @click="formModalOpen = false" aria-label="Tutup modal ruang" class="text-muted hover:text-ink cursor-pointer">
-                        <i data-lucide="x" class="size-5" aria-hidden="true"></i>
-                    </button>
-                </div>
-
-                @php($isRoomFormError = $errors->any() && ! in_array($oldForm, ['closure', 'batch_capacity', 'batch_facility'], true))
-                <form method="POST" action="{{ route('admin.rooms.store') }}"
-                      :action="formRoom.id ? @js(route('admin.rooms.update', '__ROOM_ID__')).replace('__ROOM_ID__', formRoom.id) : @js(route('admin.rooms.store'))"
-                      class="mt-4 flex flex-col gap-4">
-                    @csrf
-                    <template x-if="formRoom.id">
-                        <input type="hidden" name="_method" value="PUT">
-                    </template>
-                    <input type="hidden" name="form" :value="formRoom.id ? 'edit-' + formRoom.id : 'add'">
-                    <input type="hidden" name="room_id" :value="formRoom.id || ''">
-
-                    @if ($isRoomFormError)
-                        <x-alert variant="danger">{{ $errors->first() }}</x-alert>
-                    @endif
-
-                    <div>
-                        <label for="room-form-name" class="mb-1 block text-xs font-medium text-muted">Nama Ruang <span class="text-danger">*</span></label>
-                        <input id="room-form-name" type="text" name="name" x-model="formRoom.name" required placeholder="Contoh: AE 107 atau Lab ICT 10" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
-                        @if ($isRoomFormError)
-                            @error('name') <p class="mt-1 text-xs font-medium text-danger">{{ $message }}</p> @enderror
-                            @error('code') <p class="mt-1 text-xs font-medium text-danger">{{ $message }}</p> @enderror
-                        @endif
-                    </div>
-
-                    <div>
-                        <label for="room-form-type" class="mb-1 block text-xs font-medium text-muted">Jenis Ruang <span class="text-danger">*</span></label>
-                        <select id="room-form-type" name="type" x-model="formRoom.type" required class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
-                            <option value="classroom">Ruang kuliah (Kelas teori / umum)</option>
-                            <option value="lab">Laboratorium (Lab komputer / praktikum)</option>
-                        </select>
-                        @if ($isRoomFormError) @error('type') <p class="mt-1 text-xs font-medium text-danger">{{ $message }}</p> @enderror @endif
-                    </div>
-
-                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <div>
-                            <label for="room-form-capacity" class="mb-1 block text-xs font-medium text-muted">Kapasitas (Kursi)</label>
-                            <input id="room-form-capacity" type="number" min="1" max="1000" name="capacity" x-model="formRoom.capacity" placeholder="Contoh: 40" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
-                            @if ($isRoomFormError) @error('capacity') <p class="mt-1 text-xs font-medium text-danger">{{ $message }}</p> @enderror @endif
-                        </div>
-                        <div>
-                            <label for="room-form-floor" class="mb-1 block text-xs font-medium text-muted">Lantai</label>
-                            <input id="room-form-floor" type="number" min="0" max="20" name="floor" x-model="formRoom.floor" placeholder="Contoh: 1" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
-                            @if ($isRoomFormError) @error('floor') <p class="mt-1 text-xs font-medium text-danger">{{ $message }}</p> @enderror @endif
-                        </div>
-                    </div>
-
-                    <div>
-                        <label for="room-form-building" class="mb-1 block text-xs font-medium text-muted">Gedung</label>
-                        <input id="room-form-building" type="text" name="building" x-model="formRoom.building" placeholder="Contoh: AE atau Pinisi" list="building-suggestions" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
-                        <datalist id="building-suggestions">
-                            @foreach ($buildings as $b)
-                                <option value="{{ $b->name }}"></option>
-                            @endforeach
-                        </datalist>
-                        <p class="mt-1 text-[11px] text-muted">Kosongkan bila gedung belum didata (akan ditandai Perlu Verifikasi).</p>
-                        @if ($isRoomFormError) @error('building') <p class="mt-1 text-xs font-medium text-danger">{{ $message }}</p> @enderror @endif
-                    </div>
-
-                    <div>
-                        <label for="room-form-facilities" class="mb-1 block text-xs font-medium text-muted">Fasilitas Ruang (Pisahkan dengan koma)</label>
-                        <input id="room-form-facilities" type="text" name="facilities" x-model="formRoom.facilities" placeholder="Contoh: Proyektor, AC, Stopkontak, Papan tulis" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
-                        @if ($isRoomFormError) @error('facilities') <p class="mt-1 text-xs font-medium text-danger">{{ $message }}</p> @enderror @endif
-                        {{-- Saran Tag Cepat --}}
-                        <div class="mt-2 flex flex-wrap gap-1.5">
-                            <span class="text-[11px] text-muted self-center mr-1">Saran cepat:</span>
-                            <template x-for="tag in ['Proyektor', 'AC', 'Papan tulis', 'Stopkontak', 'Smart TV', 'Sound System']" :key="tag">
-                                <button type="button" @click="addFacilityTag(tag)"
-                                        :class="(formRoom.facilities || '').split(',').map(s => s.trim().toLowerCase()).includes(tag.toLowerCase()) ? 'border-primary bg-primary-soft text-primary font-semibold' : 'border-border bg-page text-muted hover:border-primary hover:text-primary'"
-                                        class="rounded-full border px-2 py-0.5 text-[11px] transition cursor-pointer"
-                                        x-text="(formRoom.facilities || '').split(',').map(s => s.trim().toLowerCase()).includes(tag.toLowerCase()) ? '✓ ' + tag : '+ ' + tag"></button>
-                            </template>
-                        </div>
-                    </div>
-
-                    <div class="mt-2 flex items-center justify-between gap-3 border-t border-border pt-4">
-                        <template x-if="formRoom.id">
-                            <x-button variant="danger-outline" type="button" icon="trash-2" @click="openDeleteFromEdit()">Hapus ruang</x-button>
-                        </template>
-                        <template x-if="!formRoom.id">
-                            <div></div>
-                        </template>
-                        <div class="flex gap-2">
-                            <x-button variant="secondary" type="button" @click="formModalOpen = false">Batal</x-button>
-                            <x-button variant="primary" type="submit" icon="check">Simpan Data Ruang</x-button>
-                        </div>
-                    </div>
-                </form>
-            </div>
-        </div>
-
-        {{-- MODAL 2: PENUTUPAN RUANG SEMENTARA --}}
-        <div x-show="closureModalOpen" x-cloak data-modal-name="room-closure"
-             role="dialog" aria-modal="true" aria-labelledby="room-closure-title"
-             @keydown.escape.window="if (closureModalOpen) closureModalOpen = false"
-             class="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div class="absolute inset-0 bg-ink/80 backdrop-blur-sm" @click="closureModalOpen = false"></div>
-            <div class="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-surface p-6 shadow-2xl">
-                <div class="flex items-start justify-between border-b border-border pb-3">
-                    <div>
-                        <span class="text-xs font-semibold text-danger">Pemeliharaan & Penutupan</span>
-                        <h3 id="room-closure-title" class="text-lg font-bold text-ink">Tutup Ruang Sementara</h3>
-                    </div>
-                    <button type="button" @click="closureModalOpen = false" aria-label="Tutup modal penutupan ruang" class="text-muted hover:text-ink cursor-pointer">
-                        <i data-lucide="x" class="size-5" aria-hidden="true"></i>
-                    </button>
-                </div>
-
-                <p class="mt-2 text-xs text-muted">Atur penutupan ruang sekali jalan atau berulang pada jam dan hari tertentu.</p>
-
-                <form method="POST" action="{{ route('admin.closures.store') }}" class="mt-4 flex flex-col gap-4">
-                    @csrf
-                    <input type="hidden" name="form" value="closure">
-                    <input type="hidden" name="mode" x-model="closureMode">
-
-                    @if ($errors->any() && $oldForm === 'closure')
-                        <x-alert variant="danger">{{ $errors->first() }}</x-alert>
-                    @endif
-
-                    <div>
-                        <span class="mb-1.5 block text-xs font-medium text-muted">Jenis Penutupan <span class="text-danger">*</span></span>
-                        <div class="grid grid-cols-2 gap-2 rounded-control border border-border bg-page p-1">
-                            <button type="button"
-                                    @click="closureMode = 'once'"
-                                    :class="closureMode === 'once' ? 'bg-surface text-primary shadow-2xs font-bold' : 'text-muted hover:text-ink font-medium'"
-                                    class="rounded-control px-3 py-1.5 text-xs transition cursor-pointer">
-                                Sekali (Rentang Waktu)
-                            </button>
-                            <button type="button"
-                                    @click="closureMode = 'recurring'"
-                                    :class="closureMode === 'recurring' ? 'bg-surface text-primary shadow-2xs font-bold' : 'text-muted hover:text-ink font-medium'"
-                                    class="rounded-control px-3 py-1.5 text-xs transition cursor-pointer">
-                                Berulang (Jam Tertentu)
-                            </button>
-                        </div>
-                    </div>
-
-                    <div>
-                        <label for="closure-room-id" class="mb-1 block text-xs font-medium text-muted">Pilih Ruang <span class="text-danger">*</span></label>
-                        <select id="closure-room-id" name="room_id" x-model="closureRoomId" required class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
-                            <option value="">-- Pilih Ruangan --</option>
-                            @foreach ($allRooms as $id => $name)
-                                <option value="{{ $id }}">{{ $name }}</option>
-                            @endforeach
-                        </select>
-                        @if ($oldForm === 'closure') @error('room_id') <p class="mt-1 text-xs font-medium text-danger">{{ $message }}</p> @enderror @endif
-                    </div>
-
-                    <div x-show="closureMode === 'once'" class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <div>
-                            <label for="closure-start-at" class="mb-1 block text-xs font-medium text-muted">Mulai Tutup <span class="text-danger">*</span></label>
-                            <input id="closure-start-at" type="datetime-local" name="start_at" x-model="closureStart" :disabled="closureMode !== 'once'" :required="closureMode === 'once'" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
-                            @if ($oldForm === 'closure') @error('start_at') <p class="mt-1 text-xs font-medium text-danger">{{ $message }}</p> @enderror @endif
-                        </div>
-                        <div>
-                            <label for="closure-end-at" class="mb-1 block text-xs font-medium text-muted">Selesai Tutup <span class="text-danger">*</span></label>
-                            <input id="closure-end-at" type="datetime-local" name="end_at" x-model="closureEnd" :disabled="closureMode !== 'once'" :required="closureMode === 'once'" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
-                            @if ($oldForm === 'closure') @error('end_at') <p class="mt-1 text-xs font-medium text-danger">{{ $message }}</p> @enderror @endif
-                        </div>
-                    </div>
-
-                    <div x-show="closureMode === 'recurring'" x-cloak class="flex flex-col gap-3 rounded-control border border-border bg-page/60 p-3.5">
-                        <div class="flex flex-wrap items-center justify-between gap-2">
-                            <span class="text-xs font-semibold text-ink">Jam Tidak Boleh Dipakai <span class="text-danger">*</span></span>
-                            <div class="flex items-center gap-1.5">
-                                <button type="button" @click="closureStartTime = '07:30'; closureEndTime = '12:00'" class="rounded border border-border bg-surface px-2 py-0.5 text-[11px] font-medium text-primary hover:bg-primary-soft cursor-pointer">Pagi (07:30–12:00)</button>
-                                <button type="button" @click="closureStartTime = '13:00'; closureEndTime = '17:30'" class="rounded border border-border bg-surface px-2 py-0.5 text-[11px] font-medium text-primary hover:bg-primary-soft cursor-pointer">Siang (13:00–17:30)</button>
-                            </div>
-                        </div>
-
-                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                            <div>
-                                <label for="closure-start-time" class="mb-1 block text-xs font-medium text-muted">Mulai Jam <span class="text-danger">*</span></label>
-                                <input id="closure-start-time" type="time" name="start_time" x-model="closureStartTime" :disabled="closureMode !== 'recurring'" :required="closureMode === 'recurring'" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
-                                @if ($oldForm === 'closure') @error('start_time') <p class="mt-1 text-xs font-medium text-danger">{{ $message }}</p> @enderror @endif
-                            </div>
-                            <div>
-                                <label for="closure-end-time" class="mb-1 block text-xs font-medium text-muted">Selesai Jam <span class="text-danger">*</span></label>
-                                <input id="closure-end-time" type="time" name="end_time" x-model="closureEndTime" :disabled="closureMode !== 'recurring'" :required="closureMode === 'recurring'" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
-                                @if ($oldForm === 'closure') @error('end_time') <p class="mt-1 text-xs font-medium text-danger">{{ $message }}</p> @enderror @endif
-                            </div>
-                        </div>
-
-                        <div>
-                            <div class="mb-1.5 flex flex-wrap items-center justify-between gap-2">
-                                <span class="text-xs font-medium text-muted">Berlaku Setiap Hari <span class="text-danger">*</span></span>
-                                <div class="flex items-center gap-1.5">
-                                    <button type="button" @click="setClosureDays([1, 2, 3, 4, 5])" class="rounded border border-border bg-surface px-2 py-0.5 text-[11px] font-medium text-primary hover:bg-primary-soft cursor-pointer">Senin–Jumat</button>
-                                    <button type="button" @click="setClosureDays([1, 2, 3, 4, 5, 6, 7])" class="rounded border border-border bg-surface px-2 py-0.5 text-[11px] font-medium text-primary hover:bg-primary-soft cursor-pointer">Setiap Hari</button>
-                                </div>
-                            </div>
-                            <div class="grid grid-cols-7 gap-1">
-                                @foreach ([1 => 'Sen', 2 => 'Sel', 3 => 'Rab', 4 => 'Kam', 5 => 'Jum', 6 => 'Sab', 7 => 'Min'] as $dayNum => $dayLabel)
-                                    <label class="cursor-pointer">
-                                        <input type="checkbox"
-                                               name="days_of_week[]"
-                                               value="{{ $dayNum }}"
-                                               :disabled="closureMode !== 'recurring'"
-                                               :checked="closureDays.includes({{ $dayNum }})"
-                                               @change="toggleClosureDay({{ $dayNum }})"
-                                               class="sr-only">
-                                        <span :class="closureDays.includes({{ $dayNum }}) ? 'border-primary bg-primary text-white font-bold' : 'border-border bg-surface text-muted hover:text-ink font-medium'"
-                                              class="flex items-center justify-center rounded-control border py-1.5 text-xs transition select-none">
-                                            {{ $dayLabel }}
-                                        </span>
-                                    </label>
-                                @endforeach
-                            </div>
-                            @if ($oldForm === 'closure') @error('days_of_week') <p class="mt-1 text-xs font-medium text-danger">{{ $message }}</p> @enderror @endif
-                        </div>
-
-                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                            <div>
-                                <label for="closure-start-date" class="mb-1 block text-xs font-medium text-muted">Dari Tanggal <span class="text-danger">*</span></label>
-                                <input id="closure-start-date" type="date" name="start_date" x-model="closureStartDate" :disabled="closureMode !== 'recurring'" :required="closureMode === 'recurring'" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
-                                @if ($oldForm === 'closure') @error('start_date') <p class="mt-1 text-xs font-medium text-danger">{{ $message }}</p> @enderror @endif
-                            </div>
-                            <div>
-                                <label for="closure-end-date" class="mb-1 block text-xs font-medium text-muted">Sampai Tanggal <span class="text-danger">*</span></label>
-                                <input id="closure-end-date" type="date" name="end_date" x-model="closureEndDate" :disabled="closureMode !== 'recurring'" :required="closureMode === 'recurring'" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
-                                @if ($oldForm === 'closure') @error('end_date') <p class="mt-1 text-xs font-medium text-danger">{{ $message }}</p> @enderror @endif
-                            </div>
-                        </div>
-                    </div>
-
-                    <div>
-                        <label for="closure-reason" class="mb-1 block text-xs font-medium text-muted">Alasan Penutupan <span class="text-danger">*</span></label>
-                        <input id="closure-reason" type="text" name="reason" x-model="closureReason" required placeholder="Contoh: Perawatan AC / Perbaikan proyektor / Renovasi" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
-                        @if ($oldForm === 'closure') @error('reason') <p class="mt-1 text-xs font-medium text-danger">{{ $message }}</p> @enderror @endif
-                    </div>
-
-                    <div>
-                        <label class="flex items-center gap-2 text-xs text-ink cursor-pointer font-medium select-none">
-                            <input type="checkbox" name="cancel_impacted" value="1" @checked(old('cancel_impacted')) class="size-4 accent-danger rounded cursor-pointer">
-                            Batalkan juga reservasi terdampak secara otomatis jika ada
-                        </label>
-                    </div>
-
-                    @if (session('closure_impact'))
-                        <div class="flex flex-col gap-2 rounded-card bg-danger-soft p-4 text-xs">
-                            <div class="flex items-center gap-1.5 font-semibold text-danger">
-                                <i data-lucide="triangle-alert" class="size-4" aria-hidden="true"></i>
-                                <span>{{ count(session('closure_impact')) }} reservasi aktif terdampak penutupan ini:</span>
-                            </div>
-                            <div class="divide-y divide-danger/20 max-h-36 overflow-y-auto">
-                                @foreach (session('closure_impact') as $impact)
-                                    <div class="py-1 text-ink">
-                                        <strong>{{ $impact['class'] }}</strong> • {{ $impact['time'] }} ({{ $impact['purpose'] }})
-                                    </div>
-                                @endforeach
-                            </div>
-                            <p class="text-[11px] text-muted mt-1">Kelas terdampak akan diberi notifikasi secara otomatis.</p>
-                            <label class="mt-1 flex items-center gap-2 text-ink cursor-pointer font-medium">
-                                <input type="checkbox" name="confirm_impact" value="1" class="size-4 accent-danger rounded cursor-pointer" required>
-                                Saya mengerti dan tetap menutup ruang
-                            </label>
-                        </div>
-                    @endif
-
-                    <div class="mt-2 flex items-center justify-end gap-2 border-t border-border pt-4">
-                        <x-button variant="secondary" type="button" @click="closureModalOpen = false">Batal</x-button>
-                        <x-button variant="danger" type="submit" icon="lock">Tutup Ruang</x-button>
-                    </div>
-                </form>
-            </div>
-        </div>
-
-        {{-- MODAL 3: KONFIRMASI HAPUS DINAMIS TUNGGAL --}}
-        <div x-show="deleteModalOpen" x-cloak data-modal-name="room-delete"
-             role="dialog" aria-modal="true" aria-labelledby="room-delete-title"
-             @keydown.escape.window="if (deleteModalOpen) deleteModalOpen = false"
-             class="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div class="absolute inset-0 bg-ink/80 backdrop-blur-sm" @click="deleteModalOpen = false"></div>
-            <div class="relative w-full max-w-md rounded-2xl bg-surface p-6 shadow-2xl">
-                <div class="flex items-start justify-between border-b border-border pb-3">
-                    <h3 id="room-delete-title" class="text-lg font-bold text-ink">Hapus ruang <span x-text="roomToDelete.name"></span>?</h3>
-                    <button type="button" @click="deleteModalOpen = false" aria-label="Tutup konfirmasi hapus ruang" class="text-muted hover:text-ink cursor-pointer">
-                        <i data-lucide="x" class="size-5" aria-hidden="true"></i>
-                    </button>
-                </div>
-                <p class="mt-3 text-xs text-muted">Ruang ini akan hilang dari daftar. Ruang yang masih dipakai reservasi aktif atau jadwal resmi tidak dapat dihapus.</p>
-
-                <form method="POST" :action="@js(route('admin.rooms.destroy', '__ROOM_ID__')).replace('__ROOM_ID__', roomToDelete.id)" class="mt-4 flex flex-col gap-4">
-                    @csrf
-                    @method('DELETE')
-                    <div>
-                        <label for="room-delete-reason" class="mb-1 block text-xs font-medium text-muted">Alasan Penghapusan (Opsional)</label>
-                        <input id="room-delete-reason" type="text" name="reason" placeholder="Contoh: Ruang dialihfungsikan" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
-                    </div>
-
-                    <div class="mt-2 flex items-center justify-end gap-2 border-t border-border pt-4">
-                        <x-button variant="secondary" type="button" @click="deleteModalOpen = false">Batal</x-button>
-                        <x-button variant="danger" type="submit" icon="trash-2">Hapus Ruang</x-button>
-                    </div>
-                </form>
-            </div>
-        </div>
-
-        {{-- MODAL 4: BATCH ATUR KAPASITAS --}}
-        <div x-show="batchCapacityModalOpen" x-cloak data-modal-name="room-batch-capacity" role="dialog" aria-modal="true" aria-labelledby="batch-capacity-title"
-             @keydown.escape.window="if (batchCapacityModalOpen) batchCapacityModalOpen = false" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div class="absolute inset-0 bg-ink/80 backdrop-blur-sm" @click="batchCapacityModalOpen = false"></div>
-            <div class="relative w-full max-w-md rounded-2xl bg-surface p-6 shadow-2xl">
-                <div class="flex items-start justify-between border-b border-border pb-3">
-                    <div>
-                        <span class="text-xs font-semibold text-primary">Penyesuaian Massal</span>
-                        <h3 id="batch-capacity-title" class="text-lg font-bold text-ink">Atur Kapasitas (<span x-text="selectedIds.length"></span> Ruang Terpilih)</h3>
-                    </div>
-                    <button type="button" @click="batchCapacityModalOpen = false" aria-label="Tutup pengaturan kapasitas" class="text-muted hover:text-ink cursor-pointer">
-                        <i data-lucide="x" class="size-5" aria-hidden="true"></i>
-                    </button>
-                </div>
-
-                <form method="POST" action="{{ route('admin.rooms.batch') }}" class="mt-4 flex flex-col gap-4">
-                    @csrf
-                    <input type="hidden" name="form" value="batch_capacity">
-                    <input type="hidden" name="action" value="set_capacity">
-                    <template x-for="id in selectedIds" :key="id">
-                        <input type="hidden" name="room_ids[]" :value="id">
-                    </template>
-
-                    <div>
-                        <label for="batch-capacity" class="mb-1 block text-xs font-medium text-muted">Kapasitas Kursi per Ruang (Orang)</label>
-                        <x-input name="capacity" id="batch-capacity" type="number" min="1" max="1000" step="1" required
-                                 x-ref="batchCapacityInput" x-model="batchCapacity" placeholder="Misal: 40" aria-describedby="batch-capacity-help" />
-                        @if (old('form') === 'batch_capacity')
-                            @error('capacity')
-                                <p id="capacity-error" class="mt-1 text-sm text-danger">{{ $message }}</p>
-                            @enderror
-                            @error('room_ids')
-                                <p class="mt-1 text-sm text-danger">{{ $message }}</p>
-                            @enderror
-                        @endif
-                    </div>
-
-                    <div id="batch-capacity-help" class="rounded-lg border border-primary/20 bg-primary-soft/40 p-3 text-xs text-ink">
-                        Kapasitas ini akan diterapkan serentak ke <strong x-text="selectedIds.length"></strong> ruangan yang sedang dicentang.
-                    </div>
-
-                    <div class="mt-1 flex flex-wrap items-center justify-end gap-2 border-t border-border pt-4">
-                        <x-button variant="secondary" type="button" @click="batchCapacityModalOpen = false">Batal</x-button>
-                        <x-button variant="primary" type="submit" icon="check" x-bind:disabled="selectedIds.length === 0">
-                            Terapkan ke Ruang Terpilih
-                        </x-button>
-                    </div>
-                </form>
-            </div>
-        </div>
-
-        {{-- MODAL 5: BATCH TAMBAH FASILITAS --}}
-        <div x-show="batchFacilityModalOpen" x-cloak data-modal-name="room-batch-facility"
-             role="dialog" aria-modal="true" aria-labelledby="batch-facility-title"
-             @keydown.escape.window="if (batchFacilityModalOpen) batchFacilityModalOpen = false"
-             class="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div class="absolute inset-0 bg-ink/80 backdrop-blur-sm" @click="batchFacilityModalOpen = false"></div>
-            <div class="relative w-full max-w-md rounded-2xl bg-surface p-6 shadow-2xl">
-                <div class="flex items-start justify-between border-b border-border pb-3">
-                    <div>
-                        <span class="text-xs font-semibold text-primary">Penyesuaian Massal</span>
-                        <h3 id="batch-facility-title" class="text-lg font-bold text-ink">Tambah Fasilitas (<span x-text="selectedIds.length"></span> Ruang Terpilih)</h3>
-                    </div>
-                    <button type="button" @click="batchFacilityModalOpen = false" aria-label="Tutup modal tambah fasilitas" class="text-muted hover:text-ink cursor-pointer">
-                        <i data-lucide="x" class="size-5" aria-hidden="true"></i>
-                    </button>
-                </div>
-
-                <form method="POST" action="{{ route('admin.rooms.batch') }}" class="mt-4 flex flex-col gap-4">
-                    @csrf
-                    <input type="hidden" name="form" value="batch_facility">
-                    <input type="hidden" name="action" value="add_facilities">
-                    <template x-for="id in selectedIds" :key="id">
-                        <input type="hidden" name="room_ids[]" :value="id">
-                    </template>
-
-                    @if ($errors->any() && $oldForm === 'batch_facility')
-                        <x-alert variant="danger">{{ $errors->first() }}</x-alert>
-                    @endif
-
-                    <div>
-                        <label for="batch-facilities-input" class="mb-1 block text-xs font-medium text-muted">Fasilitas yang Ditambahkan (Pisahkan koma)</label>
-                        <input id="batch-facilities-input" type="text" name="facilities" value="{{ $oldForm === 'batch_facility' ? old('facilities') : '' }}" required placeholder="Contoh: AC, Proyektor, Papan tulis" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
-                        @if ($oldForm === 'batch_facility')
-                            @error('facilities') <p class="mt-1 text-xs font-medium text-danger">{{ $message }}</p> @enderror
-                            @error('room_ids') <p class="mt-1 text-xs font-medium text-danger">{{ $message }}</p> @enderror
-                        @endif
-                    </div>
-
-                    <div class="rounded-lg border border-primary/20 bg-primary-soft/40 p-3 text-xs text-ink">
-                        Fasilitas baru akan ditambahkan ke <strong x-text="selectedIds.length"></strong> ruangan terpilih tanpa menghapus fasilitas yang sudah ada.
-                    </div>
-
-                    <div class="mt-1 flex items-center justify-end gap-2 border-t border-border pt-4">
-                        <x-button variant="secondary" type="button" @click="batchFacilityModalOpen = false">Batal</x-button>
-                        <x-button variant="primary" type="submit" icon="check" x-bind:disabled="selectedIds.length === 0">Terapkan ke Ruang Terpilih</x-button>
-                    </div>
-                </form>
-            </div>
-        </div>
-
-        {{-- MODAL 6: KONFIRMASI BUKA PENUTUPAN RUANG --}}
-        <div x-show="reopenModalOpen" x-cloak data-modal-name="room-reopen-closure"
-             role="dialog" aria-modal="true" aria-labelledby="room-reopen-title"
-             @keydown.escape.window="if (reopenModalOpen) reopenModalOpen = false"
-             class="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div class="absolute inset-0 bg-ink/80 backdrop-blur-sm" @click="reopenModalOpen = false"></div>
-            <div class="relative w-full max-w-md rounded-2xl bg-surface p-6 shadow-2xl">
-                <div class="flex items-start justify-between border-b border-border pb-3">
-                    <h3 id="room-reopen-title" class="text-lg font-bold text-ink">Buka kembali ruang <span x-text="closureToReopen.name"></span>?</h3>
-                    <button type="button" @click="reopenModalOpen = false" aria-label="Tutup konfirmasi buka ruang" class="text-muted hover:text-ink cursor-pointer">
-                        <i data-lucide="x" class="size-5" aria-hidden="true"></i>
-                    </button>
-                </div>
-                <p class="mt-3 text-xs text-muted">Penutupan ruang akan dihapus sehingga ruang kembali tersedia untuk pemesanan.</p>
-                <form method="POST" :action="closureToReopen.url" class="mt-5 flex justify-end gap-2">
-                    @csrf
-                    @method('DELETE')
-                    <x-button variant="secondary" type="button" @click="reopenModalOpen = false">Batal</x-button>
-                    <x-button variant="primary" type="submit" icon="lock-open">Buka Ruang</x-button>
-                </form>
-            </div>
-        </div>
+        @include('admin.rooms.modals.form-modal')
+        @include('admin.rooms.modals.closure-modal')
+        @include('admin.rooms.modals.batch-modals')
     </div>
 @endsection

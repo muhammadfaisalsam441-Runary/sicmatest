@@ -11,6 +11,7 @@ use App\Models\Room\Room;
 use App\Models\Scheduling\ScheduleSession;
 use App\Services\Scheduling\ScheduleImportService;
 use App\Services\Scheduling\ScheduleValidator;
+use App\Support\CsvStream;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -53,11 +54,7 @@ class ScheduleController extends Controller
             ->distinct()
             ->orderBy('study_program')
             ->pluck('study_program', 'study_program')
-            ->map(fn (string $name): string => match ($name) {
-                'PTIK', 'Pendidikan Teknik Informatika dan Komputer' => 'PTIK (Pend. Teknik Informatika dan Komputer)',
-                'TEKOM', 'Teknik Komputer' => 'TEKOM (Teknik Komputer)',
-                default => $name,
-            })
+            ->map(ClassGroup::studyProgramLabel(...))
             ->all();
 
         $cohortYears = ClassGroup::query()
@@ -70,9 +67,7 @@ class ScheduleController extends Controller
 
         $classGroupsQuery = ClassGroup::query()->orderBy('name');
         if ($prodi !== '') {
-            $classGroupsQuery->where(fn (Builder $q) => $q
-                ->where('study_program', $prodi)
-                ->orWhere('study_program', 'like', "%{$prodi}%"));
+            $classGroupsQuery->whereStudyProgramMatches($prodi);
         }
         if ($cohortYear) {
             $classGroupsQuery->where('cohort_year', $cohortYear);
@@ -87,9 +82,7 @@ class ScheduleController extends Controller
             ->whereBelongsTo($official, 'version')
             ->with(['room', 'participants', 'lecturers'])
             ->when($day, fn (Builder $query, int $day) => $query->where('day_of_week', $day))
-            ->when($prodi !== '', fn (Builder $query) => $query->whereHas('participants', fn (Builder $query) => $query->where(fn (Builder $q) => $q
-                ->where('study_program', $prodi)
-                ->orWhere('study_program', 'like', "%{$prodi}%"))))
+            ->when($prodi !== '', fn (Builder $query) => $query->whereHas('participants', fn (Builder $query) => $query->whereStudyProgramMatches($prodi)))
             ->when($cohortYear, fn (Builder $query, int $year) => $query->whereHas('participants', fn (Builder $query) => $query->where('cohort_year', $year)))
             ->when($classGroupId, fn (Builder $query, int $id) => $query->whereHas('participants', fn (Builder $query) => $query->whereKey($id)))
             ->when($lecturerId, fn (Builder $query, int $id) => $query->whereHas('lecturers', fn (Builder $query) => $query->whereKey($id)))
@@ -141,15 +134,7 @@ class ScheduleController extends Controller
     public function template(Request $request, ScheduleImportService $imports): StreamedResponse
     {
         if ($request->query('format') === 'csv') {
-            return response()->streamDownload(function () use ($imports): void {
-                $handle = fopen('php://output', 'w');
-                // Output UTF-8 BOM agar Excel dapat membuka file CSV dengan benar
-                fwrite($handle, "\xEF\xBB\xBF");
-                foreach ($imports->templateRows() as $row) {
-                    fputcsv($handle, $row, ';');
-                }
-                fclose($handle);
-            }, 'templat-jadwal-sicma.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
+            return CsvStream::download('templat-jadwal-sicma.csv', [], $imports->templateRows(), ';');
         }
 
         return response()->streamDownload(function () use ($imports): void {

@@ -39,17 +39,13 @@
         overflow: hidden;
     }
 
-    dialog[open] {
+    dialog:modal, dialog[open] {
         overscroll-behavior: contain;
     }
 
     dialog::backdrop {
         overflow: hidden;
         overscroll-behavior: contain;
-    }
-
-    body:has(dialog[open]) {
-        overflow: hidden;
     }
 
     [x-cloak] {

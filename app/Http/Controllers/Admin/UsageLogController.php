@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Academic\ClassGroup;
 use App\Models\Reservation\Reservation;
 use App\Models\Room\Room;
+use App\Support\CsvStream;
 use App\Support\Wita;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -52,25 +53,22 @@ class UsageLogController extends Controller
         $date = $this->date($request);
         $logs = $this->query($request, $date)->get();
 
-        return response()->streamDownload(function () use ($logs): void {
-            $handle = fopen('php://output', 'w');
-            fputcsv($handle, ['Pengguna', 'Kelas', 'Ruang', 'Rencana (WITA)', 'Mulai (WITA)', 'Selesai (WITA)', 'Kegiatan', 'Status']);
+        $rows = $logs->map(fn (Reservation $log): array => [
+            $log->creator->name,
+            $log->classGroup->name,
+            $log->room->name,
+            Wita::range($log->start_at, $log->end_at),
+            Wita::clock($log->actual_start_at, false),
+            $log->actual_end_at ? Wita::clock($log->actual_end_at, false) : '—',
+            $log->purpose,
+            $log->status->label(),
+        ]);
 
-            foreach ($logs as $log) {
-                fputcsv($handle, [
-                    $log->creator->name,
-                    $log->classGroup->name,
-                    $log->room->name,
-                    Wita::range($log->start_at, $log->end_at),
-                    Wita::clock($log->actual_start_at, false),
-                    $log->actual_end_at ? Wita::clock($log->actual_end_at, false) : '—',
-                    $log->purpose,
-                    $log->status->label(),
-                ]);
-            }
-
-            fclose($handle);
-        }, 'log-pemakaian-'.$date->toDateString().'.csv', ['Content-Type' => 'text/csv']);
+        return CsvStream::download(
+            'log-pemakaian-'.$date->toDateString().'.csv',
+            ['Pengguna', 'Kelas', 'Ruang', 'Rencana (WITA)', 'Mulai (WITA)', 'Selesai (WITA)', 'Kegiatan', 'Status'],
+            $rows,
+        );
     }
 
     /**

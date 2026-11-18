@@ -40,8 +40,8 @@ class AvailabilityService
      */
     public function forRooms(Collection $rooms, CarbonInterface $start, ?CarbonInterface $end = null): Collection
     {
-        $start = $this->normalize($start);
-        $end = $end === null ? $start->addMinute() : $this->normalize($end);
+        $start = Wita::normalize($start);
+        $end = $end === null ? $start->addMinute() : Wita::normalize($end);
         [$open, $close] = $this->operatingWindow($start);
 
         $blocks = $this->blocksFor($rooms->map(fn (Room $room): int => $room->id)->values()->all(), $start, $end->max($close));
@@ -90,7 +90,7 @@ class AvailabilityService
      */
     public function dailySlots(SearchCriteria $criteria): Collection
     {
-        $now = $this->normalize(CarbonImmutable::now());
+        $now = Wita::normalize(CarbonImmutable::now());
         [$open, $close] = $this->operatingWindow($criteria->start);
         $from = $open->max($now);
         $duration = $criteria->durationMinutes;
@@ -401,7 +401,7 @@ class AvailabilityService
      */
     public function operatingWindow(CarbonInterface $date): array
     {
-        $day = $this->normalize($date)->startOfDay();
+        $day = Wita::normalize($date)->startOfDay();
         [$openHour, $openMinute] = array_map('intval', explode(':', (string) config('sicma.operating_hours.start')));
         [$closeHour, $closeMinute] = array_map('intval', explode(':', (string) config('sicma.operating_hours.end')));
 
@@ -423,10 +423,5 @@ class AvailabilityService
                 fn (AvailabilityResult $a, AvailabilityResult $b): int => strnatcmp($a->room->name, $b->room->name),
             ]),
         };
-    }
-
-    private function normalize(CarbonInterface $time): CarbonImmutable
-    {
-        return CarbonImmutable::instance($time)->setTimezone(config('app.timezone'))->startOfMinute();
     }
 }

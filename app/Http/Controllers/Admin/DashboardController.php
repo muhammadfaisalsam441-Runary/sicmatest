@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Reservation\Reservation;
 use App\Services\Account\AdminDashboardService;
 use App\Services\Room\AvailabilityService;
 use App\Services\Room\OverdueReservationService;
@@ -25,11 +24,6 @@ class DashboardController extends Controller
             'roomStatuses' => $dashboard->roomStatuses($now),
             'notStarted' => $overdue->notStarted(),
             'overrunning' => $overdue->overrunning(),
-            'latestReservations' => Reservation::query()
-                ->with(['room', 'classGroup'])
-                ->latest()
-                ->limit(5)
-                ->get(),
         ]);
     }
 }

@@ -118,62 +118,38 @@
             </div>
         </x-card>
 
-        <div class="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_360px]">
-            <x-card padding="p-4" class="admin-table-card flex flex-col gap-3">
-                <x-table-scroll max-height="max-h-[420px]">
-                    <x-slot:title>Status ruang saat ini • {{ $summary['all'] }} ruang ({{ $summary['available'] }} tersedia, {{ $summary['busy'] }} digunakan)</x-slot:title>
-                    <x-slot:headerActions>
-                        <x-table-density-toggle />
-                        <a href="{{ route('admin.usage-logs.index') }}" class="text-xs font-semibold text-primary hover:underline">Lihat log lengkap</a>
-                    </x-slot:headerActions>
-                    <table class="w-full text-left text-sm">
-                        <thead class="sticky top-0 z-10 border-b border-border bg-page text-xs font-semibold text-muted">
+        <x-card padding="p-4" class="admin-table-card flex flex-col gap-3">
+            <x-table-scroll max-height="max-h-[420px]">
+                <x-slot:title>Status ruang saat ini • {{ $summary['all'] }} ruang ({{ $summary['available'] }} tersedia, {{ $summary['busy'] }} digunakan)</x-slot:title>
+                <x-slot:headerActions>
+                    <x-table-density-toggle />
+                    <a href="{{ route('admin.usage-logs.index') }}" class="text-xs font-semibold text-primary hover:underline">Lihat log lengkap</a>
+                </x-slot:headerActions>
+                <table class="w-full text-left text-sm">
+                    <thead class="sticky top-0 z-10 border-b border-border bg-page text-xs font-semibold text-muted">
+                        <tr>
+                            <th scope="col" class="px-4 py-3 font-medium">Ruang</th>
+                            <th scope="col" class="px-4 py-3 font-medium">Kelas</th>
+                            <th scope="col" class="px-4 py-3 font-medium">Mata kuliah</th>
+                            <th scope="col" class="px-4 py-3 font-medium">Waktu</th>
+                            <th scope="col" class="px-4 py-3 font-medium">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-border">
+                        @forelse ($roomStatuses as $row)
                             <tr>
-                                <th scope="col" class="px-4 py-3 font-medium">Ruang</th>
-                                <th scope="col" class="px-4 py-3 font-medium">Kelas</th>
-                                <th scope="col" class="px-4 py-3 font-medium">Mata kuliah</th>
-                                <th scope="col" class="px-4 py-3 font-medium">Waktu</th>
-                                <th scope="col" class="px-4 py-3 font-medium">Status</th>
+                                <td class="px-4 py-3 font-semibold">{{ $row['room'] }}</td>
+                                <td class="px-4 py-3">{{ $row['class'] ?? '—' }}</td>
+                                <td @class(['px-4 py-3', 'text-muted' => $row['class'] === null])>{{ $row['title'] }}</td>
+                                <td class="px-4 py-3">{{ $row['until'] }}</td>
+                                <td class="px-4 py-3"><x-status-badge :variant="$row['variant']">{{ $row['badge'] }}</x-status-badge></td>
                             </tr>
-                        </thead>
-                        <tbody class="divide-y divide-border">
-                            @forelse ($roomStatuses as $row)
-                                <tr>
-                                    <td class="px-4 py-3 font-semibold">{{ $row['room'] }}</td>
-                                    <td class="px-4 py-3">{{ $row['class'] ?? '—' }}</td>
-                                    <td @class(['px-4 py-3', 'text-muted' => $row['class'] === null])>{{ $row['title'] }}</td>
-                                    <td class="px-4 py-3">{{ $row['until'] }}</td>
-                                    <td class="px-4 py-3"><x-status-badge :variant="$row['variant']">{{ $row['badge'] }}</x-status-badge></td>
-                                </tr>
-                            @empty
-                                <tr><td colspan="5" class="py-10 text-center text-muted">Belum ada ruang. Tambahkan ruang agar status bisa dihitung.</td></tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </x-table-scroll>
-            </x-card>
-
-            <x-card padding="p-4" class="flex flex-col gap-2 self-start">
-                <div class="flex items-center justify-between border-b border-border pb-2">
-                    <h2 class="text-base font-semibold">Reservasi terbaru</h2>
-                    <a href="{{ route('admin.reservations.index') }}" class="text-xs font-semibold text-primary hover:underline">Semua</a>
-                </div>
-                @forelse ($latestReservations as $reservation)
-                    <div class="flex flex-col gap-0.5 border-b border-border py-2 last:border-0">
-                        <div class="flex items-center justify-between">
-                            <span class="text-sm font-semibold">{{ $reservation->room->name }}</span>
-                            <span class="text-xs text-muted">{{ Wita::date($reservation->start_at) }}</span>
-                        </div>
-                        <span class="text-xs">{{ Wita::range($reservation->start_at, $reservation->end_at) }} • {{ $reservation->classGroup->name }}</span>
-                        <div class="flex items-center justify-between gap-2">
-                            <span class="truncate text-xs text-muted" title="{{ $reservation->purpose }}">{{ $reservation->purpose }}</span>
-                            <x-status-badge class="shrink-0" :variant="match ($reservation->status->value) { 'finished' => 'success', 'cancelled' => 'neutral', 'in_use' => 'danger', default => 'primary' }">{{ $reservation->status->label() }}</x-status-badge>
-                        </div>
-                    </div>
-                @empty
-                    <p class="py-6 text-center text-sm text-muted">Belum ada reservasi.</p>
-                @endforelse
-            </x-card>
-        </div>
+                        @empty
+                            <tr><td colspan="5" class="py-10 text-center text-muted">Belum ada ruang. Tambahkan ruang agar status bisa dihitung.</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </x-table-scroll>
+        </x-card>
     </div>
 @endsection

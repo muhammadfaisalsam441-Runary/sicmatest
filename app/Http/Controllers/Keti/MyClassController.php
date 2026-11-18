@@ -4,11 +4,13 @@ namespace App\Http\Controllers\Keti;
 
 use App\Enums\RescheduleMode;
 use App\Enums\ReservationStatus;
+use App\Enums\RoomBlockSource;
 use App\Enums\SessionMode;
 use App\Enums\TeachingRole;
 use App\Http\Controllers\Controller;
 use App\Models\Academic\SessionReschedule;
 use App\Models\Reservation\Reservation;
+use App\Models\Room\RoomBlock;
 use App\Models\Scheduling\ScheduleSession;
 use App\Services\Academic\ClassScheduleService;
 use App\Services\Academic\MeetingLocator;
@@ -52,14 +54,29 @@ class MyClassController extends Controller
                 && ! $reschedule->effectiveStart()->equalTo(CarbonImmutable::instance($reschedule->original_start_at)))
             ->values();
 
+        $officialVersion = $schedules->officialVersionOn($date);
+        $scheduleBlocks = $officialVersion !== null
+            ? RoomBlock::query()
+                ->where('source_type', RoomBlockSource::Schedule)
+                ->where('schedule_version_id', $officialVersion->id)
+                ->where('is_active', true)
+                ->whereBetween('start_at', [$date, $date->endOfDay()])
+                ->get()
+                ->keyBy(fn (RoomBlock $block): string => "{$block->source_id}|{$block->start_at->format('Y-m-d H:i:s')}")
+            : collect();
+
         return view('keti.my-class', [
             'classGroup' => $classGroup,
             'date' => $date,
             'days' => collect(config('sicma.scheduler.days'))->map(fn (int $day): CarbonImmutable => $weekStart->addDays($day - 1)),
-            'meetings' => $schedules->sessionsFor($classGroup, $date)->map(function (ScheduleSession $session) use ($date, $now, $locator): array {
+            'meetings' => $schedules->sessionsFor($classGroup, $date)->map(function (ScheduleSession $session) use ($date, $now, $locator, $scheduleBlocks): array {
                 $session->loadMissing(['lecturers', 'participants', 'room.building']);
                 $start = $date->addMinutes($session->start_minute);
-                $end = $date->addMinutes($session->end_minute);
+                $scheduledEnd = $date->addMinutes($session->end_minute);
+                $block = $session->blocksRoom()
+                    ? $scheduleBlocks->get("{$session->id}|{$start->format('Y-m-d H:i:s')}")
+                    : null;
+                $blockEnd = $block !== null ? CarbonImmutable::instance($block->end_at)->min($scheduledEnd) : $scheduledEnd;
                 $reschedule = $session->blocksRoom() ? $locator->activeRescheduleFor($session, $start) : null;
                 $reschedule?->loadMissing(['reservation.room', 'lecturers', 'originalRoom']);
 
@@ -67,13 +84,17 @@ class MyClassController extends Controller
                     && $reschedule->isOnline()
                     && $reschedule->effectiveStart()->equalTo($start);
 
+                $finishedEarly = $session->blocksRoom() && $reschedule === null && $blockEnd->lessThan($scheduledEnd);
+
                 $rotation = $session->blocksRoom() ? $locator->rotationLecturerIds($session, $start) : null;
                 $defaultLecturers = $session->blocksRoom() ? $locator->defaultLecturerIds($session, $start)->all() : [];
 
                 return [
                     'session' => $session,
                     'start' => $start,
-                    'end' => $end,
+                    'end' => $scheduledEnd,
+                    'actualEnd' => $blockEnd,
+                    'finishedEarly' => $finishedEarly,
                     'reschedule' => $reschedule,
                     'canRestoreOnline' => $sameSlotOnline && $start->greaterThan($now),
                     'team' => $session->lecturers->map(fn ($lecturer): array => [
@@ -87,7 +108,7 @@ class MyClassController extends Controller
                         $session->mode === SessionMode::Online => 'online',
                         $sameSlotOnline => 'switched_online',
                         $reschedule !== null => 'moved',
-                        $end->lessThanOrEqualTo($now) => 'finished',
+                        $finishedEarly || $scheduledEnd->lessThanOrEqualTo($now) => 'finished',
                         $start->lessThanOrEqualTo($now) => 'ongoing',
                         default => 'upcoming',
                     },

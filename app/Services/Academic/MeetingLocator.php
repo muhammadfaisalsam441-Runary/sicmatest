@@ -2,11 +2,13 @@
 
 namespace App\Services\Academic;
 
+use App\Enums\RoomBlockSource;
 use App\Enums\SessionMode;
 use App\Enums\SessionPhase;
 use App\Enums\TeachingRole;
 use App\Models\Academic\SessionReschedule;
 use App\Models\Lecturer\TeachingAssignment;
+use App\Models\Room\RoomBlock;
 use App\Models\Scheduling\ScheduleSession;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -38,8 +40,17 @@ class MeetingLocator
         }
 
         $start = $date->addMinutes($session->start_minute);
+        $scheduledEnd = $date->addMinutes($session->end_minute);
+        $block = RoomBlock::query()
+            ->where('source_type', RoomBlockSource::Schedule)
+            ->where('schedule_version_id', $version->id)
+            ->where('source_id', $session->id)
+            ->where('start_at', $start)
+            ->where('is_active', true)
+            ->first();
+        $end = $block !== null ? CarbonImmutable::instance($block->end_at)->min($scheduledEnd) : $scheduledEnd;
 
-        return new Meeting($session, $start, $date->addMinutes($session->end_minute), $this->activeRescheduleFor($session, $start));
+        return new Meeting($session, $start, $end, $this->activeRescheduleFor($session, $start));
     }
 
     /**
@@ -62,6 +73,14 @@ class MeetingLocator
             ->whereBetween('original_start_at', [$date, $date->endOfDay()])
             ->get();
 
+        $blocks = RoomBlock::query()
+            ->where('source_type', RoomBlockSource::Schedule)
+            ->where('schedule_version_id', $version->id)
+            ->where('is_active', true)
+            ->whereBetween('start_at', [$date, $date->endOfDay()])
+            ->get()
+            ->keyBy(fn (RoomBlock $block): string => "{$block->source_id}|{$block->start_at->format('Y-m-d H:i:s')}");
+
         return $version->sessions()
             ->where('day_of_week', $date->dayOfWeekIso)
             ->where('mode', '!=', SessionMode::Unscheduled)
@@ -71,13 +90,18 @@ class MeetingLocator
             ->orderBy('start_minute')
             ->get()
             ->filter(fn (ScheduleSession $session): bool => $this->schedules->phaseCovers($session, $date, $version->period))
-            ->map(function (ScheduleSession $session) use ($date, $reschedules): Meeting {
+            ->map(function (ScheduleSession $session) use ($date, $reschedules, $blocks): Meeting {
                 $start = $date->addMinutes($session->start_minute);
+                $scheduledEnd = $date->addMinutes($session->end_minute);
+                $block = $session->blocksRoom()
+                    ? $blocks->get("{$session->id}|{$start->format('Y-m-d H:i:s')}")
+                    : null;
+                $end = $block !== null ? CarbonImmutable::instance($block->end_at)->min($scheduledEnd) : $scheduledEnd;
 
                 return new Meeting(
                     $session,
                     $start,
-                    $date->addMinutes($session->end_minute),
+                    $end,
                     $reschedules->first(fn (SessionReschedule $reschedule): bool => $reschedule->matches($session, $start)),
                 );
             })

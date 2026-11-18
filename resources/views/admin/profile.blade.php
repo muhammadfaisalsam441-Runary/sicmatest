@@ -46,26 +46,17 @@
             <div class="flex flex-col gap-6">
                 <x-card class="flex flex-col gap-4">
                     <h2 class="text-lg font-semibold">Ubah kata sandi</h2>
-                    <form method="POST" action="{{ route('admin.profile.password') }}" class="flex flex-col gap-4" x-data="{ showCurrent: false, showNew: false, showConfirm: false }">
+                    <form method="POST" action="{{ route('admin.profile.password') }}" class="flex flex-col gap-4">
                         @csrf
                         @method('PUT')
                         <x-field label="Kata sandi saat ini" name="current_password">
-                            <div class="relative">
-                                <x-input ::type="showCurrent ? 'text' : 'password'" name="current_password" autocomplete="current-password" placeholder="Masukkan kata sandi saat ini" class="pr-16" required />
-                                <button type="button" @click="showCurrent = !showCurrent" :aria-label="showCurrent ? 'Sembunyikan kata sandi saat ini' : 'Tampilkan kata sandi saat ini'" class="absolute right-2.5 top-1/2 -translate-y-1/2 cursor-pointer rounded px-1.5 py-0.5 text-xs font-semibold text-muted hover:text-ink" x-text="showCurrent ? 'Tutup' : 'Lihat'"></button>
-                            </div>
+                            <x-input type="password" name="current_password" autocomplete="current-password" placeholder="Masukkan kata sandi saat ini" required />
                         </x-field>
                         <x-field label="Kata sandi baru" name="password" hint="Gunakan kombinasi huruf dan angka agar sulit ditebak.">
-                            <div class="relative">
-                                <x-input ::type="showNew ? 'text' : 'password'" name="password" autocomplete="new-password" placeholder="Minimal 8 karakter" class="pr-16" required />
-                                <button type="button" @click="showNew = !showNew" :aria-label="showNew ? 'Sembunyikan kata sandi baru' : 'Tampilkan kata sandi baru'" class="absolute right-2.5 top-1/2 -translate-y-1/2 cursor-pointer rounded px-1.5 py-0.5 text-xs font-semibold text-muted hover:text-ink" x-text="showNew ? 'Tutup' : 'Lihat'"></button>
-                            </div>
+                            <x-input type="password" name="password" autocomplete="new-password" placeholder="Minimal 8 karakter" required />
                         </x-field>
                         <x-field label="Ulangi kata sandi baru" name="password_confirmation">
-                            <div class="relative">
-                                <x-input ::type="showConfirm ? 'text' : 'password'" name="password_confirmation" autocomplete="new-password" placeholder="Ketik ulang kata sandi baru" class="pr-16" required />
-                                <button type="button" @click="showConfirm = !showConfirm" :aria-label="showConfirm ? 'Sembunyikan konfirmasi kata sandi' : 'Tampilkan konfirmasi kata sandi'" class="absolute right-2.5 top-1/2 -translate-y-1/2 cursor-pointer rounded px-1.5 py-0.5 text-xs font-semibold text-muted hover:text-ink" x-text="showConfirm ? 'Tutup' : 'Lihat'"></button>
-                            </div>
+                            <x-input type="password" name="password_confirmation" autocomplete="new-password" placeholder="Ketik ulang kata sandi baru" required />
                         </x-field>
                         <x-button type="submit">Perbarui kata sandi</x-button>
                     </form>

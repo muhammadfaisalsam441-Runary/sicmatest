@@ -65,7 +65,7 @@
                             'online' => ['Online', 'primary'],
                             'switched_online' => ['Online • Ruang dilepas', 'primary'],
                             'moved' => ['Dipindahkan', 'neutral'],
-                            'finished' => ['Selesai', 'neutral'],
+                            'finished' => ($meeting['finishedEarly'] ?? false) ? ['Selesai • Ruang dilepas', 'neutral'] : ['Selesai', 'neutral'],
                             'ongoing' => ['Sedang berlangsung', 'success'],
                             default => ['Akan datang', 'primary'],
                         };
@@ -125,6 +125,8 @@
                             <div class="rounded-control border border-primary/20 bg-primary-soft/35 px-3 py-2 text-xs font-medium text-ink">
                                 ke {{ Wita::dayName($reschedule->target_start_at) }}, {{ Wita::longDate($reschedule->target_start_at) }} • {{ Wita::clock($reschedule->target_start_at, false) }} • Kuliah Online
                             </div>
+                        @elseif ($meeting['status'] === 'finished' && ($meeting['finishedEarly'] ?? false))
+                            <div class="rounded-control border border-border bg-page px-3 py-2 text-xs text-ink">Diselesaikan pukul {{ Wita::clock($meeting['actualEnd'], false) }} • Ruang {{ $session->room?->name }} dilepas untuk kelas lain</div>
                         @endif
 
                         <div class="flex flex-col gap-1 text-xs text-muted">
@@ -153,6 +155,8 @@
                                     </form>
                                     <x-button size="sm" variant="soft" :href="route('keti.meetings.reschedule', ['sesi' => $session->id, 'tanggal' => $date->toDateString(), 'pengganti_online' => $reschedule->id])">Pindahkan</x-button>
                                 @endif
+                            @elseif ($meeting['status'] === 'ongoing' && $session->blocksRoom())
+                                <x-button size="sm" type="button" variant="primary" icon="check" x-data="" x-on:click="$dispatch('open-modal', 'finish-session-{{ $session->id }}')">Selesaikan kelas</x-button>
                             @elseif ($meeting['status'] === 'upcoming' && $session->blocksRoom())
                                 <x-button size="sm" type="button" variant="soft" x-data="" x-on:click="$dispatch('open-modal', 'online-{{ $session->id }}')">Jadikan Online</x-button>
                                 <x-button size="sm" variant="secondary" :href="route('keti.meetings.reschedule', ['sesi' => $session->id, 'tanggal' => $date->toDateString()])">Pindahkan</x-button>
@@ -162,6 +166,25 @@
                             @endif
                         </div>
                     </x-card>
+
+                    @if ($meeting['status'] === 'ongoing' && $session->blocksRoom())
+                        <x-modal name="finish-session-{{ $session->id }}" title="Selesaikan Perkuliahan Sekarang?">
+                            <form method="POST" action="{{ route('keti.meetings.finish') }}" class="flex flex-col gap-4">
+                                @csrf
+                                <input type="hidden" name="session_id" value="{{ $session->id }}">
+                                <input type="hidden" name="original_date" value="{{ $date->toDateString() }}">
+
+                                <p class="text-sm text-muted">
+                                    Perkuliahan <strong class="text-ink">{{ $session->title }}</strong> sedang berlangsung di <strong class="text-ink">{{ $session->room?->name }}</strong>. Jika diselesaikan sekarang, ruang <strong class="text-ink">{{ $session->room?->name }}</strong> akan langsung dilepas dan tersedia untuk kelas lain hingga pukul <strong class="text-ink">{{ Wita::minutes($session->end_minute) }} WITA</strong>.
+                                </p>
+
+                                <div class="flex flex-wrap justify-end gap-2 pt-2">
+                                    <x-button type="button" variant="secondary" autofocus x-on:click="$dispatch('close-modal', 'finish-session-{{ $session->id }}')">Batal</x-button>
+                                    <x-button type="submit" icon="check">Ya, Selesaikan &amp; Kosongkan Ruang</x-button>
+                                </div>
+                            </form>
+                        </x-modal>
+                    @endif
 
                     @if ($meeting['status'] === 'upcoming' && $session->blocksRoom())
                         <x-modal name="online-{{ $session->id }}" title="Jadikan Kuliah Online?">
@@ -230,7 +253,15 @@
                             </div>
                         </dl>
                         <p class="text-xs text-muted">Dipindah dari {{ Wita::dayName($reservation->sessionReschedule->original_start_at) }}, {{ Wita::longDate($reservation->sessionReschedule->original_start_at) }} • {{ Wita::clock($reservation->sessionReschedule->original_start_at, false) }}</p>
-                        <div class="mt-auto flex justify-end border-t border-border/60 pt-3">
+                        <div class="mt-auto flex flex-wrap items-center justify-end gap-2 border-t border-border/60 pt-3">
+                            @if ($reservation->status->value === 'in_use')
+                                @can('manage', $reservation)
+                                    <form method="POST" action="{{ route('keti.reservations.finish', $reservation) }}">
+                                        @csrf
+                                        <x-button size="sm" type="submit" icon="check">Selesai menggunakan</x-button>
+                                    </form>
+                                @endcan
+                            @endif
                             <x-button size="sm" variant="soft" :href="route('keti.reservations.show', $reservation)">Lihat pengganti</x-button>
                         </div>
                     </x-card>
@@ -297,13 +328,23 @@
                 <x-button variant="secondary" :href="route('keti.search')">Cari ruangan kosong</x-button>
             </div>
             @forelse ($reservations as $reservation)
-                <a href="{{ route('keti.reservations.show', $reservation) }}" class="flex flex-col gap-2 rounded-control border border-border px-4 py-3 transition hover:bg-primary-soft/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:flex-row sm:items-center sm:justify-between">
-                    <span class="font-medium">{{ $reservation->room->name }} • {{ $reservation->purpose }}</span>
-                    <span class="flex flex-wrap items-center gap-3 text-sm text-muted">
-                        {{ Wita::range($reservation->start_at, $reservation->end_at) }}
-                        <x-status-badge :variant="$reservation->status->badgeVariant()">{{ $reservation->status->label() }}</x-status-badge>
-                    </span>
-                </a>
+                <div class="flex flex-col gap-2 rounded-control border border-border px-4 py-3 transition hover:bg-primary-soft/40 sm:flex-row sm:items-center sm:justify-between">
+                    <a href="{{ route('keti.reservations.show', $reservation) }}" class="flex flex-1 flex-col gap-2 rounded-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:flex-row sm:items-center sm:justify-between">
+                        <span class="font-medium">{{ $reservation->room->name }} • {{ $reservation->purpose }}</span>
+                        <span class="flex flex-wrap items-center gap-3 text-sm text-muted">
+                            {{ Wita::range($reservation->start_at, $reservation->end_at) }}
+                            <x-status-badge :variant="$reservation->status->badgeVariant()" :pulse="$reservation->status->value === 'in_use'">{{ $reservation->status->label() }}</x-status-badge>
+                        </span>
+                    </a>
+                    @if ($reservation->status->value === 'in_use')
+                        @can('manage', $reservation)
+                            <form method="POST" action="{{ route('keti.reservations.finish', $reservation) }}" class="shrink-0">
+                                @csrf
+                                <x-button size="sm" type="submit" icon="check">Selesai menggunakan</x-button>
+                            </form>
+                        @endcan
+                    @endif
+                </div>
             @empty
                 <p class="text-sm text-muted">Belum ada pesanan kelas pada tanggal ini.</p>
             @endforelse

@@ -65,3 +65,29 @@ test('pengguna bisa keluar', function () {
 
     $this->assertGuest();
 });
+
+test('halaman masuk, daftar, dan profil admin merender tombol lihat dan sembunyikan kata sandi', function () {
+    $this->withoutVite();
+
+    foreach ([route('login'), route('register')] as $url) {
+        $this->get($url)
+            ->assertOk()
+            ->assertSee('data-lucide="eye"', false)
+            ->assertSee('data-lucide="eye-off"', false)
+            ->assertSee('aria-pressed="false"', false)
+            ->assertSee('aria-label="Tampilkan kata sandi"', false);
+    }
+
+    $admin = User::factory()->admin()->create();
+
+    $profileResponse = $this->actingAs($admin)
+        ->get(route('admin.profile'))
+        ->assertOk()
+        ->assertSee('data-lucide="eye"', false)
+        ->assertSee('data-lucide="eye-off"', false)
+        ->assertSee('aria-pressed="false"', false)
+        ->assertSee('aria-label="Tampilkan kata sandi"', false)
+        ->assertDontSee('showCurrent', false);
+
+    expect(substr_count($profileResponse->getContent(), 'aria-label="Tampilkan kata sandi"'))->toBe(3);
+});

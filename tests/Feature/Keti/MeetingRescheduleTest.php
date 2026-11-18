@@ -1,5 +1,7 @@
 <?php
 
+use App\Enums\RoomBlockSource;
+use App\Enums\RoomStatus;
 use App\Enums\SessionMode;
 use App\Enums\SessionPhase;
 use App\Enums\TeachingRole;
@@ -7,9 +9,14 @@ use App\Models\Academic\ClassGroup;
 use App\Models\Academic\SessionReschedule;
 use App\Models\Lecturer\Lecturer;
 use App\Models\Room\Room;
+use App\Models\Room\RoomBlock;
 use App\Models\Scheduling\ScheduleSession;
+use App\Models\User\AppNotification;
+use App\Models\User\AuditLog;
 use App\Models\User\User;
+use App\Services\Room\AvailabilityService;
 use App\Services\Room\ReservationService;
+use App\Services\Scheduling\ScheduleBlockBuilder;
 use App\Support\Wita;
 use Carbon\CarbonImmutable;
 
@@ -302,4 +309,175 @@ test('Keti kelas gabungan lain ikut melihat status Kuliah Online di My Class', f
         ->assertSee('Online • Ruang dilepas')
         ->assertSee('Statistika')
         ->assertSee('Kembalikan ke luring');
+});
+
+test('Keti dapat menyelesaikan kelas yang sedang berlangsung lebih awal dan melepas ruangan', function () {
+    $admin = User::factory()->admin()->create();
+    $otherKeti = User::factory()->approvedKeti(ClassGroup::factory()->create(['name' => 'Tekom A']))->create();
+    $this->travelTo(CarbonImmutable::parse('2026-11-09 08:30'));
+
+    $this->actingAs($this->keti)->get(myClassUrl('2026-11-09'))->assertOk()
+        ->assertSee('Sedang berlangsung')
+        ->assertSee('Selesaikan kelas')
+        ->assertSee('Selesaikan Perkuliahan Sekarang?')
+        ->assertSee('Ya, Selesaikan &amp; Kosongkan Ruang', false);
+
+    expect(app(AvailabilityService::class)->forRoom($this->ae107, now())->status)->toBe(RoomStatus::Scheduled);
+
+    $this->actingAs($this->keti)->post(route('keti.meetings.finish'), [
+        'session_id' => $this->session->id,
+        'original_date' => '2026-11-09',
+    ])->assertRedirect(myClassUrl('2026-11-09'))
+        ->assertSessionHas('toast.type', 'success');
+
+    $block = RoomBlock::query()
+        ->where('source_type', RoomBlockSource::Schedule)
+        ->where('source_id', $this->session->id)
+        ->whereDate('start_at', '2026-11-09')
+        ->sole();
+
+    expect($block->end_at->format('Y-m-d H:i:s'))->toBe('2026-11-09 08:30:00')
+        ->and(AuditLog::query()->where('action', 'meeting.finished_early')->exists())->toBeTrue()
+        ->and(AppNotification::query()->whereBelongsTo($admin)->where('type', 'meeting.finished_early')->exists())->toBeTrue();
+
+    $availability = app(AvailabilityService::class)->forRoom($this->ae107, now());
+    expect($availability->status)->toBe(RoomStatus::Available)
+        ->and($availability->badge())->toBe('Tersedia');
+
+    $booking = app(ReservationService::class)->create(
+        $otherKeti,
+        $this->ae107,
+        CarbonImmutable::parse('2026-11-09 08:30'),
+        CarbonImmutable::parse('2026-11-09 10:00'),
+        'Diskusi / Kerja Kelompok',
+        20,
+        (string) str()->uuid(),
+    );
+    expect($booking->exists)->toBeTrue();
+
+    $ownClassBooking = app(ReservationService::class)->create(
+        $this->keti,
+        $this->ae209,
+        CarbonImmutable::parse('2026-11-09 08:30'),
+        CarbonImmutable::parse('2026-11-09 10:00'),
+        'Diskusi / Kerja Kelompok',
+        20,
+        (string) str()->uuid(),
+    );
+    expect($ownClassBooking->exists)->toBeTrue();
+
+    $this->actingAs($this->keti)->get(myClassUrl('2026-11-09'))->assertOk()
+        ->assertSee('Selesai • Ruang dilepas')
+        ->assertSee('Diselesaikan pukul 08:30 • Ruang AE 107 dilepas untuk kelas lain')
+        ->assertDontSee('Selesaikan kelas');
+
+    $this->actingAs($this->keti)->postJson(route('keti.meetings.finish'), [
+        'session_id' => $this->session->id,
+        'original_date' => '2026-11-09',
+    ])->assertConflict()->assertJsonPath('code', 'MEETING_ALREADY_FINISHED');
+});
+
+test('ScheduleBlockBuilder rebuild mempertahankan waktu selesai kelas yang dipendekkan', function () {
+    $this->travelTo(CarbonImmutable::parse('2026-11-09 08:45'));
+
+    $this->actingAs($this->keti)->post(route('keti.meetings.finish'), [
+        'session_id' => $this->session->id,
+        'original_date' => '2026-11-09',
+    ])->assertRedirect(myClassUrl('2026-11-09'));
+
+    app(ScheduleBlockBuilder::class)->rebuild($this->session->version->fresh());
+
+    $shortenedBlock = RoomBlock::query()
+        ->where('source_type', RoomBlockSource::Schedule)
+        ->where('source_id', $this->session->id)
+        ->whereDate('start_at', '2026-11-09')
+        ->sole();
+
+    $nextWeekBlock = RoomBlock::query()
+        ->where('source_type', RoomBlockSource::Schedule)
+        ->where('source_id', $this->session->id)
+        ->whereDate('start_at', '2026-11-16')
+        ->sole();
+
+    expect($shortenedBlock->end_at->format('Y-m-d H:i:s'))->toBe('2026-11-09 08:45:00')
+        ->and($nextWeekBlock->end_at->format('Y-m-d H:i:s'))->toBe('2026-11-16 10:00:00');
+});
+
+test('menyelesaikan kelas yang belum dimulai atau milik kelas lain ditolak', function () {
+    $this->travelTo(CarbonImmutable::parse('2026-11-09 07:00'));
+
+    $this->actingAs($this->keti)
+        ->from(myClassUrl('2026-11-09'))
+        ->post(route('keti.meetings.finish'), [
+            'session_id' => $this->session->id,
+            'original_date' => '2026-11-09',
+        ])
+        ->assertRedirect(myClassUrl('2026-11-09'))
+        ->assertSessionHas('toast.type', 'error');
+
+    $this->actingAs($this->keti)
+        ->postJson(route('keti.meetings.finish'), [
+            'session_id' => $this->session->id,
+            'original_date' => '2026-11-09',
+        ])
+        ->assertConflict()
+        ->assertJsonPath('code', 'MEETING_NOT_STARTED');
+
+    $this->travelTo(CarbonImmutable::parse('2026-11-09 08:30'));
+    $otherKeti = User::factory()->approvedKeti(ClassGroup::factory()->create(['name' => 'Tekom A']))->create();
+
+    $this->actingAs($otherKeti)
+        ->from(myClassUrl('2026-11-09'))
+        ->post(route('keti.meetings.finish'), [
+            'session_id' => $this->session->id,
+            'original_date' => '2026-11-09',
+        ])
+        ->assertRedirect(myClassUrl('2026-11-09'))
+        ->assertSessionHas('toast.type', 'error');
+
+    $this->actingAs($otherKeti)
+        ->postJson(route('keti.meetings.finish'), [
+            'session_id' => $this->session->id,
+            'original_date' => '2026-11-09',
+        ])
+        ->assertConflict()
+        ->assertJsonPath('code', 'NOT_CLASS_REPRESENTATIVE');
+
+    $block = RoomBlock::query()
+        ->where('source_type', RoomBlockSource::Schedule)
+        ->where('source_id', $this->session->id)
+        ->whereDate('start_at', '2026-11-09')
+        ->sole();
+
+    expect($block->end_at->format('Y-m-d H:i:s'))->toBe('2026-11-09 10:00:00');
+});
+
+test('My Class menampilkan tombol Selesai menggunakan pada Kuliah Pengganti dan Pesanan kelas yang sedang digunakan', function () {
+    $this->actingAs($this->keti)->post(route('keti.meetings.reschedule.store'), movePayload());
+    $replacement = SessionReschedule::query()->sole()->reservation;
+
+    $reservation = app(ReservationService::class)->create(
+        $this->keti,
+        $this->ae107,
+        CarbonImmutable::parse('2026-11-10 13:00'),
+        CarbonImmutable::parse('2026-11-10 14:30'),
+        'Diskusi / Kerja Kelompok',
+        15,
+        (string) str()->uuid(),
+    );
+
+    $this->travelTo(CarbonImmutable::parse('2026-11-10 10:05'));
+    app(ReservationService::class)->start($replacement, $this->keti);
+
+    $this->travelTo(CarbonImmutable::parse('2026-11-10 13:05'));
+    app(ReservationService::class)->start($reservation, $this->keti);
+
+    $content = $this->actingAs($this->keti)->get(myClassUrl('2026-11-10'))
+        ->assertOk()
+        ->assertSee(route('keti.reservations.finish', $replacement))
+        ->assertSee(route('keti.reservations.finish', $reservation))
+        ->assertSee('Selesai menggunakan')
+        ->getContent();
+
+    expect($content)->not->toMatch('/<a\b[^>]*>(?:(?!<\/a>).)*<form\b/s');
 });

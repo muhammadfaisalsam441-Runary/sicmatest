@@ -38,6 +38,27 @@ class ScheduleBlockBuilder
         $rows = $this->occurrences($version);
 
         DB::transaction(function () use ($version, $rows): void {
+            $existingBlocks = RoomBlock::query()
+                ->whereBelongsTo($version, 'scheduleVersion')
+                ->where('source_type', RoomBlockSource::Schedule)
+                ->where('is_active', true)
+                ->get(['source_id', 'room_id', 'start_at', 'end_at'])
+                ->keyBy(fn (RoomBlock $block): string => "{$block->source_id}|{$block->start_at->format('Y-m-d H:i:s')}");
+
+            $rows = array_map(function (array $row) use ($existingBlocks): array {
+                $existing = $existingBlocks->get("{$row['source_id']}|{$row['start_at']}");
+
+                if ($existing !== null && $existing->room_id === $row['room_id']) {
+                    $existingEnd = $existing->end_at->format('Y-m-d H:i:s');
+
+                    if ($existingEnd < $row['end_at']) {
+                        $row['end_at'] = $existingEnd;
+                    }
+                }
+
+                return $row;
+            }, $rows);
+
             RoomBlock::query()
                 ->whereBelongsTo($version, 'scheduleVersion')
                 ->where('source_type', RoomBlockSource::Schedule)

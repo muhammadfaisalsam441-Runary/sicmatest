@@ -300,4 +300,47 @@ class MeetingRescheduleController extends Controller
         return redirect()->route('keti.my-class', ['tanggal' => $originalDate])
             ->with('toast', ['type' => 'success', 'title' => 'Pertemuan dikembalikan ke ruang luring', 'message' => 'Jadwal ruang asli kembali aktif.']);
     }
+
+    /**
+     * Selesaikan perkuliahan terjadwal yang sedang berlangsung lebih cepat agar ruangan segera dilepas.
+     */
+    public function finishEarly(Request $request): RedirectResponse|JsonResponse
+    {
+        $data = $request->validate([
+            'session_id' => ['required', 'integer', 'exists:schedule_sessions,id'],
+            'original_date' => ['required', 'date_format:Y-m-d'],
+        ]);
+
+        try {
+            $this->reschedules->finishEarly(
+                $request->user(),
+                ScheduleSession::query()->with(['participants', 'room'])->findOrFail($data['session_id']),
+                CarbonImmutable::parse($data['original_date']),
+            );
+        } catch (DomainException $exception) {
+            if ($request->expectsJson()) {
+                return response()->json($exception->toArray(), 409);
+            }
+
+            return back()->with('toast', [
+                'type' => 'error',
+                'title' => 'Belum bisa menyelesaikan kelas',
+                'message' => $exception->getMessage(),
+            ]);
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'ok' => true,
+                'redirect_url' => route('keti.my-class', ['tanggal' => $data['original_date']]),
+            ]);
+        }
+
+        return redirect()->route('keti.my-class', ['tanggal' => $data['original_date']])
+            ->with('toast', [
+                'type' => 'success',
+                'title' => 'Perkuliahan diselesaikan',
+                'message' => 'Ruangan sudah dikosongkan dan bisa dipakai kelas lain.',
+            ]);
+    }
 }

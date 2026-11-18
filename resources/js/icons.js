@@ -36,6 +36,7 @@ export {
     Download,
     Edit3,
     Eye,
+    EyeOff,
     FileSpreadsheet,
     Filter,
     Funnel,

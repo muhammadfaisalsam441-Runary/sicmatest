@@ -324,6 +324,78 @@ class MeetingRescheduleService
     }
 
     /**
+     * Selesaikan perkuliahan terjadwal yang sedang berlangsung lebih awal agar ruang segera tersedia.
+     *
+     * @throws DomainException NOT_CLASS_REPRESENTATIVE | MEETING_NOT_FOUND | MEETING_ALREADY_MOVED | MEETING_NOT_STARTED | MEETING_ALREADY_FINISHED
+     */
+    public function finishEarly(User $keti, ScheduleSession $session, CarbonInterface $originalDate): RoomBlock
+    {
+        $session->loadMissing(['participants', 'room']);
+        $classGroup = $this->assertParticipant($keti, $session);
+
+        $meeting = $this->meetings->find($session, $originalDate)
+            ?? throw new DomainException('MEETING_NOT_FOUND', 'Pertemuan ini tidak ada di jadwal resmi pada tanggal tersebut.');
+
+        if ($meeting->isMoved()) {
+            throw new DomainException('MEETING_ALREADY_MOVED', 'Pertemuan ini sudah dipindahkan.');
+        }
+
+        $now = $this->normalize(CarbonImmutable::now());
+
+        if ($now->lessThan($meeting->start)) {
+            throw new DomainException('MEETING_NOT_STARTED', 'Pertemuan belum dimulai sehingga belum bisa diselesaikan.');
+        }
+
+        if ($now->greaterThanOrEqualTo($meeting->end)) {
+            throw new DomainException('MEETING_ALREADY_FINISHED', 'Pertemuan ini sudah selesai.');
+        }
+
+        return DB::transaction(function () use ($keti, $session, $classGroup, $meeting, $now): RoomBlock {
+            $room = Room::query()->whereKey($session->room_id)->lockForUpdate()->firstOrFail();
+
+            $block = RoomBlock::query()
+                ->where('source_type', RoomBlockSource::Schedule)
+                ->where('schedule_version_id', $session->schedule_version_id)
+                ->where('source_id', $session->id)
+                ->where('room_id', $session->room_id)
+                ->where('start_at', $meeting->start)
+                ->lockForUpdate()
+                ->first();
+
+            if ($block === null || ! $block->is_active || $now->greaterThanOrEqualTo($block->end_at)) {
+                throw new DomainException('MEETING_ALREADY_FINISHED', 'Pertemuan ini sudah selesai.');
+            }
+
+            $before = ['end_at' => $block->end_at->format('Y-m-d H:i:s')];
+            $block->update(['end_at' => $now->max($meeting->start)]);
+            AvailabilityCache::bust();
+
+            $freshBlock = $block->fresh();
+
+            $this->audit->log(
+                'meeting.finished_early',
+                $session,
+                $before,
+                [
+                    'end_at' => $freshBlock->end_at->format('Y-m-d H:i:s'),
+                    'room_id' => $session->room_id,
+                    'class_group_id' => $classGroup->id,
+                ],
+            );
+
+            $this->notifications->notify(
+                $this->notifications->admins(),
+                'meeting.finished_early',
+                'Perkuliahan selesai lebih cepat: '.$room->name,
+                "{$keti->name} ({$classGroup->name}) menyelesaikan perkuliahan {$session->title} di {$room->name} pukul ".Wita::clock($now).'. Ruangan kini tersedia.',
+                ['session_id' => $session->id],
+            );
+
+            return $freshBlock;
+        });
+    }
+
+    /**
      * Batalkan pemindahan: reservasi pengganti dibatalkan dan pertemuan kembali ke jam & ruang aslinya.
      *
      * @throws DomainException DATA_INCOMPLETE | INVALID_STATUS_TRANSITION | RESTORE_NOT_POSSIBLE

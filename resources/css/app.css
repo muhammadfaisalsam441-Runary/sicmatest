@@ -42,6 +42,13 @@
         overflow-wrap: break-word;
     }
 
+    button,
+    a,
+    summary,
+    [role="button"] {
+        touch-action: manipulation;
+    }
+
     img,
     video {
         max-inline-size: 100%;
@@ -359,6 +366,10 @@ body[data-portal="public"] > header {
    Ambient & Architectural Backdrops (Public, Auth, Admin/Keti Portals)
    ========================================================================== */
 
+[data-ambient-backdrop] {
+    contain: layout style paint;
+}
+
 .sicma-arch-grid {
     --grid-size: 40px;
     --grid-line: color-mix(in oklab, var(--color-primary) 10%, transparent);
@@ -375,37 +386,36 @@ body[data-portal="public"] > header {
     position: absolute;
     border-radius: 9999px;
     pointer-events: none;
-    will-change: transform, opacity;
 }
 
 .sicma-aurora-orb--primary {
-    top: -12rem;
+    top: -15rem;
     left: 50%;
-    width: 64rem;
-    height: 38rem;
+    width: 72rem;
+    height: 44rem;
     transform: translate3d(-50%, 0, 0);
     background: radial-gradient(
         ellipse at center,
-        color-mix(in oklab, var(--color-primary) 22%, transparent) 0%,
-        color-mix(in oklab, #0ea5e9 16%, transparent) 45%,
-        transparent 72%
+        color-mix(in oklab, var(--color-primary) 20%, transparent) 0%,
+        color-mix(in oklab, #0ea5e9 14%, transparent) 32%,
+        color-mix(in oklab, #0ea5e9 5%, transparent) 58%,
+        transparent 76%
     );
-    filter: blur(56px);
     opacity: 0.95;
 }
 
 .sicma-aurora-orb--secondary {
-    top: 6rem;
-    right: -8rem;
-    width: 38rem;
-    height: 30rem;
+    top: 3rem;
+    right: -11rem;
+    width: 44rem;
+    height: 36rem;
     background: radial-gradient(
         circle at center,
-        color-mix(in oklab, #0284c7 18%, transparent) 0%,
-        color-mix(in oklab, #6366f1 14%, transparent) 45%,
-        transparent 75%
+        color-mix(in oklab, #0284c7 17%, transparent) 0%,
+        color-mix(in oklab, #6366f1 11%, transparent) 34%,
+        color-mix(in oklab, #6366f1 4%, transparent) 60%,
+        transparent 76%
     );
-    filter: blur(64px);
     opacity: 0.85;
 }
 
@@ -424,7 +434,6 @@ body[data-portal="public"] > header {
     border: 1px solid color-mix(in oklab, var(--color-primary) 28%, transparent);
     box-shadow: 0 0 18px color-mix(in oklab, #0ea5e9 20%, transparent);
     opacity: 0.35;
-    will-change: transform, opacity;
 }
 
 .sicma-grid-beam {
@@ -441,7 +450,6 @@ body[data-portal="public"] > header {
         transparent
     );
     opacity: 0;
-    will-change: transform, opacity;
 }
 
 .sicma-grid-beam--vertical {
@@ -458,7 +466,6 @@ body[data-portal="public"] > header {
         transparent
     );
     opacity: 0;
-    will-change: transform, opacity;
 }
 
 /* Auth Dark Navy Panel Backdrop */
@@ -475,33 +482,33 @@ body[data-portal="public"] > header {
 .sicma-auth-aurora {
     position: absolute;
     border-radius: 9999px;
-    filter: blur(64px);
-    will-change: transform, opacity;
 }
 
 .sicma-auth-aurora--top {
-    top: -8rem;
-    left: -6rem;
-    width: 28rem;
-    height: 28rem;
+    top: -11rem;
+    left: -9rem;
+    width: 34rem;
+    height: 34rem;
     background: radial-gradient(
         circle at center,
-        color-mix(in oklab, #38bdf8 26%, transparent) 0%,
-        color-mix(in oklab, #2563eb 14%, transparent) 50%,
-        transparent 75%
+        color-mix(in oklab, #38bdf8 24%, transparent) 0%,
+        color-mix(in oklab, #2563eb 13%, transparent) 34%,
+        color-mix(in oklab, #2563eb 4%, transparent) 60%,
+        transparent 76%
     );
     opacity: 0.85;
 }
 
 .sicma-auth-aurora--bottom {
-    bottom: -10rem;
-    right: -8rem;
-    width: 30rem;
-    height: 30rem;
+    bottom: -13rem;
+    right: -11rem;
+    width: 36rem;
+    height: 36rem;
     background: radial-gradient(
         circle at center,
-        color-mix(in oklab, #60a5fa 22%, transparent) 0%,
-        color-mix(in oklab, #1d4ed8 12%, transparent) 55%,
+        color-mix(in oklab, #60a5fa 20%, transparent) 0%,
+        color-mix(in oklab, #1d4ed8 11%, transparent) 35%,
+        color-mix(in oklab, #1d4ed8 4%, transparent) 62%,
         transparent 78%
     );
     opacity: 0.75;
@@ -517,7 +524,6 @@ body[data-portal="public"] > header {
     background: color-mix(in oklab, white 10%, transparent);
     border: 1px solid color-mix(in oklab, white 18%, transparent);
     opacity: 0.3;
-    will-change: transform, opacity;
 }
 
 /* Admin & Keti Portal Subtle Static Ambient Canvas */
@@ -736,6 +742,8 @@ body[data-portal="public"] > header {
     --spot-x: -999px;
     --spot-y: -999px;
     isolation: isolate;
+    content-visibility: auto;
+    contain-intrinsic-size: auto 240px;
 }
 
 .sicma-room-card[data-status-tone="success"] {
@@ -865,6 +873,13 @@ body[data-portal="public"] > header {
 
     .sicma-card-accent {
         transform: scaleX(1);
+    }
+}
+
+@media (hover: none) and (pointer: coarse) {
+    .sicma-card-spotlight,
+    .sicma-room-card::before {
+        display: none;
     }
 }
 

@@ -17,6 +17,13 @@ server {
 
     client_max_body_size 25M;
 
+    gzip on;
+    gzip_vary on;
+    gzip_proxied any;
+    gzip_comp_level 5;
+    gzip_min_length 256;
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml image/svg+xml;
+
     # WebSocket Laravel Reverb (port internal 8080)
     location ~ ^/apps? {
         proxy_pass http://127.0.0.1:8080;

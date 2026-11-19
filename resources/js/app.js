@@ -2,14 +2,6 @@ import Alpine from 'alpinejs';
 import { createIcons } from 'lucide';
 import * as icons from './icons.js';
 import { installPortalNavigation, registerStatusPolling } from './navigation.js';
-import { installRealtimePush } from './realtime.js';
-import { applyTableDensity, filterDrawer, readTableDensity, tableDensityToggle, tableScrollBox } from './alpine/table-ui.js';
-import { teachingManager } from './alpine/teaching-manager.js';
-import { lecturerManager } from './alpine/lecturer-manager.js';
-import { roomManager } from './alpine/room-manager.js';
-import { classManager } from './alpine/class-manager.js';
-import { cohortArchiveModal, cohortGenerateModal } from './alpine/cohort-modals.js';
-import { bookingModal } from './alpine/booking-modal.js';
 import { sicmaToast } from './alpine/toast.js';
 
 window.Alpine = Alpine;
@@ -49,10 +41,25 @@ window.sicmaCloseDialog = async function (dialog) {
 
 const navigation = installPortalNavigation(Alpine, (root = document) => window.renderIcons(root));
 registerStatusPolling(Alpine, navigation);
-installRealtimePush(navigation);
 
-applyTableDensity(readTableDensity());
-document.addEventListener('sicma:navigated', () => applyTableDensity(readTableDensity()));
+function scheduleRealtimePush(nav) {
+    if (document.body?.dataset?.portal === 'auth') return;
+    if (!document.querySelector('meta[name="reverb-config"]')) return;
+
+    const start = () => {
+        void import('./realtime.js')
+            .then(({ installRealtimePush }) => installRealtimePush(nav))
+            .catch(() => {});
+    };
+
+    if (typeof window.requestIdleCallback === 'function') {
+        window.requestIdleCallback(start, { timeout: 2500 });
+    } else {
+        window.setTimeout(start, 400);
+    }
+}
+
+scheduleRealtimePush(navigation);
 
 // Shortcut `/` untuk memfokuskan kolom pencarian tabel aktif.
 document.addEventListener('keydown', (event) => {
@@ -70,49 +77,22 @@ document.addEventListener('keydown', (event) => {
     }
 });
 
-// Shift+Click rentang checkbox pada baris tabel yang tampil.
-const lastCheckedByTable = new WeakMap();
-document.addEventListener('click', (event) => {
-    const target = event.target;
-    if (!(target instanceof HTMLInputElement) || target.type !== 'checkbox') return;
-    const tbody = target.closest('tbody');
-    const table = target.closest('table');
-    if (!tbody || !table) return;
-    const previous = lastCheckedByTable.get(table);
-    if (event.shiftKey && previous && previous !== target && table.contains(previous)) {
-        const checkboxes = Array.from(tbody.querySelectorAll('tr input[type="checkbox"]')).filter((cb) => {
-            const row = cb.closest('tr');
-            return row && row.offsetParent !== null && !cb.disabled;
-        });
-        const start = checkboxes.indexOf(previous);
-        const end = checkboxes.indexOf(target);
-        if (start !== -1 && end !== -1) {
-            const [from, to] = start < end ? [start, end] : [end, start];
-            for (let i = from; i <= to; i++) {
-                const cb = checkboxes[i];
-                if (cb !== target && cb.checked !== target.checked) {
-                    cb.checked = target.checked;
-                    cb.dispatchEvent(new Event('change', { bubbles: true }));
-                }
-            }
-        }
-    }
-    lastCheckedByTable.set(table, target);
-});
-
-Alpine.data('tableDensityToggle', tableDensityToggle);
-Alpine.data('tableScrollBox', tableScrollBox);
-Alpine.data('filterDrawer', filterDrawer);
-Alpine.data('teachingManager', teachingManager);
-Alpine.data('lecturerManager', lecturerManager);
-Alpine.data('roomManager', roomManager);
-Alpine.data('classManager', classManager);
-Alpine.data('cohortArchiveModal', cohortArchiveModal);
-Alpine.data('cohortGenerateModal', cohortGenerateModal);
-Alpine.data('bookingModal', bookingModal);
 Alpine.data('sicmaToast', sicmaToast);
 
-Alpine.start();
+async function bootPortal() {
+    const portal = document.body?.dataset?.portal;
+    if (portal === 'admin') {
+        const { registerAdminPortal } = await import('./portals/admin.js');
+        registerAdminPortal(Alpine);
+    } else if (portal === 'keti') {
+        const { registerKetiPortal } = await import('./portals/keti.js');
+        registerKetiPortal(Alpine);
+    }
+
+    Alpine.start();
+}
+
+void bootPortal();
 
 function shouldAutoPlaySplash() {
     if (new URLSearchParams(window.location.search).get('splash') === '1') return true;
@@ -206,61 +186,63 @@ document.addEventListener('click', (event) => {
     syncBgMotionButtons();
 });
 
-// Mouse-tracking spotlight pada grid kartu ruangan (berjalan mulus lintas navigasi SPA).
-let spotFrame = 0;
-let spotEvent = null;
-let activeSpotGrid = null;
+// Mouse-tracking spotlight pada grid kartu ruangan (hanya perangkat pointer presisi/desktop).
+if (window.matchMedia?.('(hover: hover) and (pointer: fine)').matches) {
+    let spotFrame = 0;
+    let spotEvent = null;
+    let activeSpotGrid = null;
 
-function clearGridSpotlight(grid) {
-    if (!grid) return;
-    for (const card of grid.querySelectorAll('[data-room-card]')) {
-        card.removeAttribute('data-spot-active');
-        card.style.setProperty('--spot-x', '-999px');
-        card.style.setProperty('--spot-y', '-999px');
+    function clearGridSpotlight(grid) {
+        if (!grid) return;
+        for (const card of grid.querySelectorAll('[data-room-card]')) {
+            card.removeAttribute('data-spot-active');
+            card.style.setProperty('--spot-x', '-999px');
+            card.style.setProperty('--spot-y', '-999px');
+        }
     }
-}
 
-document.addEventListener('pointermove', (event) => {
-    if (event.pointerType === 'touch') return;
-    const card = event.target?.closest?.('[data-room-card]');
-    if (!card) {
-        if (activeSpotGrid) {
+    document.addEventListener('pointermove', (event) => {
+        if (event.pointerType === 'touch') return;
+        const card = event.target?.closest?.('[data-room-card]');
+        if (!card) {
+            if (activeSpotGrid) {
+                clearGridSpotlight(activeSpotGrid);
+                activeSpotGrid = null;
+            }
+            return;
+        }
+
+        const grid = card.closest('.grid') || card.parentElement;
+        if (activeSpotGrid && activeSpotGrid !== grid) {
+            clearGridSpotlight(activeSpotGrid);
+        }
+        activeSpotGrid = grid;
+        spotEvent = { x: event.clientX, y: event.clientY, grid, card };
+
+        if (spotFrame) return;
+        spotFrame = window.requestAnimationFrame(() => {
+            spotFrame = 0;
+            const current = spotEvent;
+            if (!current) return;
+            const cards = current.grid ? current.grid.querySelectorAll('[data-room-card]') : [current.card];
+            for (const item of cards) {
+                const rect = item.getBoundingClientRect();
+                item.style.setProperty('--spot-x', `${current.x - rect.left}px`);
+                item.style.setProperty('--spot-y', `${current.y - rect.top}px`);
+                item.setAttribute('data-spot-active', 'true');
+            }
+        });
+    }, { passive: true });
+
+    document.addEventListener('pointerleave', (event) => {
+        if (event.target === document || event.target === document.documentElement) {
             clearGridSpotlight(activeSpotGrid);
             activeSpotGrid = null;
         }
-        return;
-    }
-
-    const grid = card.closest('.grid') || card.parentElement;
-    if (activeSpotGrid && activeSpotGrid !== grid) {
-        clearGridSpotlight(activeSpotGrid);
-    }
-    activeSpotGrid = grid;
-    spotEvent = { x: event.clientX, y: event.clientY, grid, card };
-
-    if (spotFrame) return;
-    spotFrame = window.requestAnimationFrame(() => {
-        spotFrame = 0;
-        const current = spotEvent;
-        if (!current) return;
-        const cards = current.grid ? current.grid.querySelectorAll('[data-room-card]') : [current.card];
-        for (const item of cards) {
-            const rect = item.getBoundingClientRect();
-            item.style.setProperty('--spot-x', `${current.x - rect.left}px`);
-            item.style.setProperty('--spot-y', `${current.y - rect.top}px`);
-            item.setAttribute('data-spot-active', 'true');
-        }
     });
-}, { passive: true });
 
-document.addEventListener('pointerleave', (event) => {
-    if (event.target === document || event.target === document.documentElement) {
+    document.addEventListener('sicma:navigated', () => {
         clearGridSpotlight(activeSpotGrid);
         activeSpotGrid = null;
-    }
-});
-
-document.addEventListener('sicma:navigated', () => {
-    clearGridSpotlight(activeSpotGrid);
-    activeSpotGrid = null;
-});
+    });
+}

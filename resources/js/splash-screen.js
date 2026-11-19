@@ -182,6 +182,15 @@ export async function playSicmaSplash(options = {}) {
         return true;
     }
 
+    if (posterUrl) {
+        const posterUnderlay = document.createElement('img');
+        posterUnderlay.src = posterUrl;
+        posterUnderlay.alt = '';
+        posterUnderlay.decoding = 'async';
+        posterUnderlay.className = 'pointer-events-none absolute inset-0 block h-full w-full object-contain';
+        ui.mediaEl.appendChild(posterUnderlay);
+    }
+
     const video = document.createElement('video');
     video.setAttribute('data-splash-video', '');
     video.autoplay = true;
@@ -190,7 +199,7 @@ export async function playSicmaSplash(options = {}) {
     video.playsInline = true;
     video.preload = 'auto';
     video.poster = posterUrl;
-    video.className = 'block h-full w-full object-contain transition-opacity duration-200';
+    video.className = 'relative z-10 block h-full w-full object-contain transition-opacity duration-200';
     video.style.opacity = '0';
 
     const srcWebm = document.createElement('source');
@@ -281,6 +290,7 @@ export async function playSicmaSplash(options = {}) {
     };
 
     const onPointerMove = (e) => {
+        if (e.pointerType === 'touch') return;
         const nx = (e.clientX / Math.max(1, window.innerWidth)) * 2 - 1;
         const ny = (e.clientY / Math.max(1, window.innerHeight)) * 2 - 1;
         pointerTargetX = Math.max(-1, Math.min(1, nx));
@@ -330,13 +340,20 @@ export async function playSicmaSplash(options = {}) {
         const dtSec = lastFrameMs > 0 ? Math.min(0.05, (now - lastFrameMs) * 0.001) : 0.016;
         lastFrameMs = now;
 
-        const damp = 1 - Math.exp(-dtSec * 8.5);
-        pointerCurrentX += (pointerTargetX - pointerCurrentX) * damp;
-        pointerCurrentY += (pointerTargetY - pointerCurrentY) * damp;
+        if (
+            pointerTargetX !== 0
+            || pointerTargetY !== 0
+            || Math.abs(pointerCurrentX) > 0.0005
+            || Math.abs(pointerCurrentY) > 0.0005
+        ) {
+            const damp = 1 - Math.exp(-dtSec * 8.5);
+            pointerCurrentX += (pointerTargetX - pointerCurrentX) * damp;
+            pointerCurrentY += (pointerTargetY - pointerCurrentY) * damp;
 
-        const rotY = pointerCurrentX * 5.0;
-        const rotX = -pointerCurrentY * 4.5;
-        ui.stageEl.style.transform = `perspective(1100px) rotateX(${rotX.toFixed(3)}deg) rotateY(${rotY.toFixed(3)}deg)`;
+            const rotY = pointerCurrentX * 5.0;
+            const rotX = -pointerCurrentY * 4.5;
+            ui.stageEl.style.transform = `perspective(1100px) rotateX(${rotX.toFixed(3)}deg) rotateY(${rotY.toFixed(3)}deg)`;
+        }
 
         if (!usingFallbackPoster && Number.isFinite(video.duration) && video.duration > 0) {
             const normT = Math.max(0, Math.min(1, video.currentTime / video.duration));

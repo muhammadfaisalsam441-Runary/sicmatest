@@ -20,7 +20,7 @@ RUN apt-get update \
     && printf '\n\n\n\n\n\n' | pecl install redis \
     && docker-php-ext-enable redis \
     && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false $PHPIZE_DEPS \
-    && a2enmod rewrite \
+    && a2enmod rewrite headers expires deflate \
     && rm -rf /var/lib/apt/lists/* /tmp/pear
 
 COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer

@@ -12,16 +12,24 @@
 @section('content')
     @php
         $summary = [
-            'pending' => [$counts['pending'].' pengajuan menunggu pemeriksaan', 'Email telah diverifikasi. Hak pemesanan belum diberikan.'],
+            'pending' => [$counts['pending'].' pengajuan menunggu pemeriksaan', 'Periksa status verifikasi email dan kecocokan kelas sebelum menyetujui.'],
             'approved' => [$counts['approved'].' akun Keti aktif', 'Akses Keti diberikan untuk kelas yang sudah diverifikasi.'],
             'rejected' => [$counts['rejected'].' pengajuan ditolak atau perlu diperbaiki', 'Alasan penolakan dapat dibaca dan pengajuan bisa diperbaiki.'],
         ][$tab];
+
+        $unverifiedPendingCount = $tab === 'pending'
+            ? $applications->filter(fn ($app): bool => ! $app->user->hasVerifiedEmail())->count()
+            : 0;
+
+        $approvablePageIds = $tab === 'pending'
+            ? $applications->filter(fn ($app): bool => $app->user->hasVerifiedEmail())->pluck('id')->values()->all()
+            : [];
     @endphp
 
     <div class="flex flex-col gap-4 admin-page-stack"
          x-data="{
              selectedIds: [],
-             pageIds: @js($tab === 'pending' ? $applications->pluck('id')->all() : []),
+             pageIds: @js($approvablePageIds),
              activeApp: null,
              declineMode: 'reject',
              deactivateConfirmed: false,
@@ -103,6 +111,12 @@
                 @endif
             </form>
 
+            @if ($unverifiedPendingCount > 0)
+                <x-info-box variant="warning" title="{{ $unverifiedPendingCount }} pengajuan belum memverifikasi email">
+                    <p>Pendaftar wajib memasukkan kode verifikasi 6 digit dari emailnya terlebih dahulu sebelum dapat disetujui.</p>
+                </x-info-box>
+            @endif
+
             @if ($applications->isEmpty())
                 <x-empty-state :title="$keyword !== '' || $classGroupFilter !== null ? 'Tidak ada pengajuan yang cocok' : ($tab === 'pending' ? 'Tidak ada pengajuan baru' : 'Belum ada data')"
                                message="{{ $keyword !== '' || $classGroupFilter !== null ? 'Coba kata kunci atau kelas lain.' : 'Pengajuan Keti yang sudah memverifikasi email akan muncul di sini.' }}"
@@ -141,13 +155,15 @@
                             @foreach ($applications as $application)
                                 @php
                                     $applicant = $application->user;
+                                    $emailVerified = $applicant->hasVerifiedEmail();
+                                    $unverifiedPending = $application->status === KetiApplicationStatus::Pending && ! $emailVerified;
                                     $inactive = $application->status === KetiApplicationStatus::Approved && ! $applicant->is_active;
                                     $appPayload = [
                                         'id' => $application->id,
                                         'name' => $applicant->name,
                                         'nim' => $applicant->nim ?? '—',
                                         'email' => $applicant->email,
-                                        'emailVerified' => $applicant->hasVerifiedEmail(),
+                                        'emailVerified' => $emailVerified,
                                         'classGroupName' => $application->classGroup->name,
                                         'classGroupId' => (string) $application->class_group_id,
                                         'createdStamp' => Wita::stamp($application->created_at),
@@ -168,8 +184,10 @@
                                             <input type="checkbox"
                                                    value="{{ $application->id }}"
                                                    x-model.number="selectedIds"
+                                                   @disabled(! $emailVerified)
+                                                   title="{{ $emailVerified ? 'Pilih '.$applicant->name : 'Tidak dapat disetujui sebelum email terverifikasi' }}"
                                                    aria-label="Pilih {{ $applicant->name }}"
-                                                   class="size-4 rounded border-border text-primary focus:ring-primary cursor-pointer">
+                                                   class="size-4 rounded border-border text-primary focus:ring-primary cursor-pointer disabled:cursor-not-allowed disabled:opacity-40">
                                         </td>
                                     @endif
                                     <td class="px-4 py-3">
@@ -177,19 +195,33 @@
                                         <span class="text-xs text-muted">{{ $applicant->nim ?? '—' }}</span>
                                     </td>
                                     <td class="px-4 py-3">{{ $application->classGroup->name }}</td>
-                                    <td class="px-4 py-3 text-muted">{{ $applicant->email }}</td>
+                                    <td class="px-4 py-3">
+                                        <span class="block text-muted">{{ $applicant->email }}</span>
+                                        @if ($emailVerified)
+                                            <span class="mt-0.5 inline-flex items-center gap-1 text-[11px] font-medium text-success">
+                                                <i data-lucide="circle-check" class="size-3 shrink-0" aria-hidden="true"></i>
+                                                <span>Email terverifikasi</span>
+                                            </span>
+                                        @else
+                                            <span class="mt-0.5 inline-flex items-center gap-1 text-[11px] font-semibold text-warning-ink">
+                                                <i data-lucide="triangle-alert" class="size-3 shrink-0 text-warning" aria-hidden="true"></i>
+                                                <span>Belum verifikasi email</span>
+                                            </span>
+                                        @endif
+                                    </td>
                                     <td class="px-4 py-3">
                                         <x-status-badge :variant="match (true) {
                                             $inactive => 'neutral',
+                                            $unverifiedPending => 'warning',
                                             $application->status === KetiApplicationStatus::Approved => 'success',
                                             $application->status === KetiApplicationStatus::Pending => 'primary',
                                             $application->status === KetiApplicationStatus::NeedsRevision => 'warning',
                                             default => 'danger',
-                                        }">{{ $inactive ? 'Nonaktif' : match ($application->status) {
+                                        }">{{ $inactive ? 'Nonaktif' : ($unverifiedPending ? 'Belum verifikasi' : match ($application->status) {
                                             KetiApplicationStatus::Pending => 'Menunggu',
                                             KetiApplicationStatus::Approved => 'Aktif',
                                             default => $application->status->label(),
-                                        } }}</x-status-badge>
+                                        }) }}</x-status-badge>
                                     </td>
                                     <td class="px-4 py-3 text-right">
                                         <div class="inline-flex items-center justify-end gap-2">
@@ -198,6 +230,8 @@
                                                     @csrf
                                                     <input type="hidden" name="class_group_id" value="{{ $application->class_group_id }}">
                                                     <button type="submit"
+                                                            @disabled(! $emailVerified)
+                                                            title="{{ $emailVerified ? 'Setujui '.$applicant->name : 'Menunggu pendaftar memverifikasi email' }}"
                                                             aria-label="Setujui {{ $applicant->name }}"
                                                             class="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-control bg-success px-3 py-2 text-xs font-semibold text-white shadow-2xs transition hover:bg-success/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50">
                                                         <i data-lucide="user-check" class="size-3.5" aria-hidden="true"></i>
@@ -273,15 +307,22 @@
 
                     <template x-if="activeApp.status === 'pending'">
                         <div class="flex flex-col gap-4">
-                            <x-info-box title="Pemeriksaan admin">
-                                <p><span x-text="activeApp.emailVerified ? 'Email sudah terverifikasi.' : 'Email belum terverifikasi.'"></span> Cocokkan identitas dan kelas dengan data akademik sebelum menyetujui.</p>
-                            </x-info-box>
+                            <template x-if="!activeApp.emailVerified">
+                                <x-info-box variant="warning" title="Email pendaftar belum terverifikasi">
+                                    <p>Pendaftar belum memasukkan kode verifikasi 6 digit dari emailnya. Akun belum dapat disetujui sampai email diverifikasi.</p>
+                                </x-info-box>
+                            </template>
+                            <template x-if="activeApp.emailVerified">
+                                <x-info-box variant="success" title="Email sudah terverifikasi">
+                                    <p>Cocokkan identitas dan kelas dengan data akademik sebelum menyetujui.</p>
+                                </x-info-box>
+                            </template>
                             <form method="POST" :action="activeApp.approveUrl" class="flex flex-col gap-4">
                                 @csrf
                                 <x-field label="Kelas yang ditetapkan" name="class_group_id" hint="Persetujuan mengaktifkan akses Keti untuk kelas ini.">
                                     <x-select name="class_group_id" :options="$classGroups" x-model="activeApp.classGroupId" />
                                 </x-field>
-                                <x-button type="submit" icon="check">Setujui dan aktifkan akun</x-button>
+                                <x-button type="submit" icon="check" x-bind:disabled="!activeApp.emailVerified">Setujui dan aktifkan akun</x-button>
                             </form>
                             <div class="flex gap-3">
                                 <x-button variant="danger-outline" class="flex-1" x-on:click="openDecline()">Tolak / Minta Perbaikan</x-button>

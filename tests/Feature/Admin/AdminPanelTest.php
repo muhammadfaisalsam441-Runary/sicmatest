@@ -764,3 +764,23 @@ test('dashboard admin merender tombol lipat untuk informasi penyusunan jadwal', 
         ->assertSee('id="dashboard-schedule-progress-panel"', false)
         ->assertSee('Tampilkan informasi');
 });
+
+test('halaman akun keti menampilkan peringatan dan menonaktifkan setujui bagi pendaftar yang belum verifikasi email', function () {
+    $classA = ClassGroup::factory()->create(['name' => 'PTIK A']);
+    $classB = ClassGroup::factory()->create(['name' => 'PTIK B']);
+
+    User::factory()->pendingKeti($classA)->create(['name' => 'Verified Applicant']);
+    User::factory()->unverified()->pendingKeti($classB)->create(['name' => 'Unverified Applicant']);
+
+    $html = $this->actingAs($this->admin)
+        ->get(route('admin.keti-accounts.index'))
+        ->assertOk()
+        ->assertSee('1 pengajuan belum memverifikasi email')
+        ->assertSee('Belum verifikasi email')
+        ->assertSee('Belum verifikasi')
+        ->assertSee('Email terverifikasi')
+        ->getContent();
+
+    expect($html)->toMatch('/<button\b[^>]*\sdisabled(?=[\s>])[^>]*aria-label="Setujui Unverified Applicant"/');
+    expect($html)->toMatch('/<button\b(?![^>]*\sdisabled(?=[\s>]))[^>]*aria-label="Setujui Verified Applicant"/');
+});

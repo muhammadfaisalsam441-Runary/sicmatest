@@ -37,10 +37,10 @@
                         <x-room-card :name="$room['name']" :badge="$room['badge']" :location="$room['location']" :capacity="$room['capacity']" :facilities="$room['facilities']"
                                      :time-label="$room['time_label']" :time="$room['time']" :note="$room['note']"
                                      style="--stagger: {{ $loop->index }}">
-                            <div class="flex w-full gap-2">
-                                <x-button variant="secondary" :href="route('keti.rooms.show', $room['id'])" class="flex-1">Detail</x-button>
+                            <div class="flex w-full flex-wrap gap-2">
+                                <x-button variant="secondary" :href="route('keti.rooms.show', $room['id'])" class="min-h-11 flex-1 sm:min-h-0">Detail</x-button>
                                 @if ($room['badge'] === 'Tersedia')
-                                    <x-button :href="route('keti.rooms.show', $room['id'])" class="flex-1">Pesan ruang</x-button>
+                                    <x-button :href="route('keti.rooms.show', $room['id'])" class="min-h-11 flex-1 sm:min-h-0">Pesan ruang</x-button>
                                 @endif
                             </div>
                         </x-room-card>

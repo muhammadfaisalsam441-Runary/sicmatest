@@ -8,6 +8,6 @@
         <x-info-box title="Pemulihan berhasil" variant="success">
             <p>Kata sandi baru berlaku untuk web dan APK.</p>
         </x-info-box>
-        <x-button :href="route('login')" class="w-full">Masuk kembali</x-button>
+        <x-button :href="route('login')" class="min-h-11 w-full">Masuk kembali</x-button>
     </div>
 @endsection

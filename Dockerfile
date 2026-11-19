@@ -30,8 +30,13 @@ COPY docker/entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 ENV COMPOSER_ALLOW_SUPERUSER=1
 
+ARG COMPOSER_NO_DEV=0
 COPY composer.json composer.lock ./
-RUN composer install --prefer-dist --no-interaction --no-progress --no-scripts --no-autoloader
+RUN if [ "$COMPOSER_NO_DEV" = "1" ]; then \
+        composer install --no-dev --prefer-dist --no-interaction --no-progress --no-scripts --no-autoloader; \
+    else \
+        composer install --prefer-dist --no-interaction --no-progress --no-scripts --no-autoloader; \
+    fi
 COPY . .
 COPY --from=assets /app/public/build ./public/build
 RUN mkdir -p storage/app/public storage/app/private \

@@ -5,6 +5,8 @@ x-laravel: &laravel
   build:
     context: .
     target: app
+    args:
+      COMPOSER_NO_DEV: ${COMPOSER_NO_DEV:-0}
   restart: unless-stopped
   init: true
   working_dir: /var/www/html
@@ -31,7 +33,7 @@ x-laravel: &laravel
     REVERB_SCHEME: http
     VITE_REVERB_APP_KEY: ${REVERB_APP_KEY:-sicma-key}
     VITE_REVERB_HOST: ${VITE_REVERB_HOST:-}
-    VITE_REVERB_PORT: ${REVERB_PORT:-8080}
+    VITE_REVERB_PORT: ${VITE_REVERB_PORT:-8080}
     VITE_REVERB_SCHEME: ${VITE_REVERB_SCHEME:-http}
     SICMA_SCHEDULER_MODE: queue
     DB_QUEUE_RETRY_AFTER: 300

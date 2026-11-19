@@ -6,8 +6,8 @@
 @section('content')
     <div class="flex flex-col gap-10 sm:gap-14">
         <section class="flex flex-col items-center gap-5 pt-4 text-center sm:gap-6 sm:pt-10">
-            <span class="rounded-full bg-primary-soft px-6 py-2 text-[11px] font-semibold tracking-wide text-primary uppercase sm:px-16">Layanan ruang kelas JTIK</span>
-            <h1 class="max-w-3xl text-[clamp(2rem,4.5vw,3.5rem)] leading-[1.15] font-bold tracking-tight text-primary">Temukan ruangan yang tepat untuk kelasmu.</h1>
+            <span class="max-w-full rounded-full bg-primary-soft px-4 py-1.5 text-center text-[11px] font-semibold tracking-wide text-primary uppercase sm:px-16 sm:py-2">Layanan ruang kelas JTIK</span>
+            <h1 class="max-w-3xl text-[clamp(1.75rem,1.2rem+2.5vw,3.25rem)] leading-[1.15] font-bold tracking-tight text-primary">Temukan ruangan yang tepat untuk kelasmu.</h1>
             <p class="max-w-xl text-base leading-relaxed text-muted sm:text-lg">Lihat ketersediaan ruang kelas JTIK tanpa akun. Masuk sebagai Keti untuk memesan dan mengelola penggunaan.</p>
             <div class="flex w-full flex-col items-center justify-center gap-3 sm:w-auto sm:flex-row">
                 <x-button :href="Nav::url('login')" animated class="w-full sm:w-auto sm:min-w-52">Masuk ke SICMA</x-button>
@@ -44,8 +44,8 @@
             </div>
         </section>
 
-        <section class="flex flex-col items-start justify-between gap-6 rounded-card border border-border bg-surface px-6 py-6 sm:flex-row sm:items-center">
-            <div class="flex flex-col gap-2">
+        <section class="flex flex-col items-start justify-between gap-4 rounded-card border border-border bg-surface p-5 sm:flex-row sm:items-center sm:gap-6 sm:px-6 sm:py-6">
+            <div class="flex min-w-0 flex-col gap-2">
                 <h2 class="text-lg font-semibold text-ink">Mau menggunakan ruangan untuk kelasmu?</h2>
                 <p class="text-sm text-ink">Masuk dengan akun Keti yang terdaftar untuk memesan dan mengelola penggunaan ruangan.</p>
             </div>

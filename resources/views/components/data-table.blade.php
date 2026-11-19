@@ -1,7 +1,7 @@
 @props([
     'headers' => [],
     'sticky' => true,
-    'maxHeight' => 'max-h-[70vh]',
+    'maxHeight' => 'max-h-[70dvh]',
     'ariaLabel' => 'Tabel data',
 ])
 
@@ -15,7 +15,7 @@
                 <thead @class(['border-b border-border bg-page text-xs font-semibold text-muted', 'sticky top-0 z-10' => $sticky])>
                     <tr>
                         @foreach ($headers as $header)
-                            <th scope="col" class="px-5 py-3 font-medium">{{ $header }}</th>
+                            <th scope="col" class="px-3.5 py-3 font-medium whitespace-nowrap sm:px-5">{{ $header }}</th>
                         @endforeach
                     </tr>
                 </thead>

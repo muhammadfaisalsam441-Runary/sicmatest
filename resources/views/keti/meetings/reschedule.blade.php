@@ -17,8 +17,8 @@
     <div class="flex flex-col gap-6">
         <x-page-header title="Pindahkan pertemuan" subtitle="Pindahkan satu pertemuan ke jam lain yang kosong. Jadwal mingguan dari admin tidak berubah." />
 
-        <x-card class="flex flex-col justify-between gap-4 sm:flex-row sm:items-start sm:gap-6">
-            <div class="flex flex-col gap-1">
+        <x-card padding="p-4 sm:p-6" class="flex flex-col justify-between gap-4 sm:flex-row sm:items-start sm:gap-6">
+            <div class="flex min-w-0 flex-col gap-1">
                 <h2 class="text-xl font-semibold">{{ $session->title }}</h2>
                 <p class="text-sm text-muted">Kelas {{ $session->participants->pluck('name')->implode(' + ') }}</p>
             </div>
@@ -29,7 +29,7 @@
             </div>
         </x-card>
 
-        <form method="GET" action="{{ route('keti.meetings.reschedule') }}" class="flex flex-col gap-5 rounded-card border border-border bg-surface p-6">
+        <form method="GET" action="{{ route('keti.meetings.reschedule') }}" class="flex flex-col gap-5 rounded-card border border-border bg-surface p-4 sm:p-6">
             <input type="hidden" name="sesi" value="{{ $session->id }}">
             <input type="hidden" name="tanggal" value="{{ $meeting->start->toDateString() }}">
             @if ($replacing)
@@ -40,10 +40,10 @@
                 @endif
             @endif
 
-            <fieldset class="flex flex-col gap-2">
+            <fieldset class="flex flex-col gap-1.5">
                 <legend class="mb-2 text-sm font-semibold">Dosen yang masuk</legend>
                 @foreach ($team as $lecturer)
-                    <label class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                    <label class="flex min-h-11 cursor-pointer flex-wrap items-center gap-x-3 gap-y-1 py-1.5 text-sm">
                         <input type="checkbox" name="dosen[]" value="{{ $lecturer['id'] }}" @checked(in_array($lecturer['id'], $selectedLecturerIds, true))
                                class="size-4 rounded border-border text-primary focus:ring-primary/30">
                         <span class="font-medium">{{ $lecturer['name'] }}</span>
@@ -65,7 +65,7 @@
                 <x-field label="Pilih jam tertentu (opsional)" name="jam">
                     <x-select name="jam" :options="$timeOptions" :value="$pickedTime" placeholder="Semua slot rekomendasi (Otomatis)" onchange="this.form.requestSubmit()" />
                 </x-field>
-                <x-button type="submit" icon="search" class="sm:col-span-2 md:col-span-1">Cari Rekomendasi</x-button>
+                <x-button type="submit" icon="search" class="min-h-11 w-full sm:col-span-2 md:col-span-1">Cari Rekomendasi</x-button>
             </div>
             <p class="text-xs text-muted">Durasi perkuliahan: {{ Wita::duration($duration) }} (1 SKS = 50 menit). Rekomendasi otomatis memindai slot waktu bebas bentrok dosen & kelas serta ruangan yang kosong.</p>
         </form>
@@ -75,7 +75,7 @@
                 <p>{{ $conflict['message'] }}</p>
             </x-info-box>
             @if ($recommendations->isNotEmpty())
-                <div class="flex flex-col gap-2 rounded-card border border-border bg-surface p-4">
+                <div class="flex flex-col gap-2 rounded-card border border-border bg-surface p-4 sm:p-5">
                     <span class="text-sm font-semibold text-foreground">Rekomendasi slot lain yang kosong pada tanggal ini:</span>
                     <div class="flex flex-wrap gap-2">
                         @foreach ($recommendations as $rec)
@@ -88,7 +88,7 @@
                                     'pengganti_online' => $replacing?->isOnline() ? $replacing->id : null,
                                     'dosen' => $selectedLecturerIds,
                                 ])) }}"
-                               class="inline-flex items-center gap-1.5 rounded-lg border border-border bg-subtle px-3 py-1.5 text-xs font-medium text-foreground hover:bg-border/60 transition-colors">
+                               class="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border bg-subtle px-3 py-2 text-xs font-medium text-foreground transition-colors hover:bg-border/60">
                                 <span>{{ $rec['slot'] }}</span>
                                 <span class="rounded bg-primary/10 px-1.5 py-0.5 text-primary text-[10px] font-semibold">
                                     {{ $rec['rooms_count'] > 0 ? $rec['rooms_count'].' ruang' : 'Online' }}
@@ -100,12 +100,12 @@
             @endif
         @elseif ($start)
             <div class="flex flex-col gap-4">
-                <div class="flex flex-col justify-between gap-4 rounded-card border border-primary/40 bg-primary-soft/30 px-5 py-4 sm:flex-row sm:items-center">
-                    <div class="flex flex-col gap-0.5">
+                <div class="flex flex-col justify-between gap-4 rounded-card border border-primary/40 bg-primary-soft/30 p-4 sm:flex-row sm:items-center sm:px-5">
+                    <div class="flex min-w-0 flex-col gap-0.5">
                         <span class="font-semibold text-ink">Kuliah Online (Tanpa Ruangan)</span>
                         <span class="text-xs text-muted">{{ Wita::longDate($start) }} • {{ Wita::range($start, $start->addMinutes($duration)) }} • Ruang asli dilepas untuk kelas lain</span>
                     </div>
-                    <form method="POST" action="{{ route('keti.meetings.online.store') }}" class="flex flex-wrap items-center gap-2">
+                    <form method="POST" action="{{ route('keti.meetings.online.store') }}" class="flex w-full flex-wrap items-center gap-2 sm:w-auto">
                         @csrf
                         <input type="hidden" name="session_id" value="{{ $session->id }}">
                         <input type="hidden" name="original_date" value="{{ $meeting->start->toDateString() }}">
@@ -121,7 +121,7 @@
                         @foreach ($selectedLecturerIds as $lecturerId)
                             <input type="hidden" name="lecturer_ids[]" value="{{ $lecturerId }}">
                         @endforeach
-                        <x-button type="submit" variant="soft">Pilih Kuliah Online</x-button>
+                        <x-button type="submit" variant="soft" class="min-h-11 w-full sm:w-auto">Pilih Kuliah Online</x-button>
                     </form>
                 </div>
 
@@ -130,8 +130,8 @@
                     <span class="text-xs text-muted">{{ Wita::longDate($start) }} • {{ Wita::range($start, $start->addMinutes($duration)) }}</span>
                 </div>
                 @forelse ($rooms as $room)
-                    <div class="flex flex-col justify-between gap-4 rounded-card border border-border bg-surface px-5 py-4 sm:flex-row sm:items-center">
-                        <div class="flex flex-col gap-0.5">
+                    <div class="flex flex-col justify-between gap-4 rounded-card border border-border bg-surface p-4 sm:flex-row sm:items-center sm:px-5">
+                        <div class="flex min-w-0 flex-col gap-0.5">
                             <span class="font-semibold">{{ $room['name'] }}
                                 @if ($room['id'] === $session->room_id)
                                     <span class="text-xs font-normal text-muted">• ruang asli</span>
@@ -139,7 +139,7 @@
                             </span>
                             <span class="text-xs text-muted">{{ $room['location'] }} • {{ $room['capacity'] ? $room['capacity'].' kursi' : 'Kapasitas belum didata' }}</span>
                         </div>
-                        <form method="POST" action="{{ route('keti.meetings.reschedule.store') }}">
+                        <form method="POST" action="{{ route('keti.meetings.reschedule.store') }}" class="w-full sm:w-auto">
                             @csrf
                             <input type="hidden" name="session_id" value="{{ $session->id }}">
                             <input type="hidden" name="original_date" value="{{ $meeting->start->toDateString() }}">
@@ -156,7 +156,7 @@
                             @foreach ($selectedLecturerIds as $lecturerId)
                                 <input type="hidden" name="lecturer_ids[]" value="{{ $lecturerId }}">
                             @endforeach
-                            <x-button type="submit">Pindahkan ke sini</x-button>
+                            <x-button type="submit" class="min-h-11 w-full sm:w-auto">Pindahkan ke sini</x-button>
                         </form>
                     </div>
                 @empty
@@ -174,7 +174,7 @@
 
                 <div class="flex flex-col gap-5">
                     @foreach ($recommendations as $rec)
-                        <div class="sicma-card-enter flex flex-col gap-3 rounded-card border border-border bg-surface p-5" style="--stagger: {{ $loop->index }}">
+                        <div class="sicma-card-enter flex flex-col gap-3 rounded-card border border-border bg-surface p-4 sm:p-5" style="--stagger: {{ $loop->index }}">
                             <div class="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 pb-3">
                                 <div class="flex items-center gap-3">
                                     <span class="flex size-8 items-center justify-center rounded-lg bg-primary-soft text-primary font-bold text-sm">
@@ -217,7 +217,7 @@
                                         @foreach ($selectedLecturerIds as $lecturerId)
                                             <input type="hidden" name="lecturer_ids[]" value="{{ $lecturerId }}">
                                         @endforeach
-                                        <x-button type="submit" variant="soft" size="sm" class="w-full justify-center">Pilih Kuliah Online</x-button>
+                                        <x-button type="submit" variant="soft" size="sm" class="min-h-11 w-full justify-center sm:min-h-0">Pilih Kuliah Online</x-button>
                                     </form>
                                 </div>
                                 @foreach ($rec['rooms'] as $room)
@@ -256,7 +256,7 @@
                                             @foreach ($selectedLecturerIds as $lecturerId)
                                                 <input type="hidden" name="lecturer_ids[]" value="{{ $lecturerId }}">
                                             @endforeach
-                                            <x-button type="submit" size="sm" class="w-full justify-center">Pindahkan ke sini</x-button>
+                                            <x-button type="submit" size="sm" class="min-h-11 w-full justify-center sm:min-h-0">Pindahkan ke sini</x-button>
                                         </form>
                                     </div>
                                 @endforeach

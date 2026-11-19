@@ -16,7 +16,7 @@
         @endif
 
         <x-info-box title="Email pendaftaran">
-            <p>{{ $email }} • Periksa juga folder spam.</p>
+            <p class="break-words">{{ $email }} • Periksa juga folder spam.</p>
         </x-info-box>
 
         @if (session('error_code') === 'RESEND_TOO_SOON')
@@ -30,15 +30,15 @@
         <form method="POST" action="{{ route('verification.verify') }}" class="flex flex-col gap-4" novalidate>
             @csrf
             <x-field label="Kode verifikasi" name="code">
-                <x-input name="code" inputmode="numeric" maxlength="6" autocomplete="one-time-code" autofocus required class="tracking-[0.3em]" />
+                <x-input name="code" inputmode="numeric" maxlength="6" autocomplete="one-time-code" autocorrect="off" autocapitalize="none" spellcheck="false" enterkeyhint="done" autofocus required class="tracking-[0.3em]" />
             </x-field>
-            <x-button type="submit" class="w-full">Verifikasi email</x-button>
+            <x-button type="submit" class="min-h-11 w-full">Verifikasi email</x-button>
         </form>
 
         <form method="POST" action="{{ route('verification.send') }}">
             @csrf
-            <x-button type="submit" variant="secondary" class="w-full">Kirim ulang kode</x-button>
+            <x-button type="submit" variant="secondary" class="min-h-11 w-full">Kirim ulang kode</x-button>
         </form>
-        <x-button variant="secondary" :href="route('verification.email.edit')" class="w-full">Ubah email pendaftaran</x-button>
+        <x-button variant="secondary" :href="route('verification.email.edit')" class="min-h-11 w-full">Ubah email pendaftaran</x-button>
     </div>
 @endsection

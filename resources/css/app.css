@@ -32,8 +32,24 @@
 }
 
 @layer base {
+    html {
+        scroll-padding-top: calc(5.5rem + env(safe-area-inset-top, 0px));
+        scroll-padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+    }
+
     body {
         @apply bg-page font-sans text-ink antialiased;
+        overflow-wrap: break-word;
+    }
+
+    img,
+    video {
+        max-inline-size: 100%;
+        block-size: auto;
+    }
+
+    :where(a, code) {
+        overflow-wrap: anywhere;
     }
 
     h1,
@@ -42,6 +58,12 @@
     .sicma-card-title {
         font-family: var(--font-display);
         letter-spacing: -0.015em;
+        text-wrap: balance;
+    }
+
+    p,
+    li {
+        text-wrap: pretty;
     }
 
     body:has([data-table-fullscreen="true"]) {
@@ -59,6 +81,16 @@
 
     [x-cloak] {
         display: none !important;
+    }
+}
+
+@layer components {
+    .sicma-safe-top {
+        padding-top: env(safe-area-inset-top, 0px);
+    }
+
+    .sicma-safe-bottom {
+        padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
     }
 }
 
@@ -102,6 +134,19 @@
     [data-ui-density='compact'] table td {
         padding-top: 0.375rem !important;
         padding-bottom: 0.375rem !important;
+    }
+}
+
+@media (pointer: coarse) {
+    body:is([data-portal="public"], [data-portal="auth"], [data-portal="keti"]) input:not([type="checkbox"]):not([type="radio"]),
+    body:is([data-portal="public"], [data-portal="auth"], [data-portal="keti"]) select,
+    body:is([data-portal="public"], [data-portal="auth"], [data-portal="keti"]) textarea {
+        font-size: max(1rem, 1em);
+        min-block-size: 44px;
+    }
+
+    body:is([data-portal="public"], [data-portal="auth"], [data-portal="keti"]) :where(button, [role="button"], nav a, label:has(input[type="checkbox"], input[type="radio"])) {
+        min-block-size: 44px;
     }
 }
 
@@ -1212,5 +1257,19 @@ body[data-portal="public"] > header {
 
     .sicma-animated-btn:not(:disabled):not([aria-disabled="true"]):active {
         transform: none;
+    }
+}
+
+@media (max-width: 480px) {
+    .sicma-animated-btn {
+        max-inline-size: 100%;
+        white-space: normal;
+        text-align: center;
+        padding: 12px 36px;
+    }
+
+    .sicma-animated-btn--sm {
+        padding: 8px 30px;
+        font-size: 0.8125rem;
     }
 }

@@ -68,10 +68,25 @@
                       aria-label="Catatan pemeriksaan">
                     <i data-lucide="info" class="size-3.5" aria-hidden="true"></i>
                 </span>
+                @if ($version->allow_conflicts)
+                    <span class="rounded-full border border-current/25 bg-white/60 px-2.5 py-0.5 text-[11px] font-semibold">
+                        Toleransi draf aktif
+                    </span>
+                @endif
             </div>
-            @if ($isDraft && $reviewStatus['ready'])
-                <x-button size="sm" :href="route('admin.schedules.index', ['tab' => 'penetapan', 'draf' => $version->id])">Lanjut ke Penetapan</x-button>
-            @endif
+            <div class="flex flex-wrap items-center gap-2">
+                @if ($isDraft && auth()->user()->can('publish-schedule') && ($version->allow_conflicts || $reviewStatus['errors'] > 0))
+                    <form method="POST" action="{{ route('admin.drafts.tolerance', $version) }}">
+                        @csrf
+                        <x-button type="submit" variant="secondary" size="sm">
+                            {{ $version->allow_conflicts ? 'Ketatkan Kembali' : 'Izinkan Toleransi Draf Ini' }}
+                        </x-button>
+                    </form>
+                @endif
+                @if ($isDraft && $reviewStatus['ready'])
+                    <x-button size="sm" :href="route('admin.schedules.index', ['tab' => 'penetapan', 'draf' => $version->id])">Lanjut ke Penetapan</x-button>
+                @endif
+            </div>
         </div>
 
         <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">

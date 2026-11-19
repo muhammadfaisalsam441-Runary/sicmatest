@@ -268,3 +268,23 @@ test('portal keti merender latar belakang animasi dan tombol jeda animasi', func
         ->assertSee('data-toggle-bg-motion', false)
         ->assertDontSee('data-toggle-bg-motion" aria-pressed', false);
 });
+
+test('halaman portal keti merender navigasi cepat mobile dan layout responsif', function (string $routeName) {
+    $room = Room::factory()->create();
+
+    $this->actingAs($this->keti)
+        ->get(route($routeName, $routeName === 'keti.rooms.show' ? $room : []))
+        ->assertOk()
+        ->assertSee('viewport-fit=cover', false)
+        ->assertSee('min-h-dvh', false)
+        ->assertSee('aria-label="Navigasi cepat mobile"', false);
+})->with([
+    'search' => ['keti.search'],
+    'my-class' => ['keti.my-class'],
+    'rooms' => ['keti.rooms.index'],
+    'room-detail' => ['keti.rooms.show'],
+    'favorites' => ['keti.favorites.index'],
+    'activity' => ['keti.activity'],
+    'notifications' => ['keti.notifications'],
+    'profile' => ['keti.profile'],
+]);

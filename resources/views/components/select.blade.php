@@ -27,7 +27,7 @@
         @if ($describedByIds !== []) aria-describedby="{{ implode(' ', $describedByIds) }}" @endif
         {{ $attributes->except(['id', 'aria-describedby'])->class([
             'w-full' => $needsFullWidth,
-            'rounded-control border bg-surface px-4 py-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15',
+            'rounded-control border bg-surface px-4 py-3 text-base sm:text-sm min-h-11 text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15',
             'border-danger' => $hasError,
             'border-muted/75' => ! $hasError,
         ]) }}>

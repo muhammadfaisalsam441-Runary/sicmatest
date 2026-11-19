@@ -26,14 +26,14 @@
         <search>
             <form method="GET" action="{{ route('public.rooms') }}" class="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
                 @if ($status)<input type="hidden" name="status" value="{{ $status }}">@endif
-                <label class="relative flex-1">
+                <label class="relative min-w-0 flex-1">
                     <span class="sr-only">Cari nama ruangan</span>
                     <i data-lucide="search" aria-hidden="true" class="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-muted"></i>
                     <input type="search" name="q" value="{{ $keyword }}" placeholder="Cari nama ruangan"
-                           class="w-full rounded-control border border-muted/60 bg-surface py-3 pr-4 pl-11 text-sm text-ink placeholder:text-muted focus:border-primary focus:ring-2 focus:ring-primary/15 focus:outline-none">
+                           class="min-h-11 w-full rounded-control border border-muted/60 bg-surface py-2.5 pr-4 pl-11 text-base text-ink placeholder:text-muted focus:border-primary focus:ring-2 focus:ring-primary/15 focus:outline-none sm:py-3 sm:text-sm">
                 </label>
                 <select name="gedung" aria-label="Filter gedung" onchange="this.form.requestSubmit()"
-                        class="w-full rounded-control border border-muted/60 bg-surface px-4 py-3 text-sm text-ink hover:border-primary focus:border-primary focus:ring-2 focus:ring-primary/15 focus:outline-none sm:w-64">
+                        class="min-h-11 w-full rounded-control border border-muted/60 bg-surface px-4 py-2.5 text-base text-ink hover:border-primary focus:border-primary focus:ring-2 focus:ring-primary/15 focus:outline-none sm:w-64 sm:py-3 sm:text-sm">
                     <option value="">Semua gedung ({{ $summary['all'] }})</option>
                     @foreach ($buildings as $buildingOption)
                         <option value="{{ $buildingOption->id }}" @selected((string) $building === (string) $buildingOption->id)>
@@ -51,7 +51,7 @@
         </search>
 
         <div class="flex items-center justify-between">
-            <div class="flex flex-col gap-3">
+            <div class="flex min-w-0 flex-col gap-3">
                 <span class="text-xs text-ink">Ringkasan status di semua gedung</span>
                 @php
                     $tabs = [
@@ -83,8 +83,8 @@
 
         <p class="text-xs text-muted">Status mengikuti pembaruan data. Pengunjung publik hanya melihat informasi ruang.</p>
 
-        <section class="flex flex-col items-start justify-between gap-4 rounded-card border border-border bg-surface px-6 py-5 sm:flex-row sm:items-center sm:gap-6">
-            <p class="text-sm text-ink">Perlu memesan ruangan untuk kelasmu? Gunakan akun Keti yang terdaftar.
+        <section class="flex flex-col items-start justify-between gap-4 rounded-card border border-border bg-surface p-5 sm:flex-row sm:items-center sm:gap-6 sm:px-6 sm:py-5">
+            <p class="min-w-0 text-sm text-ink">Perlu memesan ruangan untuk kelasmu? Gunakan akun Keti yang terdaftar.
                 <button type="button" x-data x-on:click="$dispatch('open-modal', 'bantuan-akun-keti')" class="cursor-pointer rounded font-semibold text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">Bantuan akun Keti</button>
             </p>
             @auth

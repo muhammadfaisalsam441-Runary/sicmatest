@@ -71,14 +71,14 @@
         @if ($describedBy)
             aria-describedby="{{ $describedBy }}"
         @endif
-        {{ $attributes->merge(['class' => "m-auto w-[calc(100%-2rem)] {$width} overflow-hidden rounded-2xl border border-border bg-surface p-0 text-ink shadow-xl outline-none backdrop:bg-ink/80"]) }}>
-    <div class="max-h-[90vh] overflow-y-auto p-6 sm:p-8">
+        {{ $attributes->merge(['class' => "m-auto w-[calc(100%-1.5rem)] sm:w-[calc(100%-2rem)] {$width} overflow-hidden rounded-2xl border border-border bg-surface p-0 text-ink shadow-xl outline-none backdrop:bg-ink/80"]) }}>
+    <div class="max-h-[90dvh] overflow-y-auto p-5 sm:p-8">
         @if ($title)
             <div class="mb-5 flex items-start justify-between gap-4">
                 <h2 id="{{ $name }}-modal-title" class="text-xl font-semibold text-ink">{{ $title }}</h2>
                 <button type="button"
                         x-on:click="close()"
-                        class="cursor-pointer rounded-control p-1 text-muted transition hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                        class="inline-flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-control text-muted transition hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                         aria-label="Tutup">
                     <i data-lucide="x" aria-hidden="true" class="size-5"></i>
                 </button>

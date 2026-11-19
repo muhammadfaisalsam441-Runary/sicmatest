@@ -15,10 +15,10 @@
             x-on:cancel="if (submitting) $event.preventDefault()"
             x-on:close="if (open) close()"
             x-on:click="if ($event.target === $el) close()"
-            class="m-auto w-[calc(100%-2rem)] max-w-xl rounded-modal border border-border bg-surface p-6 text-ink shadow-2xl backdrop:bg-ink/80">
+            class="m-auto max-h-[90dvh] w-[calc(100%-1.5rem)] max-w-xl overflow-y-auto rounded-modal border border-border bg-surface p-5 text-ink shadow-2xl backdrop:bg-ink/80 sm:w-[calc(100%-2rem)] sm:p-6">
         <div class="mb-5 flex items-start justify-between gap-4">
             <h2 id="booking-modal-title" class="text-xl font-semibold text-ink">Pesan <span x-text="room ? room.roomName : ''">{{ $initial['roomName'] ?? 'ruang' }}</span></h2>
-            <button type="button" x-on:click="close()" class="cursor-pointer rounded-control p-1 text-muted transition hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" aria-label="Tutup">
+            <button type="button" x-on:click="close()" class="inline-flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-control text-muted transition hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" aria-label="Tutup">
                 <i data-lucide="x" aria-hidden="true" class="size-5"></i>
             </button>
         </div>
@@ -44,8 +44,8 @@
             @endunless
 
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <x-button variant="secondary" x-on:click="close()" x-bind:disabled="submitting">Batal</x-button>
-                <x-button type="submit" x-bind:disabled="submitting">
+                <x-button variant="secondary" class="min-h-11 w-full" x-on:click="close()" x-bind:disabled="submitting">Batal</x-button>
+                <x-button type="submit" class="min-h-11 w-full" x-bind:disabled="submitting">
                     <span x-show="! submitting">Pesan sekarang</span>
                     <span x-show="submitting" x-cloak>Memproses…</span>
                 </x-button>

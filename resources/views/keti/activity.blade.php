@@ -26,7 +26,7 @@
                 <x-button variant="soft" :href="route('keti.search')">Cari ruangan</x-button>
             </x-empty-state>
         @else
-            <x-card class="flex flex-col gap-3">
+            <x-card padding="p-4 sm:p-6" class="flex flex-col gap-3">
                 <h2 class="text-lg font-semibold">Riwayat pemakaian ruang</h2>
                 <x-data-table :headers="['Pengguna', 'Ruangan', 'Kegiatan / kelas', 'Waktu', 'Status']" class="border-0">
                     @foreach ($reservations as $item)
@@ -35,29 +35,29 @@
                             $detailUrl = $canView ? route('keti.reservations.show', $item) : null;
                         @endphp
                         <tr class="transition-colors hover:bg-page/70">
-                            <td class="px-5 py-3">
+                            <td class="px-3.5 py-3 sm:px-5">
                                 @if (config('sicma.privacy.show_booker_name_to_keti') || $item->class_group_id === $classGroup->id)
                                     {{ $item->creator->name }}
                                 @else
                                     Keti {{ $item->classGroup->name }}
                                 @endif
                             </td>
-                            <td class="px-5 py-3 font-medium">
+                            <td class="px-3.5 py-3 font-medium whitespace-nowrap sm:px-5">
                                 @if ($detailUrl)
-                                    <a href="{{ $detailUrl }}" class="rounded hover:text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">{{ $item->room->name }}</a>
+                                    <a href="{{ $detailUrl }}" class="inline-flex min-h-11 items-center rounded hover:text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:min-h-0">{{ $item->room->name }}</a>
                                 @else
                                     {{ $item->room->name }}
                                 @endif
                             </td>
-                            <td class="px-5 py-3">{{ $item->purpose }} • {{ $item->classGroup->name }}</td>
-                            <td class="px-5 py-3">
+                            <td class="px-3.5 py-3 sm:px-5">{{ $item->purpose }} • {{ $item->classGroup->name }}</td>
+                            <td class="px-3.5 py-3 whitespace-nowrap sm:px-5">
                                 @if ($item->status->value === 'in_use')
                                     Mulai {{ Wita::clock($item->actual_start_at, false) }} • Selesai —
                                 @else
                                     {{ Wita::range($item->actual_start_at ?? $item->start_at, $item->actual_end_at ?? $item->end_at) }}
                                 @endif
                             </td>
-                            <td class="px-5 py-3"><x-status-badge :variant="$item->status->badgeVariant()">{{ $item->status->label() }}</x-status-badge></td>
+                            <td class="px-3.5 py-3 whitespace-nowrap sm:px-5"><x-status-badge :variant="$item->status->badgeVariant()">{{ $item->status->label() }}</x-status-badge></td>
                         </tr>
                     @endforeach
                 </x-data-table>

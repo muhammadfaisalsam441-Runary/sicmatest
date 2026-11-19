@@ -80,6 +80,7 @@ Route::get('/draf/{version}/unduh/pdf', [DraftController::class, 'pdf'])->name('
 Route::put('/draf/{version}/sesi/{session}', [DraftController::class, 'updateSession'])->scopeBindings()->name('drafts.sessions.update');
 Route::post('/draf/{version}/sesi/{session}/kunci', [DraftController::class, 'toggleLock'])->scopeBindings()->name('drafts.sessions.lock');
 Route::post('/draf/{version}/periksa', [DraftController::class, 'validateDraft'])->name('drafts.validate');
+Route::post('/draf/{version}/toleransi', [DraftController::class, 'toggleTolerance'])->can('publish-schedule')->name('drafts.tolerance');
 Route::post('/draf/{version}/tetapkan', [DraftController::class, 'publish'])->can('publish-schedule')->name('drafts.publish');
 Route::get('/draf/{version}/berhasil', [DraftController::class, 'published'])->name('drafts.published');
 

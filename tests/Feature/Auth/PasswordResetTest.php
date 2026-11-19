@@ -61,3 +61,21 @@ test('konfirmasi berbeda menampilkan "Kata sandi belum cocok"', function () {
         ->view('auth.reset-password', ['token' => 'abc', 'email' => 'siapa@sicma.test'])
         ->assertSee('Kata sandi belum cocok');
 });
+
+test('percobaan atur ulang kata sandi dibatasi 5 kali per menit', function () {
+    foreach (range(1, 5) as $attempt) {
+        $this->post(route('password.update'), [
+            'token' => 'token-salah',
+            'email' => 'user@sicma.test',
+            'password' => 'sandi-baru-panjang',
+            'password_confirmation' => 'sandi-baru-panjang',
+        ]);
+    }
+
+    $this->post(route('password.update'), [
+        'token' => 'token-salah',
+        'email' => 'user@sicma.test',
+        'password' => 'sandi-baru-panjang',
+        'password_confirmation' => 'sandi-baru-panjang',
+    ])->assertTooManyRequests();
+});

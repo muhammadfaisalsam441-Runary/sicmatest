@@ -195,3 +195,25 @@ test('slot asli yang sudah dipesan kelas lain tidak menahan penetapan jadwal bar
     expect($this->draft->fresh()->status)->toBe(ScheduleVersionStatus::Official)
         ->and(draftBlockOn('2026-11-11 10:00:00')->is_active)->toBeFalse();
 });
+
+test('admin berwenang dapat mengaktifkan toleransi khusus satu draf lalu menetapkannya', function () {
+    $classOther = ClassGroup::factory()->create(['name' => 'PTIK A']);
+    $extraSession = ScheduleSession::factory()->for($this->draft, 'version')->create([
+        'room_id' => $this->room->id,
+        'day_of_week' => 3,
+        'start_minute' => 600,
+        'end_minute' => 750,
+    ]);
+    $extraSession->participants()->sync([$classOther->id]);
+
+    $this->actingAs($this->publisher)
+        ->post(route('admin.drafts.tolerance', $this->draft))
+        ->assertRedirect(route('admin.drafts.inspect', $this->draft));
+
+    expect($this->draft->fresh()->allow_conflicts)->toBeTrue()
+        ->and($this->draft->issues()->blocking()->count())->toBe(0);
+
+    app(SchedulePublisher::class)->publish($this->draft->fresh(), $this->publisher, CarbonImmutable::parse('2026-11-09'), $this->draft->fresh()->lock_version);
+
+    expect($this->draft->fresh()->status)->toBe(ScheduleVersionStatus::Official);
+});

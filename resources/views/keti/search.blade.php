@@ -42,7 +42,8 @@
                     <span class="relative">
                         <i data-lucide="search" aria-hidden="true" class="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-muted"></i>
                         <input type="search" name="q" value="{{ $filters['q'] ?? '' }}" placeholder="Nama ruangan atau gedung"
-                               class="w-full rounded-control border border-muted/60 py-3 pr-4 pl-11 text-sm focus:border-primary focus:ring-2 focus:ring-primary/15 focus:outline-none">
+                               autocorrect="off" autocapitalize="none" spellcheck="false"
+                               class="min-h-11 w-full rounded-control border border-muted/60 py-2.5 pr-4 pl-11 text-base focus:border-primary focus:ring-2 focus:ring-primary/15 focus:outline-none sm:text-sm">
                     </span>
                 </label>
                 <x-field label="Tanggal" name="tanggal" class="lg:col-span-2">
@@ -57,7 +58,7 @@
                 <x-field label="Jumlah orang" name="orang" class="lg:col-span-1">
                     <x-input type="number" name="orang" min="1" max="500" :value="$filters['orang'] ?? null" placeholder="Bebas" />
                 </x-field>
-                <x-button type="submit" class="sm:col-span-2 lg:col-span-2" icon="search">Cari</x-button>
+                <x-button type="submit" class="min-h-11 w-full sm:col-span-2 lg:col-span-2" icon="search">Cari</x-button>
             </form>
         </search>
 

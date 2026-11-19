@@ -63,6 +63,17 @@ class ScheduleValidator
             ->merge($this->lecturerLoad($version))
             ->merge($this->reservationConflicts($version));
 
+        if ($version->allow_conflicts) {
+            $toleratedCodes = ['ROOM_CONFLICT', 'LECTURER_CONFLICT', 'LOAD_EXCEEDED'];
+            $findings = $findings->map(function (array $finding) use ($toleratedCodes): array {
+                if ($finding['severity'] === IssueSeverity::Error && in_array($finding['code'], $toleratedCodes, true)) {
+                    $finding['severity'] = IssueSeverity::Warning;
+                }
+
+                return $finding;
+            });
+        }
+
         return DB::transaction(function () use ($version, $findings): Collection {
             $version->issues()->whereNull('resolved_at')->delete();
 

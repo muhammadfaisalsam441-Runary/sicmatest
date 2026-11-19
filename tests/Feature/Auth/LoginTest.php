@@ -91,3 +91,24 @@ test('halaman masuk, daftar, dan profil admin merender tombol lihat dan sembunyi
 
     expect(substr_count($profileResponse->getContent(), 'aria-label="Tampilkan kata sandi"'))->toBe(3);
 });
+
+test('rate limiter login membaca IP asli di balik reverse proxy saat trustedproxy diaktifkan', function () {
+    config(['trustedproxy.proxies' => '*']);
+    $keti = User::factory()->approvedKeti()->create(['email' => 'proxy@sicma.test']);
+
+    foreach (range(1, 5) as $attempt) {
+        $this->withServerVariables(['REMOTE_ADDR' => '127.0.0.1'])
+            ->withHeaders(['X-Forwarded-For' => '203.0.113.10', 'X-Forwarded-Proto' => 'https'])
+            ->post(route('login.store'), ['identity' => $keti->email, 'password' => 'salah']);
+    }
+
+    $this->withServerVariables(['REMOTE_ADDR' => '127.0.0.1'])
+        ->withHeaders(['X-Forwarded-For' => '203.0.113.10', 'X-Forwarded-Proto' => 'https'])
+        ->post(route('login.store'), ['identity' => $keti->email, 'password' => 'password'])
+        ->assertTooManyRequests();
+
+    $this->withServerVariables(['REMOTE_ADDR' => '127.0.0.1'])
+        ->withHeaders(['X-Forwarded-For' => '203.0.113.20', 'X-Forwarded-Proto' => 'https'])
+        ->post(route('login.store'), ['identity' => $keti->email, 'password' => 'password'])
+        ->assertRedirect(route('keti.search'));
+});

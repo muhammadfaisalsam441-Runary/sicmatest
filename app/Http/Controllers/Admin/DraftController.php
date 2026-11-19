@@ -12,6 +12,7 @@ use App\Models\Academic\Period;
 use App\Models\Room\Room;
 use App\Models\Scheduling\ScheduleSession;
 use App\Models\Scheduling\ScheduleVersion;
+use App\Services\Account\AuditLogger;
 use App\Services\Scheduling\ScheduleDraftService;
 use App\Services\Scheduling\ScheduleExportService;
 use App\Services\Scheduling\SchedulePublisher;
@@ -190,6 +191,46 @@ class DraftController extends Controller
 
     public function validateDraft(ScheduleVersion $version, ScheduleValidator $validator): RedirectResponse
     {
+        $blocking = $this->revalidateDraft($version, $validator);
+
+        return to_route('admin.drafts.inspect', $version)->with('toast', [
+            'type' => $blocking > 0 ? 'error' : 'success',
+            'title' => $blocking > 0 ? "Selesaikan {$blocking} masalah wajib dulu." : 'Tidak ada masalah wajib',
+            'message' => $blocking > 0 ? null : 'Draf siap ditetapkan oleh admin yang berwenang.',
+        ]);
+    }
+
+    /**
+     * Izinkan atau batalkan toleransi bentrok ruang/dosen dan batas SKS khusus untuk draf ini.
+     */
+    public function toggleTolerance(ScheduleVersion $version, ScheduleValidator $validator, AuditLogger $audit): RedirectResponse
+    {
+        if (! in_array($version->status, [ScheduleVersionStatus::Draft, ScheduleVersionStatus::Ready], true)) {
+            return back()->with('toast', [
+                'type' => 'error',
+                'title' => 'Toleransi hanya dapat diubah pada draf.',
+            ]);
+        }
+
+        $previous = (bool) $version->allow_conflicts;
+        $enabled = ! $previous;
+
+        $version->forceFill(['allow_conflicts' => $enabled])->save();
+        $audit->log('schedule.tolerance_updated', $version, ['allow_conflicts' => $previous], ['allow_conflicts' => $enabled]);
+
+        $blocking = $this->revalidateDraft($version->fresh(), $validator);
+
+        return to_route('admin.drafts.inspect', $version)->with('toast', [
+            'type' => $blocking > 0 ? 'info' : 'success',
+            'title' => $enabled ? 'Toleransi diaktifkan untuk draf ini' : 'Toleransi draf dinonaktifkan',
+            'message' => $enabled
+                ? ($blocking > 0 ? "Masih tersisa {$blocking} masalah wajib lain yang harus diselesaikan." : 'Bentrok ruang/dosen dan kelebihan SKS diturunkan ke peringatan agar draf dapat ditetapkan.')
+                : "Pemeriksaan kembali ketat ({$blocking} masalah wajib).",
+        ]);
+    }
+
+    private function revalidateDraft(ScheduleVersion $version, ScheduleValidator $validator): int
+    {
         $today = now()->startOfDay();
         $effectiveFrom = $version->effective_from
             ? CarbonImmutable::parse($version->effective_from->toDateString())->max($today)
@@ -204,13 +245,8 @@ class DraftController extends Controller
         }
 
         $issues = $validator->validate($version);
-        $blocking = $issues->where('severity.value', 'error')->count();
 
-        return to_route('admin.drafts.inspect', $version)->with('toast', [
-            'type' => $blocking > 0 ? 'error' : 'success',
-            'title' => $blocking > 0 ? "Selesaikan {$blocking} masalah wajib dulu." : 'Tidak ada masalah wajib',
-            'message' => $blocking > 0 ? null : 'Draf siap ditetapkan oleh admin yang berwenang.',
-        ]);
+        return $issues->where('severity.value', 'error')->count();
     }
 
     public function publish(PublishScheduleRequest $request, ScheduleVersion $version, SchedulePublisher $publisher): RedirectResponse

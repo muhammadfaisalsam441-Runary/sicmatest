@@ -216,3 +216,24 @@ test('jadwal yang memakai ruang ditutup atau dosen tidak tersedia memiliki masal
 
     expect(issueCodes($this->draft))->toBe(['LECTURER_UNAVAILABLE', 'ROOM_CLOSED']);
 });
+
+test('toleransi draf menurunkan bentrok ruang, dosen, dan beban SKS menjadi peringatan tanpa memengaruhi draf lain', function () {
+    $room = Room::factory()->create(['name' => 'AE 107', 'capacity' => 100]);
+    $lecturer = Lecturer::factory()->create();
+    $offering = CourseOffering::factory()->for($this->period)->create();
+    $offering->course->update(['sks' => 3]);
+    $lecturer->loadTargets()->create(['period_id' => $this->period->id, 'max_sks' => 2]);
+
+    draftSession($this->draft, ['room_id' => $room->id, 'day_of_week' => 1, 'start_minute' => 450, 'end_minute' => 600, 'course_offering_id' => $offering->id], [ClassGroup::factory()->create()], [$lecturer]);
+    draftSession($this->draft, ['room_id' => $room->id, 'day_of_week' => 1, 'start_minute' => 500, 'end_minute' => 650, 'course_offering_id' => $offering->id], [ClassGroup::factory()->create()], [$lecturer]);
+
+    expect(issueCodes($this->draft))->toBe(['LECTURER_CONFLICT', 'LOAD_EXCEEDED', 'ROOM_CONFLICT']);
+
+    $this->draft->update(['allow_conflicts' => true]);
+
+    $issues = app(ScheduleValidator::class)->validate($this->draft->fresh());
+
+    expect($issues->where('severity', IssueSeverity::Error))->toBeEmpty()
+        ->and($issues->where('severity', IssueSeverity::Warning)->pluck('code')->sort()->values()->all())
+        ->toBe(['LECTURER_CONFLICT', 'LOAD_EXCEEDED', 'ROOM_CONFLICT']);
+});

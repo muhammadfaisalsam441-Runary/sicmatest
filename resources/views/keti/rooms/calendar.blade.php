@@ -23,7 +23,7 @@
             </x-info-box>
         @endif
 
-        <x-card>
+        <x-card padding="p-4 sm:p-6">
             <form method="GET" action="{{ route('keti.rooms.calendar') }}" class="flex flex-col gap-4">
                 <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     <x-field label="Tanggal" name="tanggal">
@@ -42,18 +42,18 @@
                         <x-select name="gedung" :options="$buildingOptions" :value="$filters['gedung'] ?? null" placeholder="Semua gedung" />
                     </x-field>
                     <div class="flex flex-wrap items-end gap-3">
-                        <x-button type="submit" icon="calendar-days">Tampilkan slot</x-button>
-                        <x-button variant="secondary" :href="route('keti.rooms.calendar')">Atur ulang</x-button>
+                        <x-button type="submit" icon="calendar-days" class="min-h-11 flex-1 sm:flex-none">Tampilkan slot</x-button>
+                        <x-button variant="secondary" :href="route('keti.rooms.calendar')" class="min-h-11 flex-1 sm:flex-none">Atur ulang</x-button>
                     </div>
                 </div>
             </form>
         </x-card>
 
-        <nav class="flex gap-2 overflow-x-auto pb-2" aria-label="Pilih hari pemesanan">
+        <nav class="flex gap-2 overflow-x-auto pb-2 snap-x custom-scrollbar" aria-label="Pilih hari pemesanan">
             @foreach ($days as $day)
                 <a href="{{ route('keti.rooms.calendar', [...$filters, 'tanggal' => $day->toDateString(), 'durasi' => $duration]) }}"
                    @if ($day->equalTo($date)) aria-current="date" @endif
-                   @class(['flex min-w-28 flex-1 flex-col items-center gap-1 rounded-control border px-4 py-3 text-sm', 'border-primary bg-primary text-white' => $day->equalTo($date), 'border-border bg-surface text-ink hover:bg-primary-soft' => ! $day->equalTo($date)])>
+                   @class(['flex min-h-12 min-w-28 flex-1 shrink-0 snap-start flex-col items-center justify-center gap-1 rounded-control border px-4 py-3 text-sm transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary', 'border-primary bg-primary text-white' => $day->equalTo($date), 'border-border bg-surface text-ink hover:bg-primary-soft' => ! $day->equalTo($date)])>
                     <span class="font-semibold">{{ $day->equalTo($today) ? 'Hari ini' : Wita::dayName($day) }}</span>
                     <span>{{ Wita::date($day) }}</span>
                 </a>
@@ -67,18 +67,18 @@
         @endif
 
         @forelse ($rows as $row)
-            <x-card class="flex flex-col gap-4 p-5 sm:p-6 transition hover:border-primary/40">
+            <x-card padding="p-4 sm:p-6" class="flex flex-col gap-4 transition hover:border-primary/40">
                 <div class="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
-                    <div class="flex items-center gap-3.5">
+                    <div class="flex min-w-0 items-center gap-3.5">
                         <div class="flex size-11 shrink-0 items-center justify-center rounded-control border border-primary/20 bg-primary-soft text-sm font-bold text-primary">
                             {{ $row['room']->building?->code ?? 'RM' }}
                         </div>
-                        <div class="flex flex-col gap-0.5">
-                            <div class="flex items-center gap-2">
+                        <div class="flex min-w-0 flex-col gap-0.5">
+                            <div class="flex flex-wrap items-center gap-2">
                                 <h3 class="text-lg font-bold text-ink">{{ $row['room']->name }}</h3>
                                 <x-status-badge variant="success">{{ count($row['windows']) }} rentang kosong</x-status-badge>
                             </div>
-                            <p class="flex items-center gap-2 text-xs text-muted">
+                            <p class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
                                 <span>{{ $row['room']->building?->name ?? 'Gedung belum didata' }}{{ $row['room']->floor ? ' · Lantai '.$row['room']->floor : '' }}</span>
                                 <span>•</span>
                                 <span class="inline-flex items-center gap-1 font-medium text-ink">
@@ -116,12 +116,12 @@
                         @endphp
                         <form method="GET" action="{{ route('keti.rooms.show', $row['room']) }}" class="grid items-end gap-3 py-3.5 first:pt-1 last:pb-0 sm:grid-cols-[auto_1fr_auto]"
                               x-data="{ start: @js($payloads->keys()->first()), payloads: @js($payloads) }">
-                            <div class="flex min-w-44 flex-col justify-center rounded-control border border-border bg-page px-3.5 py-2">
+                            <div class="flex min-w-0 flex-col justify-center rounded-control border border-border bg-page px-3.5 py-2 sm:min-w-44">
                                 <span class="text-xs text-muted">Kosong pada</span>
                                 <p class="text-sm font-bold text-primary">{{ Wita::range($window['start'], $window['end']) }}</p>
                             </div>
-                            <div class="flex flex-col gap-1.5">
-                                <div class="flex items-center justify-between text-xs">
+                            <div class="flex min-w-0 flex-col gap-1.5">
+                                <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
                                     <label for="{{ $selectId }}" class="font-medium text-ink">Pilih waktu pemakaian</label>
                                     <span class="text-muted">Durasi: {{ $duration }} menit</span>
                                 </div>
@@ -131,10 +131,10 @@
                             @if (isset($filters['orang']))
                                 <input type="hidden" name="orang" value="{{ $filters['orang'] }}">
                             @endif
-                            <div class="flex items-center gap-3">
-                                <button type="submit" class="text-sm font-semibold text-primary hover:underline">Detail</button>
+                            <div class="flex items-center justify-between gap-3 sm:justify-end">
+                                <button type="submit" class="inline-flex min-h-11 cursor-pointer items-center px-2 text-sm font-semibold text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">Detail</button>
                                 {{-- Pesan langsung: buka modal konfirmasi dengan jam yang dipilih, tanpa pindah halaman. --}}
-                                <x-button x-on:click="$dispatch('open-booking', payloads[start])" :aria-label="'Pesan '.$row['room']->name.' pada '.Wita::range($window['start'], $window['end'])" class="whitespace-nowrap px-6">
+                                <x-button x-on:click="$dispatch('open-booking', payloads[start])" :aria-label="'Pesan '.$row['room']->name.' pada '.Wita::range($window['start'], $window['end'])" class="min-h-11 flex-1 whitespace-nowrap px-6 sm:flex-none">
                                     <span>Pesan</span>
                                     <i data-lucide="arrow-right" class="size-4"></i>
                                 </x-button>

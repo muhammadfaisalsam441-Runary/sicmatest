@@ -47,15 +47,15 @@
             <x-empty-state title="Pesanan dibatalkan" message="Pembatalan tercatat. Kamu dapat mencari ruangan lain." icon="check">
                 <x-button :href="route('keti.search')">Cari ruangan lagi</x-button>
             </x-empty-state>
-            <x-card class="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+            <x-card padding="p-4 sm:p-6" class="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
                 <span class="text-sm text-muted">{{ $room->name }} • {{ Wita::date($reservation->start_at) }} {{ Wita::range($reservation->start_at, $reservation->end_at) }} • {{ $reservation->purpose }}</span>
                 <span class="text-sm text-muted">Dibatalkan {{ Wita::stamp($reservation->cancelled_at) }}{{ $reservation->cancel_reason ? ' • '.$reservation->cancel_reason : '' }}</span>
             </x-card>
         @else
             <div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-[1fr_390px]">
-                <x-card class="sicma-card-enter flex flex-col gap-5">
+                <x-card padding="p-4 sm:p-6" class="sicma-card-enter flex flex-col gap-5">
                     <div class="flex flex-wrap items-start justify-between gap-3">
-                        <div class="flex flex-col gap-1">
+                        <div class="flex min-w-0 flex-col gap-1">
                             <span class="text-xs font-semibold uppercase tracking-wide text-primary">{{ $reservation->purpose }}</span>
                             <h2 class="text-2xl font-semibold text-ink sm:text-3xl">{{ $room->name }}</h2>
                             <p class="inline-flex items-center gap-1.5 text-sm text-muted">
@@ -71,14 +71,14 @@
                             <i data-lucide="calendar" aria-hidden="true" class="size-3.5"></i>
                             <span>{{ Wita::longDate($reservation->start_at) }}</span>
                         </span>
-                        <dl class="grid grid-cols-2 items-end gap-4">
+                        <dl class="grid grid-cols-2 items-end gap-3 sm:gap-4">
                             <div class="flex flex-col gap-0.5">
                                 <dt class="text-xs text-muted">Mulai</dt>
-                                <dd class="text-xl font-semibold text-ink tabular-nums">{{ Wita::clock($reservation->actual_start_at ?? $reservation->start_at) }}</dd>
+                                <dd class="text-lg font-semibold text-ink tabular-nums sm:text-xl">{{ Wita::clock($reservation->actual_start_at ?? $reservation->start_at) }}</dd>
                             </div>
                             <div class="flex flex-col items-end gap-0.5 text-right">
                                 <dt class="text-xs text-muted">{{ match ($status) { ReservationStatus::Booked => 'Selesai rencana', ReservationStatus::InUse => 'Batas penggunaan', default => 'Selesai' } }}</dt>
-                                <dd class="text-xl font-semibold text-ink tabular-nums">{{ Wita::clock($reservation->actual_end_at ?? $reservation->end_at) }}</dd>
+                                <dd class="text-lg font-semibold text-ink tabular-nums sm:text-xl">{{ Wita::clock($reservation->actual_end_at ?? $reservation->end_at) }}</dd>
                             </div>
                         </dl>
                     </div>
@@ -101,36 +101,36 @@
                                 @if ($canCheckIn ?? false)
                                     <form method="POST" action="{{ route('keti.reservations.start', $reservation) }}">
                                         @csrf
-                                        <x-button type="submit" class="w-full">Mulai gunakan</x-button>
+                                        <x-button type="submit" class="min-h-11 w-full">Mulai gunakan</x-button>
                                     </form>
                                 @else
-                                    <x-button disabled class="w-full" title="Jendela check-in belum dibuka atau sudah lewat">Mulai gunakan</x-button>
+                                    <x-button disabled class="min-h-11 w-full" title="Jendela check-in belum dibuka atau sudah lewat">Mulai gunakan</x-button>
                                 @endif
                             @endunless
                             @if (! $reschedule || ! $reschedule->original_start_at->isPast())
-                                <x-button variant="danger-outline" x-data x-on:click="$dispatch('open-modal', 'batal-pesanan')">{{ $reschedule ? 'Batalkan pemindahan' : 'Batalkan' }}</x-button>
+                                <x-button variant="danger-outline" class="min-h-11 w-full" x-data x-on:click="$dispatch('open-modal', 'batal-pesanan')">{{ $reschedule ? 'Batalkan pemindahan' : 'Batalkan' }}</x-button>
                             @endif
                             @if ($reschedule && $reschedule->schedule_session_id)
-                                <x-button variant="secondary" class="sm:col-span-2" :href="route('keti.meetings.reschedule', ['sesi' => $reschedule->schedule_session_id, 'tanggal' => $reschedule->original_start_at->toDateString(), 'pengganti' => $reservation->id])">Pindahkan lagi</x-button>
+                                <x-button variant="secondary" class="min-h-11 w-full sm:col-span-2" :href="route('keti.meetings.reschedule', ['sesi' => $reschedule->schedule_session_id, 'tanggal' => $reschedule->original_start_at->toDateString(), 'pengganti' => $reservation->id])">Pindahkan lagi</x-button>
                             @endif
                         @elseif ($status === ReservationStatus::InUse && $canManage)
                             <form method="POST" action="{{ route('keti.reservations.finish', $reservation) }}">
                                 @csrf
-                                <x-button type="submit" class="w-full">Selesai menggunakan</x-button>
+                                <x-button type="submit" class="min-h-11 w-full">Selesai menggunakan</x-button>
                             </form>
-                            <x-button variant="secondary" :href="route('keti.rooms.show', $room)">Detail ruangan</x-button>
+                            <x-button variant="secondary" class="min-h-11 w-full" :href="route('keti.rooms.show', $room)">Detail ruangan</x-button>
                         @else
-                            <x-button :href="route('keti.search')">Cari ruangan lagi</x-button>
-                            <x-button variant="secondary" :href="route('keti.activity')">Lihat aktivitas</x-button>
+                            <x-button class="min-h-11 w-full" :href="route('keti.search')">Cari ruangan lagi</x-button>
+                            <x-button variant="secondary" class="min-h-11 w-full" :href="route('keti.activity')">Lihat aktivitas</x-button>
                         @endif
                     </div>
                 </x-card>
 
-                <x-card class="sicma-card-enter flex flex-col gap-4" style="--stagger: 1">
+                <x-card padding="p-4 sm:p-6" class="sicma-card-enter flex flex-col gap-4" style="--stagger: 1">
                     @if ($status === ReservationStatus::Booked && $academicBookingBlocked)
                         <h2 class="text-xl font-semibold">Pilih hari kuliah</h2>
                         <p class="text-sm text-ink">Pesan ulang untuk Senin–Jumat melalui menu Cari Ruangan.</p>
-                        <x-button :href="route('keti.search')">Buka Cari Ruangan</x-button>
+                        <x-button class="min-h-11 w-full" :href="route('keti.search')">Buka Cari Ruangan</x-button>
                     @elseif ($status === ReservationStatus::Booked)
                         <h2 class="text-xl font-semibold">Sudah berada di ruangan?</h2>
                         <p class="text-sm text-ink">Tekan Mulai gunakan untuk mencatat awal pemakaian. Batalkan jika ruangan tidak jadi dipakai.</p>
@@ -140,35 +140,35 @@
                     @elseif ($status === ReservationStatus::InUse)
                         <span class="text-xs font-semibold uppercase tracking-wide text-success">Sedang berlangsung</span>
                         <h2 class="text-xl font-semibold">Sisa waktu penggunaan</h2>
-                        <p class="rounded-control bg-success-soft px-4 py-3 text-3xl font-semibold text-success tabular-nums">{{ Wita::duration($remaining) }}</p>
+                        <p class="rounded-control bg-success-soft px-4 py-3 text-2xl font-semibold text-success tabular-nums sm:text-3xl">{{ Wita::duration($remaining) }}</p>
                         <p class="text-sm text-ink">Selesaikan penggunaan setelah meninggalkan ruangan.</p>
                         @if ($canManage)
                             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 @unless ($academicBookingBlocked)
-                                    <x-button variant="secondary" x-data x-on:click="$dispatch('open-modal', 'perpanjang')">+{{ config('sicma.reservation.extend_minutes') }} menit</x-button>
+                                    <x-button variant="secondary" class="min-h-11 w-full" x-data x-on:click="$dispatch('open-modal', 'perpanjang')">+{{ config('sicma.reservation.extend_minutes') }} menit</x-button>
                                 @endunless
-                                <x-button variant="secondary" x-data x-on:click="$dispatch('open-modal', 'lapor-kendala')">Lapor kendala</x-button>
+                                <x-button variant="secondary" class="min-h-11 w-full" x-data x-on:click="$dispatch('open-modal', 'lapor-kendala')">Lapor kendala</x-button>
                             </div>
                         @endif
                     @else
                         <h2 class="text-xl font-semibold">Pemakaian sudah tercatat</h2>
                         <p class="text-sm text-ink">Buka Aktivitas Saya untuk melihat kembali riwayat penggunaanmu.</p>
                     @endif
-                    <x-button variant="soft" class="w-full" :href="route('keti.activity', ['cakupan' => 'saya'])">Aktivitas saya</x-button>
+                    <x-button variant="soft" class="min-h-11 w-full" :href="route('keti.activity', ['cakupan' => 'saya'])">Aktivitas saya</x-button>
                 </x-card>
             </div>
 
             @if ($status === ReservationStatus::Finished)
-                <x-card class="flex flex-col gap-4">
+                <x-card padding="p-4 sm:p-6" class="flex flex-col gap-4">
                     <h2 class="text-lg font-semibold">Riwayat penggunaan terbaru</h2>
                     <x-data-table :headers="['Pengguna', 'Ruangan', 'Kegiatan / kelas', 'Waktu', 'Status']" class="border-0">
                         @foreach ($recent as $item)
                             <tr>
-                                <td class="px-5 py-3">Kelas {{ $reservation->classGroup->name }}</td>
-                                <td class="px-5 py-3">{{ $item->room->name }}</td>
-                                <td class="px-5 py-3">{{ $item->purpose }}</td>
-                                <td class="px-5 py-3">{{ Wita::date($item->start_at) }} • {{ Wita::range($item->actual_start_at ?? $item->start_at, $item->actual_end_at ?? $item->end_at) }}</td>
-                                <td class="px-5 py-3"><x-status-badge variant="success">Selesai</x-status-badge></td>
+                                <td class="px-3.5 py-3 sm:px-5">Kelas {{ $reservation->classGroup->name }}</td>
+                                <td class="px-3.5 py-3 whitespace-nowrap sm:px-5">{{ $item->room->name }}</td>
+                                <td class="px-3.5 py-3 sm:px-5">{{ $item->purpose }}</td>
+                                <td class="px-3.5 py-3 whitespace-nowrap sm:px-5">{{ Wita::date($item->start_at) }} • {{ Wita::range($item->actual_start_at ?? $item->start_at, $item->actual_end_at ?? $item->end_at) }}</td>
+                                <td class="px-3.5 py-3 whitespace-nowrap sm:px-5"><x-status-badge variant="success">Selesai</x-status-badge></td>
                             </tr>
                         @endforeach
                     </x-data-table>
@@ -198,8 +198,8 @@
                 <p class="text-sm text-muted">Tambahan {{ config('sicma.reservation.extend_minutes') }} menit tersedia selama tidak berbenturan dengan jadwal berikutnya.</p>
                 <x-info-box title="{{ $room->name }}"><p>Batas baru: {{ Wita::clock($reservation->end_at->copy()->addMinutes((int) config('sicma.reservation.extend_minutes'))) }}</p></x-info-box>
                 <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <x-button variant="secondary" x-on:click="$dispatch('close-modal', 'perpanjang')">Kembali</x-button>
-                    <x-button type="submit">Perpanjang {{ config('sicma.reservation.extend_minutes') }} menit</x-button>
+                    <x-button variant="secondary" class="min-h-11 w-full" x-on:click="$dispatch('close-modal', 'perpanjang')">Kembali</x-button>
+                    <x-button type="submit" class="min-h-11 w-full">Perpanjang {{ config('sicma.reservation.extend_minutes') }} menit</x-button>
                 </div>
             </form>
         </x-modal>
@@ -213,8 +213,8 @@
                 </x-field>
                 <x-field label="Catatan (opsional)" name="note"><x-textarea name="note" rows="2" /></x-field>
                 <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <x-button variant="secondary" x-on:click="$dispatch('close-modal', 'lapor-kendala')">Batal</x-button>
-                    <x-button type="submit">Kirim laporan</x-button>
+                    <x-button variant="secondary" class="min-h-11 w-full" x-on:click="$dispatch('close-modal', 'lapor-kendala')">Batal</x-button>
+                    <x-button type="submit" class="min-h-11 w-full">Kirim laporan</x-button>
                 </div>
             </form>
         </x-modal>

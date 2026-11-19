@@ -1,12 +1,11 @@
 @props(['items' => [], 'size' => 'md'])
 
 @php
-    $navGap = $size === 'sm' ? 'gap-2' : 'gap-3';
-    $itemSizeClasses = $size === 'sm' ? 'px-3.5 py-1.5 text-xs' : 'px-5 py-2.5 text-sm';
+    $itemSizeClasses = $size === 'sm' ? 'min-h-10 sm:min-h-0 px-3.5 py-1.5 text-xs' : 'min-h-11 py-2.5 px-4 text-sm';
 @endphp
 
 {{-- $items: list<array{label: string, href: string, active: bool, count?: int|null}> --}}
-<nav {{ $attributes->merge(['class' => "flex flex-wrap items-center {$navGap}"]) }} aria-label="Tab">
+<nav {{ $attributes->merge(['class' => 'flex flex-wrap items-center gap-2']) }} aria-label="Tab">
     @foreach ($items as $item)
         <a href="{{ $item['href'] }}"
            @if ($item['active']) aria-current="page" @endif

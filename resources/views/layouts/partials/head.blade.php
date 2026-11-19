@@ -1,5 +1,5 @@
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="csrf-token" content="{{ csrf_token() }}">
 @if (config('sicma.realtime.enabled', true) && config('broadcasting.default') === 'reverb' && filled(config('broadcasting.connections.reverb.key')))
 <meta name="reverb-config" content="{{ json_encode([

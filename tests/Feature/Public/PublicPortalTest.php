@@ -149,3 +149,16 @@ test('portal publik dan halaman masuk merender latar belakang ambient serta tomb
         ->assertSee('sicma-btn-solid', false)
         ->assertSee('data-toggle-bg-motion', false);
 });
+
+test('portal publik dan halaman masuk merender viewport safe-area serta tata letak responsif mobile', function () {
+    $home = $this->get(route('home'))->assertOk();
+    $home->assertSee('viewport-fit=cover', false)
+        ->assertSee('min-h-dvh', false)
+        ->assertSee('sicma-safe-top', false)
+        ->assertSee('sicma-safe-bottom', false);
+
+    $login = $this->get(route('login'))->assertOk();
+    $login->assertSee('viewport-fit=cover', false)
+        ->assertSee('min-h-dvh', false)
+        ->assertSee('grid-cols-1 lg:grid-cols-[41%_1fr]', false);
+});

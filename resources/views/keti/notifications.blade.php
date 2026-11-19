@@ -8,9 +8,9 @@
         <x-page-header title="Notifikasi" subtitle="Informasi terbaru tentang ruanganmu.">
             @if ($unreadCount > 0)
                 <x-slot:actions>
-                    <form method="POST" action="{{ route('keti.notifications.read-all') }}">
+                    <form method="POST" action="{{ route('keti.notifications.read-all') }}" class="w-full sm:w-auto">
                         @csrf
-                        <x-button type="submit" variant="secondary">Tandai semua dibaca</x-button>
+                        <x-button type="submit" variant="secondary" class="min-h-11 w-full sm:w-auto">Tandai semua dibaca</x-button>
                     </form>
                 </x-slot:actions>
             @endif
@@ -23,7 +23,7 @@
 
         @forelse ($notifications as $notification)
             @php($isUnread = $notification->read_at === null)
-            <x-card :class="'sicma-card-enter sicma-card-interactive flex flex-col justify-between gap-4 sm:flex-row sm:items-center '.($isUnread ? 'border-primary/25 bg-primary-soft/20' : '')" style="--stagger: {{ $loop->index }}">
+            <x-card padding="p-4 sm:p-6" :class="'sicma-card-enter sicma-card-interactive flex flex-col justify-between gap-4 sm:flex-row sm:items-center '.($isUnread ? 'border-primary/25 bg-primary-soft/20' : '')" style="--stagger: {{ $loop->index }}">
                 <div class="flex min-w-0 items-start gap-3.5">
                     <span @class([
                         'flex size-10 shrink-0 items-center justify-center rounded-control border',
@@ -46,14 +46,14 @@
                         </p>
                     </div>
                 </div>
-                <form method="POST" action="{{ route('keti.notifications.read', $notification) }}" class="shrink-0 self-end sm:self-center">
+                <form method="POST" action="{{ route('keti.notifications.read', $notification) }}" class="w-full shrink-0 sm:w-auto sm:self-center">
                     @csrf
-                    <x-button size="sm" type="submit" :variant="$isUnread ? 'soft' : 'secondary'">{{ isset($notification->data['reservation_id']) ? 'Lihat' : 'Tandai dibaca' }}</x-button>
+                    <x-button size="sm" type="submit" :variant="$isUnread ? 'soft' : 'secondary'" class="min-h-11 w-full sm:min-h-0 sm:w-auto">{{ isset($notification->data['reservation_id']) ? 'Lihat' : 'Tandai dibaca' }}</x-button>
                 </form>
             </x-card>
         @empty
             <x-empty-state title="Belum ada notifikasi" message="Informasi terbaru tentang ruangan dan pemakaianmu akan muncul di sini." icon="bell">
-                <x-button variant="soft" :href="route('keti.search')">Cari ruangan</x-button>
+                <x-button variant="soft" :href="route('keti.search')" class="min-h-11 sm:min-h-0">Cari ruangan</x-button>
             </x-empty-state>
         @endforelse
     </div>

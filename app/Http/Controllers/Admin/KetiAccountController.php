@@ -66,7 +66,7 @@ class KetiAccountController extends Controller
             'counts' => $counts,
             'keyword' => $keyword,
             'classGroupFilter' => $classGroupFilter,
-            'classGroups' => ClassGroup::query()->where('is_active', true)->orderBy('name')->pluck('name', 'id'),
+            'classGroups' => ClassGroup::query()->where('is_active', true)->orderedForSelection()->pluck('name', 'id'),
         ]);
     }
 

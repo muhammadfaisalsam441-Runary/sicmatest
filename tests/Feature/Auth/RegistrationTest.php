@@ -88,3 +88,28 @@ test('kelas nonaktif tidak bisa dipilih saat mendaftar', function () {
         'password' => 'rahasia-panjang',
     ])->assertSessionHasErrors('class_group_id');
 });
+
+test('daftar kelas di halaman pendaftaran dikelompokkan dan diurutkan berdasarkan prodi, angkatan terbaru, dan jenis kelas', function (): void {
+    $this->withoutVite();
+
+    ClassGroup::factory()->create(['name' => 'TEKOM A 2025', 'study_program' => 'Teknik Komputer', 'cohort_year' => 2025]);
+    ClassGroup::factory()->create(['name' => 'PTIK A 2024', 'study_program' => 'Pendidikan Teknik Informatika dan Komputer', 'cohort_year' => 2024]);
+    ClassGroup::factory()->create(['name' => 'PTIK ULANG 2026', 'study_program' => 'Pendidikan Teknik Informatika dan Komputer', 'cohort_year' => 2026]);
+    ClassGroup::factory()->create(['name' => 'PTIK B 2026', 'study_program' => 'Pendidikan Teknik Informatika dan Komputer', 'cohort_year' => 2026]);
+    ClassGroup::factory()->create(['name' => 'PTIK A 2026', 'study_program' => 'Pendidikan Teknik Informatika dan Komputer', 'cohort_year' => 2026]);
+    ClassGroup::factory()->create(['name' => 'PTIK Pilihan A 2026', 'study_program' => 'Pendidikan Teknik Informatika dan Komputer', 'cohort_year' => 2026]);
+
+    $this->get(route('register'))
+        ->assertOk()
+        ->assertSeeInOrder([
+            '<optgroup label="PTIK — Angkatan 2026">',
+            'PTIK A 2026',
+            'PTIK B 2026',
+            'PTIK Pilihan A 2026',
+            'PTIK ULANG 2026',
+            '<optgroup label="PTIK — Angkatan 2024">',
+            'PTIK A 2024',
+            '<optgroup label="TEKOM — Angkatan 2025">',
+            'TEKOM A 2025',
+        ], false);
+});

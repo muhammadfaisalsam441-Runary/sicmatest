@@ -39,7 +39,7 @@ class UsageLogController extends Controller
             'logs' => $logs,
             'lastUsed' => $lastUsed,
             'rooms' => Room::query()->orderBy('name')->pluck('name', 'id'),
-            'classGroups' => ClassGroup::query()->orderBy('name')->pluck('name', 'id'),
+            'classGroups' => ClassGroup::query()->orderedForSelection()->pluck('name', 'id'),
             'roomId' => $request->integer('ruang') ?: null,
             'classGroupId' => $request->integer('kelas') ?: null,
         ]);

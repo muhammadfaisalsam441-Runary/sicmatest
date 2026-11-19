@@ -65,7 +65,7 @@ class ScheduleController extends Controller
             ->map(fn (int $year): string => "Angkatan {$year}")
             ->all();
 
-        $classGroupsQuery = ClassGroup::query()->orderBy('name');
+        $classGroupsQuery = ClassGroup::query()->orderedForSelection();
         if ($prodi !== '') {
             $classGroupsQuery->whereStudyProgramMatches($prodi);
         }

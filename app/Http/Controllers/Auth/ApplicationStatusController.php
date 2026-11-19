@@ -29,7 +29,9 @@ class ApplicationStatusController extends Controller
             'application' => $user->latestKetiApplication()->with('classGroup')->first(),
             'activeClassGroup' => $user->activeClassGroup(),
             'isApproved' => $user->isApprovedKeti(),
-            'classGroups' => ClassGroup::query()->where('is_active', true)->orderBy('name')->pluck('name', 'id'),
+            'classGroups' => ClassGroup::groupedOptions(
+                ClassGroup::query()->where('is_active', true)->orderedForSelection()->get(),
+            ),
         ]);
     }
 

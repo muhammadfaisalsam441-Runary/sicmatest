@@ -35,8 +35,18 @@
         <option value="" @selected($selectedValue === null || $selectedValue === '')>{{ $placeholder }}</option>
     @endif
     @foreach ($options as $optionValue => $optionLabel)
-        <option value="{{ $optionValue }}"
-                @selected($selectedValue !== null && (string) $selectedValue === (string) $optionValue)
-                @disabled(in_array($optionValue, $disabledOptions, true))>{{ $optionLabel }}</option>
+        @if (is_iterable($optionLabel))
+            <optgroup label="{{ $optionValue }}">
+                @foreach ($optionLabel as $groupOptionValue => $groupOptionLabel)
+                    <option value="{{ $groupOptionValue }}"
+                            @selected($selectedValue !== null && (string) $selectedValue === (string) $groupOptionValue)
+                            @disabled(in_array($groupOptionValue, $disabledOptions, true))>{{ $groupOptionLabel }}</option>
+                @endforeach
+            </optgroup>
+        @else
+            <option value="{{ $optionValue }}"
+                    @selected($selectedValue !== null && (string) $selectedValue === (string) $optionValue)
+                    @disabled(in_array($optionValue, $disabledOptions, true))>{{ $optionLabel }}</option>
+        @endif
     @endforeach
 </select>

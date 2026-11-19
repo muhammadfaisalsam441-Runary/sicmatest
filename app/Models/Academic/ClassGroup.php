@@ -6,6 +6,7 @@ use App\Models\Reservation\Reservation;
 use App\Models\Scheduling\ScheduleSession;
 use App\Models\User\ClassRepresentative;
 use App\Models\User\KetiApplication;
+use Closure;
 use Database\Factories\ClassGroupFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -92,6 +93,64 @@ class ClassGroup extends Model
         return $query->where(fn (Builder $q): Builder => $q
             ->where('study_program', $prodi)
             ->orWhere('study_program', 'like', "%{$prodi}%"));
+    }
+
+    /**
+     * Urutkan kelas untuk pilihan dropdown: PTIK lalu TEKOM, angkatan terbaru dulu, reguler sebelum Pilihan/ULANG, lalu A–Z.
+     *
+     * @param  Builder<ClassGroup>  $query
+     * @return Builder<ClassGroup>
+     */
+    public function scopeOrderedForSelection(Builder $query): Builder
+    {
+        return $query
+            ->orderByRaw("CASE
+                WHEN study_program IN ('PTIK', 'Pendidikan Teknik Informatika dan Komputer') THEN 0
+                WHEN study_program IN ('TEKOM', 'Teknik Komputer') THEN 1
+                WHEN study_program IS NOT NULL AND study_program != '' THEN 2
+                ELSE 3
+            END")
+            ->orderBy('study_program')
+            ->orderByRaw('CASE WHEN cohort_year IS NULL THEN 1 ELSE 0 END')
+            ->orderByDesc('cohort_year')
+            ->orderByRaw("CASE
+                WHEN LOWER(name) LIKE '%ulang%' THEN 2
+                WHEN LOWER(name) LIKE '%pilihan%' THEN 1
+                ELSE 0
+            END")
+            ->orderBy('name');
+    }
+
+    /**
+     * Kelompokkan daftar kelas terurut menjadi array bertingkat untuk `<optgroup>`.
+     *
+     * @param  iterable<int, ClassGroup>  $classes
+     * @param  (Closure(ClassGroup): string)|null  $labelFormatter
+     * @return array<string, array<int, string>>
+     */
+    public static function groupedOptions(iterable $classes, ?Closure $labelFormatter = null): array
+    {
+        $grouped = [];
+
+        foreach ($classes as $class) {
+            $program = trim((string) $class->study_program);
+            $shortProgram = match ($program) {
+                'PTIK', 'Pendidikan Teknik Informatika dan Komputer' => 'PTIK',
+                'TEKOM', 'Teknik Komputer' => 'TEKOM',
+                '' => 'Lainnya',
+                default => $program,
+            };
+
+            $groupLabel = $class->cohort_year !== null
+                ? "{$shortProgram} — Angkatan {$class->cohort_year}"
+                : $shortProgram;
+
+            $grouped[$groupLabel][$class->id] = $labelFormatter !== null
+                ? $labelFormatter($class)
+                : $class->name;
+        }
+
+        return $grouped;
     }
 
     /**

@@ -101,7 +101,7 @@ class AcademicController extends Controller
             'offeringClasses' => $offeringClasses,
             'offeringSksList' => $offeringSksList,
             'courseOptions' => Course::query()->orderBy('name')->get()->mapWithKeys(fn (Course $course) => [$course->id => "{$course->code} • {$course->name}"]),
-            'classOptions' => ClassGroup::query()->where('is_active', true)->orderBy('name')->pluck('name', 'id'),
+            'classOptions' => ClassGroup::query()->where('is_active', true)->orderedForSelection()->pluck('name', 'id'),
         ]);
     }
 

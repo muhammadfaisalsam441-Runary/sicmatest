@@ -20,11 +20,16 @@ class RegisterKetiController extends Controller
             ->pluck('class_group_id')
             ->all();
 
+        $classes = ClassGroup::query()
+            ->where('is_active', true)
+            ->orderedForSelection()
+            ->get();
+
         return view('auth.register', [
-            'classGroups' => ClassGroup::query()->where('is_active', true)->orderBy('name')->get()
-                ->mapWithKeys(fn (ClassGroup $class): array => [
-                    $class->id => in_array($class->id, $takenIds, true) ? $class->name.' (Sudah ada Keti)' : $class->name,
-                ]),
+            'classGroups' => ClassGroup::groupedOptions(
+                $classes,
+                fn (ClassGroup $class): string => in_array($class->id, $takenIds, true) ? $class->name.' (Sudah ada Keti)' : $class->name,
+            ),
         ]);
     }
 

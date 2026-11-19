@@ -2,11 +2,7 @@ name: sicma
 
 x-laravel: &laravel
   image: sicma-app:local
-  build:
-    context: .
-    target: app
-    args:
-      COMPOSER_NO_DEV: ${COMPOSER_NO_DEV:-0}
+  pull_policy: never
   restart: unless-stopped
   init: true
   working_dir: /var/www/html
@@ -47,21 +43,35 @@ x-laravel: &laravel
     redis:
       condition: service_healthy
 
+x-app-web: &app-web
+  <<: *laravel
+  healthcheck:
+    test:
+      - CMD
+      - php
+      - -r
+      - "exit(@file_get_contents('http://127.0.0.1/up') === false ? 1 : 0);"
+    interval: 15s
+    timeout: 5s
+    retries: 5
+    start_period: 20s
+
 services:
   app:
-    <<: *laravel
+    <<: *app-web
+    build:
+      context: .
+      target: app
+      args:
+        COMPOSER_NO_DEV: ${COMPOSER_NO_DEV:-0}
     ports:
       - "127.0.0.1:${APP_PORT:-8000}:80"
-    healthcheck:
-      test:
-        - CMD
-        - php
-        - -r
-        - "exit(@file_get_contents('http://127.0.0.1/up') === false ? 1 : 0);"
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
+
+  app_green:
+    <<: *app-web
+    profiles: ["bluegreen"]
+    ports:
+      - "127.0.0.1:${APP_GREEN_PORT:-8002}:80"
 
   queue:
     <<: *laravel

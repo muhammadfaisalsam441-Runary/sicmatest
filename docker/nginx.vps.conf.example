@@ -1,3 +1,11 @@
+# Simpan definisi upstream di /etc/nginx/conf.d/sicma-upstream.conf agar deploy.sh
+# bisa memindahkan trafik Blue-Green secara otomatis tanpa downtime:
+#
+# upstream sicma_app {
+#     server 127.0.0.1:8001;
+#     keepalive 16;
+# }
+
 server {
     listen 80;
     listen [::]:80;
@@ -39,10 +47,11 @@ server {
         proxy_read_timeout 60s;
     }
 
-    # Aplikasi Laravel SICMA (port internal 8000)
+    # Aplikasi Laravel SICMA via upstream Blue-Green (/etc/nginx/conf.d/sicma-upstream.conf)
     location / {
-        proxy_pass http://127.0.0.1:8000;
+        proxy_pass http://sicma_app;
         proxy_http_version 1.1;
+        proxy_set_header Connection "";
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;

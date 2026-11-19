@@ -19,6 +19,8 @@ public/fonts-manifest.dev.json
 bootstrap/cache/*.php
 storage
 database/*.sqlite*
+database/backups
+database/sicma_backup.sql
 scratch
 tmp
 output

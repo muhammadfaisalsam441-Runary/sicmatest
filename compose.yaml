@@ -110,6 +110,7 @@ services:
     volumes:
       # Skema terbaru terpisah; volume sicma_mysql_data lama tetap disimpan.
       - mysql_data_v2:/var/lib/mysql
+      - ./database/sicma_backup.sql:/docker-entrypoint-initdb.d/01-sicma.sql:ro
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci

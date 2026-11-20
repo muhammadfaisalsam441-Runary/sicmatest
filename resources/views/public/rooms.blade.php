@@ -10,8 +10,8 @@
 
 @section('content')
     <div class="flex flex-col gap-6">
-        <div class="flex flex-wrap items-center gap-3 sm:gap-4">
-            <x-button variant="secondary" :href="route('home')" data-prefetch class="w-full sm:w-52">Kembali ke beranda</x-button>
+        <div class="flex flex-wrap items-center justify-between gap-2">
+            <x-button variant="secondary" size="sm" icon="arrow-left" :href="route('home')" data-prefetch class="w-auto">Kembali ke beranda</x-button>
             <x-status-badge variant="primary">Akses publik • Hanya lihat</x-status-badge>
         </div>
 
@@ -32,21 +32,23 @@
                     <input type="search" name="q" value="{{ $keyword }}" placeholder="Cari nama ruangan"
                            class="min-h-11 w-full rounded-control border border-muted/60 bg-surface py-2.5 pr-4 pl-11 text-base text-ink placeholder:text-muted focus:border-primary focus:ring-2 focus:ring-primary/15 focus:outline-none sm:py-3 sm:text-sm">
                 </label>
-                <select name="gedung" aria-label="Filter gedung" onchange="this.form.requestSubmit()"
-                        class="min-h-11 w-full rounded-control border border-muted/60 bg-surface px-4 py-2.5 text-base text-ink hover:border-primary focus:border-primary focus:ring-2 focus:ring-primary/15 focus:outline-none sm:w-64 sm:py-3 sm:text-sm">
-                    <option value="">Semua gedung ({{ $summary['all'] }})</option>
-                    @foreach ($buildings as $buildingOption)
-                        <option value="{{ $buildingOption->id }}" @selected((string) $building === (string) $buildingOption->id)>
-                            {{ $buildingOption->name }} ({{ $buildingOption->rooms_count }})
-                        </option>
-                    @endforeach
-                    @if ($roomsWithoutBuilding > 0)
-                        <option value="lainnya" @selected($building === 'lainnya')>
-                            Gedung belum didata ({{ $roomsWithoutBuilding }})
-                        </option>
-                    @endif
-                </select>
-                <x-button type="submit" variant="secondary" class="w-full sm:w-32">Perbarui</x-button>
+                <div class="grid grid-cols-[1fr_auto] items-center gap-2 sm:contents">
+                    <select name="gedung" aria-label="Filter gedung" onchange="this.form.requestSubmit()"
+                            class="min-h-11 w-full min-w-0 rounded-control border border-muted/60 bg-surface px-4 py-2.5 text-base text-ink hover:border-primary focus:border-primary focus:ring-2 focus:ring-primary/15 focus:outline-none sm:w-64 sm:py-3 sm:text-sm">
+                        <option value="">Semua gedung ({{ $summary['all'] }})</option>
+                        @foreach ($buildings as $buildingOption)
+                            <option value="{{ $buildingOption->id }}" @selected((string) $building === (string) $buildingOption->id)>
+                                {{ $buildingOption->name }} ({{ $buildingOption->rooms_count }})
+                            </option>
+                        @endforeach
+                        @if ($roomsWithoutBuilding > 0)
+                            <option value="lainnya" @selected($building === 'lainnya')>
+                                Gedung belum didata ({{ $roomsWithoutBuilding }})
+                            </option>
+                        @endif
+                    </select>
+                    <x-button type="submit" variant="secondary" class="shrink-0 sm:w-32">Perbarui</x-button>
+                </div>
             </form>
         </search>
 

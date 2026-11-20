@@ -640,6 +640,19 @@ body[data-portal="public"] > header {
     }
 }
 
+@media (max-width: 639px) {
+    .sicma-schedule-cell--center {
+        display: none;
+    }
+
+    .sicma-schedule-cell,
+    .sicma-auth-cell {
+        width: 30px;
+        height: 30px;
+        opacity: 0.16;
+    }
+}
+
 /* ==========================================================================
    Auth Card & Pill Form Theme (Login & Register)
    ========================================================================== */
@@ -1272,6 +1285,24 @@ body[data-portal="public"] > header {
 
     .sicma-animated-btn:not(:disabled):not([aria-disabled="true"]):active {
         transform: none;
+    }
+}
+
+@media (max-width: 639px) {
+    .sicma-animated-btn__text {
+        transform: translateX(-4px);
+    }
+
+    .sicma-animated-btn--sm .sicma-animated-btn__text {
+        transform: translateX(-4px);
+    }
+
+    .sicma-animated-btn__arr--1 {
+        right: 18px;
+    }
+
+    .sicma-animated-btn--sm .sicma-animated-btn__arr--1 {
+        right: 14px;
     }
 }
 

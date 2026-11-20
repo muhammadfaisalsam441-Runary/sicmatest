@@ -10,35 +10,16 @@
             Lewati ke konten utama
         </a>
 
-        <div x-data="{ sidebarOpen: false }"
-             x-on:keydown.escape.window="if (sidebarOpen) { sidebarOpen = false; $nextTick(() => $refs.sidebarToggle?.focus()); }"
-             @sicma:navigated.document="sidebarOpen = false"
-             class="grid min-h-dvh grid-cols-1 lg:grid-cols-[220px_1fr]">
-            <div x-show="sidebarOpen"
-                 x-cloak
-                 x-transition.opacity
-                 x-on:click="sidebarOpen = false"
-                 class="fixed inset-0 z-40 bg-ink/60 lg:hidden"
-                 aria-hidden="true"></div>
-
+        <div class="grid min-h-dvh grid-cols-1 lg:grid-cols-[220px_1fr]">
             <aside id="keti-sidebar"
-                   :class="{ 'translate-x-0': sidebarOpen, '-translate-x-full': ! sidebarOpen }"
-                   class="fixed inset-y-0 left-0 z-50 flex h-dvh w-[220px] max-w-[85dvw] -translate-x-full flex-col overflow-y-auto border-r border-border bg-surface/90 px-5 backdrop-blur-md transition-transform duration-200 sicma-safe-top sicma-safe-bottom lg:sticky lg:top-0 lg:z-auto lg:w-auto lg:translate-x-0">
+                   class="hidden h-dvh flex-col overflow-y-auto border-r border-border bg-surface/90 px-5 backdrop-blur-md sicma-safe-top sicma-safe-bottom lg:sticky lg:top-0 lg:flex">
                 <div class="flex flex-col gap-10 py-9">
-                    <div class="flex items-start justify-between gap-2">
-                        <div class="flex flex-col gap-6">
-                            <a href="{{ Nav::url('keti.search') }}" class="inline-flex items-center gap-2.5 rounded-control text-[28px] font-bold tracking-tight text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
-                                <x-brand-mark size="size-8" />
-                                <span>SICMA</span>
-                            </a>
-                            <span class="text-xs text-muted">Ruang kelas JTIK</span>
-                        </div>
-                        <button type="button"
-                                x-on:click="sidebarOpen = false; $nextTick(() => $refs.sidebarToggle?.focus())"
-                                class="inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-control text-muted hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary lg:hidden"
-                                aria-label="Tutup menu navigasi">
-                            <i data-lucide="x" aria-hidden="true" class="size-5"></i>
-                        </button>
+                    <div class="flex flex-col gap-6">
+                        <a href="{{ Nav::url('keti.search') }}" class="inline-flex items-center gap-2.5 rounded-control text-[28px] font-bold tracking-tight text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+                            <x-brand-mark size="size-8" />
+                            <span>SICMA</span>
+                        </a>
+                        <span class="text-xs text-muted">Ruang kelas JTIK</span>
                     </div>
 
                     <nav class="flex flex-col gap-3" aria-label="Menu Portal Keti">
@@ -64,17 +45,9 @@
             <div class="relative isolate flex min-w-0 flex-col">
                 <x-ambient-backdrop variant="portal" />
                 <header class="sticky top-0 z-30 flex min-h-[calc(4rem+env(safe-area-inset-top,0px))] shrink-0 items-center justify-between gap-2 border-b border-border bg-surface/85 px-4 shadow-xs backdrop-blur-md sicma-safe-top sm:gap-4 sm:px-6 lg:px-8">
-                    {{-- Sisi Kiri: Toggle Mobile & Breadcrumb / Halaman Aktif --}}
+                    {{-- Sisi Kiri: Beranda Mobile & Breadcrumb / Halaman Aktif --}}
                     <div class="flex min-w-0 items-center gap-2 sm:gap-3">
-                        <button type="button"
-                                x-ref="sidebarToggle"
-                                x-on:click="sidebarOpen = ! sidebarOpen"
-                                class="flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-control border border-border bg-surface text-ink transition hover:bg-page focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary lg:hidden"
-                                aria-label="Buka menu navigasi"
-                                :aria-expanded="sidebarOpen.toString()"
-                                aria-controls="keti-sidebar">
-                            <i data-lucide="menu" aria-hidden="true" class="size-5"></i>
-                        </button>
+                        <a href="{{ Nav::url('keti.search') }}" class="inline-flex size-10 shrink-0 items-center justify-center rounded-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary lg:hidden" aria-label="Beranda Keti SICMA"><x-brand-mark size="size-8" /></a>
 
                         <nav class="flex min-w-0 items-center gap-1.5 text-sm text-muted sm:gap-2" aria-label="Breadcrumb">
                             <a href="{{ Nav::url('keti.my-class') }}" class="inline-flex min-h-11 shrink-0 items-center rounded font-medium text-muted transition hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary lg:min-h-0">Keti</a>
@@ -125,7 +98,7 @@
                     </div>
                 </footer>
 
-                <nav aria-label="Navigasi cepat mobile" class="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-border bg-surface/95 backdrop-blur-md lg:hidden sicma-safe-bottom">
+                <nav aria-label="Navigasi cepat mobile" class="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-border bg-surface/95 shadow-[0_-4px_20px_-6px_rgba(16,34,60,0.12)] backdrop-blur-md lg:hidden sicma-safe-bottom">
                     @foreach ([
                         ['My Class', 'calendar-days', 'keti.my-class', ['keti.my-class', 'keti.meetings.*']],
                         ['Cari', 'search', 'keti.search', ['keti.search', 'keti.rooms.calendar']],
@@ -136,15 +109,14 @@
                         @php($isActive = Nav::active(...$patterns))
                         <a href="{{ Nav::url($routeName) }}"
                            @class([
-                               'relative flex min-h-12 flex-col items-center justify-center gap-0.5 px-1 py-1.5 text-[11px] font-semibold transition focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary',
-                               'bg-primary-soft/50 text-primary' => $isActive,
+                               'flex min-h-12 flex-col items-center justify-center gap-0.5 px-1 py-1.5 text-[11px] font-semibold transition focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary',
+                               'text-primary' => $isActive,
                                'text-muted hover:text-primary' => ! $isActive,
                            ])
                            @if ($isActive) aria-current="page" @endif>
-                            @if ($isActive)
-                                <span aria-hidden="true" class="absolute top-0 h-0.5 w-6 rounded-full bg-primary"></span>
-                            @endif
-                            <i data-lucide="{{ $icon }}" aria-hidden="true" class="size-4 shrink-0"></i>
+                            <span class="{{ $isActive ? 'bg-primary-soft text-primary' : '' }} inline-flex items-center justify-center rounded-full px-3 py-0.5 transition">
+                                <i data-lucide="{{ $icon }}" aria-hidden="true" class="size-4 shrink-0"></i>
+                            </span>
                             <span class="max-w-full truncate">{{ $label }}</span>
                         </a>
                     @endforeach

@@ -17,12 +17,16 @@
         </section>
 
         <section class="flex flex-col gap-4">
-            <div class="flex flex-col items-start justify-between gap-4 sm:flex-row sm:gap-6">
-                <div class="flex flex-col gap-2">
-                    <h2 class="text-2xl font-semibold text-ink sm:text-3xl">{{ $availableCount }} ruang tersedia sekarang</h2>
-                    <p class="text-sm text-ink">Tersedia berarti ruangan dapat digunakan. Digunakan berarti ruangan sedang dipakai.</p>
-                    <p class="text-xs text-ink">Pratinjau {{ count($preview) }} dari {{ $availableCount }} ruang tersedia</p>
-                </div>
+            <div class="flex flex-col gap-2">
+                <h2 class="text-2xl font-semibold text-ink sm:text-3xl">{{ $availableCount }} ruang tersedia sekarang</h2>
+                <p class="text-sm text-muted">Tersedia berarti ruangan dapat digunakan. Digunakan berarti ruangan sedang dipakai.</p>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between gap-2 rounded-control border border-border/80 bg-surface/80 px-3.5 py-2 text-xs">
+                <span class="inline-flex items-center gap-2 font-medium text-muted">
+                    <span class="sicma-live-dot size-2 shrink-0 rounded-full bg-success" aria-hidden="true"></span>
+                    <span>Pratinjau {{ count($preview) }} dari {{ $availableCount }} ruang tersedia</span>
+                </span>
                 @include('public.partials.sim-label-button')
             </div>
 

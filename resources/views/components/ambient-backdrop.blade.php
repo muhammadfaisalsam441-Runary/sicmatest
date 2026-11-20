@@ -15,12 +15,12 @@
         <div class="sicma-schedule-cells relative mx-auto h-full min-h-[540px] max-w-[1168px]">
             <span class="sicma-schedule-cell" style="--cell-x: 8%; --cell-y: 14%; --cell-delay: 0s;"></span>
             <span class="sicma-schedule-cell" style="--cell-x: 20%; --cell-y: 38%; --cell-delay: 1.3s;"></span>
-            <span class="sicma-schedule-cell" style="--cell-x: 34%; --cell-y: 22%; --cell-delay: 2.6s;"></span>
-            <span class="sicma-schedule-cell" style="--cell-x: 48%; --cell-y: 12%; --cell-delay: 0.7s;"></span>
-            <span class="sicma-schedule-cell" style="--cell-x: 62%; --cell-y: 44%; --cell-delay: 1.9s;"></span>
+            <span class="sicma-schedule-cell sicma-schedule-cell--center" style="--cell-x: 34%; --cell-y: 22%; --cell-delay: 2.6s;"></span>
+            <span class="sicma-schedule-cell sicma-schedule-cell--center" style="--cell-x: 48%; --cell-y: 12%; --cell-delay: 0.7s;"></span>
+            <span class="sicma-schedule-cell sicma-schedule-cell--center" style="--cell-x: 62%; --cell-y: 44%; --cell-delay: 1.9s;"></span>
             <span class="sicma-schedule-cell" style="--cell-x: 74%; --cell-y: 18%; --cell-delay: 0.4s;"></span>
             <span class="sicma-schedule-cell" style="--cell-x: 86%; --cell-y: 34%; --cell-delay: 2.2s;"></span>
-            <span class="sicma-schedule-cell" style="--cell-x: 56%; --cell-y: 62%; --cell-delay: 3.1s;"></span>
+            <span class="sicma-schedule-cell sicma-schedule-cell--center" style="--cell-x: 56%; --cell-y: 62%; --cell-delay: 3.1s;"></span>
             <div class="sicma-grid-beam"></div>
             <div class="sicma-grid-beam--vertical"></div>
         </div>

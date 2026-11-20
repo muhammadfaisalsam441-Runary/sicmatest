@@ -6,16 +6,21 @@
 
 @php
     $sksOptions = config('sicma.reservation.duration_options');
+    $defaultMinutes = (int) config('sicma.reservation.default_minutes');
     $durationOptions = collect($sksOptions)
         ->when(! array_key_exists($duration, $sksOptions), fn ($options) => $options->put($duration, Wita::duration($duration)))
         ->sortKeys()->all();
     $buildingOptions = $buildings->pluck('name', 'id')->put('lainnya', 'Gedung belum didata');
+    $activeFilterCount = ($duration !== $defaultMinutes ? 1 : 0)
+        + (filled($filters['orang'] ?? null) ? 1 : 0)
+        + (filled($filters['q'] ?? null) ? 1 : 0)
+        + (filled($filters['gedung'] ?? null) ? 1 : 0);
+    $durationChip = trim((string) preg_replace('/\s*\(.*\)$/', '', (string) ($durationOptions[$duration] ?? Wita::duration($duration))));
 @endphp
 
 @section('content')
-    <div class="flex flex-col gap-6">
-        <x-page-header title="Slot Kosong Ruangan" subtitle="Pilih waktu kosong dan pesan ruangan untuk kelasmu." />
-        <p class="text-sm text-muted">Kalender pemesanan menampilkan hari Senin–Jumat.</p>
+    <div class="flex flex-col gap-4 sm:gap-6">
+        <x-page-header title="Slot Kosong Ruangan" subtitle="Pilih waktu kosong Senin–Jumat dan pesan ruangan untuk kelasmu." />
 
         @if ($showingNextTeachingDay)
             <x-info-box title="Booking tetap bisa dilakukan sekarang">
@@ -23,10 +28,61 @@
             </x-info-box>
         @endif
 
-        <x-card padding="p-4 sm:p-6">
-            <form method="GET" action="{{ route('keti.rooms.calendar') }}" class="flex flex-col gap-4">
-                <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    <x-field label="Tanggal" name="tanggal">
+        <nav class="flex gap-2 overflow-x-auto pb-1 snap-x custom-scrollbar" aria-label="Pilih hari pemesanan">
+            @foreach ($days as $day)
+                <a href="{{ route('keti.rooms.calendar', [...$filters, 'tanggal' => $day->toDateString(), 'durasi' => $duration]) }}"
+                   @if ($day->equalTo($date)) aria-current="date" @endif
+                   @class(['flex min-h-11 min-w-24 flex-1 shrink-0 snap-start flex-col items-center justify-center gap-0.5 rounded-control border px-3 py-2 text-xs transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:min-h-12 sm:min-w-28 sm:gap-1 sm:px-4 sm:py-3 sm:text-sm', 'border-primary bg-primary text-white' => $day->equalTo($date), 'border-border bg-surface text-ink hover:bg-primary-soft' => ! $day->equalTo($date)])>
+                    <span class="font-semibold">{{ $day->equalTo($today) ? 'Hari ini' : Wita::dayName($day) }}</span>
+                    <span>{{ Wita::date($day) }}</span>
+                </a>
+            @endforeach
+        </nav>
+
+        <x-card padding="p-3 sm:p-4 lg:p-6" x-data="{ filtersOpen: false }">
+            <div class="flex items-center justify-between gap-2 lg:hidden">
+                <div class="flex min-w-0 flex-wrap items-center gap-1.5">
+                    <button type="button" x-on:click="filtersOpen = ! filtersOpen" class="inline-flex cursor-pointer items-center gap-1 rounded-full bg-page px-2.5 py-1 text-xs font-medium text-ink ring-1 ring-border">
+                        <i data-lucide="clock" aria-hidden="true" class="size-3 text-primary"></i>
+                        <span>{{ $durationChip }}</span>
+                    </button>
+                    @if (filled($filters['gedung'] ?? null))
+                        <button type="button" x-on:click="filtersOpen = ! filtersOpen" class="inline-flex max-w-36 cursor-pointer items-center truncate rounded-full bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary">
+                            {{ $buildingOptions[$filters['gedung']] ?? $filters['gedung'] }}
+                        </button>
+                    @endif
+                    @if (filled($filters['orang'] ?? null))
+                        <button type="button" x-on:click="filtersOpen = ! filtersOpen" class="inline-flex cursor-pointer items-center gap-1 rounded-full bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary">
+                            <i data-lucide="users" aria-hidden="true" class="size-3"></i>
+                            <span>≥ {{ $filters['orang'] }} org</span>
+                        </button>
+                    @endif
+                    @if (filled($filters['q'] ?? null))
+                        <button type="button" x-on:click="filtersOpen = ! filtersOpen" class="inline-flex max-w-32 cursor-pointer items-center truncate rounded-full bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary">
+                            "{{ $filters['q'] }}"
+                        </button>
+                    @endif
+                </div>
+                <button type="button"
+                        x-on:click="filtersOpen = ! filtersOpen"
+                        aria-controls="calendar-filters-body"
+                        aria-expanded="false"
+                        :aria-expanded="filtersOpen.toString()"
+                        class="relative inline-flex min-h-10 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-control border border-border bg-page px-3 text-xs font-semibold text-ink transition hover:border-primary/40 hover:bg-primary-soft/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                        :class="filtersOpen ? 'border-primary bg-primary-soft/60 text-primary' : ''">
+                    <i data-lucide="sliders-horizontal" aria-hidden="true" class="size-4 shrink-0"></i>
+                    <span>Filter</span>
+                    @if ($activeFilterCount > 0)
+                        <span class="inline-flex size-4.5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">{{ $activeFilterCount }}</span>
+                    @endif
+                </button>
+            </div>
+
+            <form id="calendar-filters-body" method="GET" action="{{ route('keti.rooms.calendar') }}"
+                  class="mt-3 hidden flex-col gap-3 border-t border-border/70 pt-3 lg:mt-0 lg:block lg:border-0 lg:pt-0"
+                  :class="{ 'hidden': ! filtersOpen, 'flex': filtersOpen }">
+                <div class="grid grid-cols-2 gap-2.5 lg:grid-cols-3 lg:gap-4">
+                    <x-field label="Tanggal" name="tanggal" class="col-span-2 sm:col-span-1">
                         <x-select name="tanggal" :options="$days->mapWithKeys(fn ($day) => [$day->toDateString() => Wita::dayName($day).', '.Wita::date($day)])" :value="$date->toDateString()" />
                     </x-field>
                     <x-field label="Durasi pemakaian" name="durasi">
@@ -41,24 +97,13 @@
                     <x-field label="Gedung" name="gedung">
                         <x-select name="gedung" :options="$buildingOptions" :value="$filters['gedung'] ?? null" placeholder="Semua gedung" />
                     </x-field>
-                    <div class="flex flex-wrap items-end gap-3">
+                    <div class="col-span-2 flex flex-wrap items-end gap-2 lg:col-span-1 lg:gap-3">
                         <x-button type="submit" icon="calendar-days" class="min-h-11 flex-1 sm:flex-none">Tampilkan slot</x-button>
                         <x-button variant="secondary" :href="route('keti.rooms.calendar')" class="min-h-11 flex-1 sm:flex-none">Atur ulang</x-button>
                     </div>
                 </div>
             </form>
         </x-card>
-
-        <nav class="flex gap-2 overflow-x-auto pb-2 snap-x custom-scrollbar" aria-label="Pilih hari pemesanan">
-            @foreach ($days as $day)
-                <a href="{{ route('keti.rooms.calendar', [...$filters, 'tanggal' => $day->toDateString(), 'durasi' => $duration]) }}"
-                   @if ($day->equalTo($date)) aria-current="date" @endif
-                   @class(['flex min-h-12 min-w-28 flex-1 shrink-0 snap-start flex-col items-center justify-center gap-1 rounded-control border px-4 py-3 text-sm transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary', 'border-primary bg-primary text-white' => $day->equalTo($date), 'border-border bg-surface text-ink hover:bg-primary-soft' => ! $day->equalTo($date)])>
-                    <span class="font-semibold">{{ $day->equalTo($today) ? 'Hari ini' : Wita::dayName($day) }}</span>
-                    <span>{{ Wita::date($day) }}</span>
-                </a>
-            @endforeach
-        </nav>
 
         @if (! $scheduleConfirmed)
             <x-info-box title="Jadwal resmi belum ditetapkan">

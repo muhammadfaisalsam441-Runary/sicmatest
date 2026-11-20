@@ -4,19 +4,19 @@
 @section('title', 'Aktivitas ruangan')
 
 @section('content')
-    <div class="flex flex-col gap-6">
+    <div class="flex flex-col gap-4 sm:gap-6">
         <x-page-header title="Aktivitas ruangan" subtitle="Siapa saja yang memesan dan memakai ruangan." />
 
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div class="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
             <x-tabs :items="[
                 ['label' => 'Semua pengguna', 'href' => route('keti.activity', ['tanggal' => $date->toDateString()]), 'active' => $scope === 'semua'],
                 ['label' => 'Saya • '.$myCount, 'href' => route('keti.activity', ['cakupan' => 'saya', 'tanggal' => $date->toDateString()]), 'active' => $scope === 'saya'],
-            ]" />
+            ]" scrollable />
             <search>
-                <form method="GET" action="{{ route('keti.activity') }}" class="flex flex-wrap items-center gap-2">
+                <form method="GET" action="{{ route('keti.activity') }}" class="grid grid-cols-[1fr_auto] items-center gap-2 sm:flex sm:items-center">
                     <input type="hidden" name="cakupan" value="{{ $scope }}">
-                    <span class="text-sm text-muted">{{ $date->isToday() ? 'Hari ini • ' : '' }}{{ Wita::longDate($date) }}</span>
-                    <x-input type="date" name="tanggal" :value="$date->toDateString()" class="w-full sm:w-44" aria-label="Tanggal" onchange="this.form.requestSubmit()" />
+                    <span class="truncate text-xs text-muted sm:text-sm">{{ $date->isToday() ? 'Hari ini • ' : '' }}{{ Wita::longDate($date) }}</span>
+                    <x-input type="date" name="tanggal" :value="$date->toDateString()" class="w-40 py-2 sm:w-44 sm:py-3" aria-label="Tanggal" onchange="this.form.requestSubmit()" />
                 </form>
             </search>
         </div>

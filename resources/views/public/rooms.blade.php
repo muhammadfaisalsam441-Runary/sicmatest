@@ -9,14 +9,14 @@
 @endphp
 
 @section('content')
-    <div class="flex flex-col gap-6">
+    <div class="flex flex-col gap-4 sm:gap-6">
         <div class="flex flex-wrap items-center justify-between gap-2">
             <x-button variant="secondary" size="sm" icon="arrow-left" :href="route('home')" data-prefetch class="w-auto">Kembali ke beranda</x-button>
             <x-status-badge variant="primary">Akses publik • Hanya lihat</x-status-badge>
         </div>
 
-        <div class="flex flex-col items-start justify-between gap-4 sm:flex-row sm:gap-6">
-            <div class="flex flex-col gap-2">
+        <div class="flex flex-col items-start justify-between gap-2.5 sm:flex-row sm:gap-6">
+            <div class="flex flex-col gap-1">
                 <h1 class="text-2xl font-semibold text-ink sm:text-3xl">{{ $title }}</h1>
                 <p class="text-sm text-ink">{{ count($rooms) }} ruang ditemukan • {{ $buildingLabel }}</p>
             </div>
@@ -24,17 +24,17 @@
         </div>
 
         <search>
-            <form method="GET" action="{{ route('public.rooms') }}" class="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
+            <form method="GET" action="{{ route('public.rooms') }}" class="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:gap-3">
                 @if ($status)<input type="hidden" name="status" value="{{ $status }}">@endif
                 <label class="relative min-w-0 flex-1">
                     <span class="sr-only">Cari nama ruangan</span>
-                    <i data-lucide="search" aria-hidden="true" class="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-muted"></i>
+                    <i data-lucide="search" aria-hidden="true" class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted"></i>
                     <input type="search" name="q" value="{{ $keyword }}" placeholder="Cari nama ruangan"
-                           class="min-h-11 w-full rounded-control border border-muted/60 bg-surface py-2.5 pr-4 pl-11 text-base text-ink placeholder:text-muted focus:border-primary focus:ring-2 focus:ring-primary/15 focus:outline-none sm:py-3 sm:text-sm">
+                           class="min-h-11 w-full rounded-control border border-muted/60 bg-surface py-2.5 pr-4 pl-10 text-base text-ink placeholder:text-muted focus:border-primary focus:ring-2 focus:ring-primary/15 focus:outline-none sm:py-3 sm:text-sm">
                 </label>
                 <div class="grid grid-cols-[1fr_auto] items-center gap-2 sm:contents">
                     <select name="gedung" aria-label="Filter gedung" onchange="this.form.requestSubmit()"
-                            class="min-h-11 w-full min-w-0 rounded-control border border-muted/60 bg-surface px-4 py-2.5 text-base text-ink hover:border-primary focus:border-primary focus:ring-2 focus:ring-primary/15 focus:outline-none sm:w-64 sm:py-3 sm:text-sm">
+                            class="min-h-11 w-full min-w-0 rounded-control border border-muted/60 bg-surface px-3.5 py-2.5 text-base text-ink hover:border-primary focus:border-primary focus:ring-2 focus:ring-primary/15 focus:outline-none sm:w-64 sm:px-4 sm:py-3 sm:text-sm">
                         <option value="">Semua gedung ({{ $summary['all'] }})</option>
                         @foreach ($buildings as $buildingOption)
                             <option value="{{ $buildingOption->id }}" @selected((string) $building === (string) $buildingOption->id)>
@@ -52,21 +52,19 @@
             </form>
         </search>
 
-        <div class="flex items-center justify-between">
-            <div class="flex min-w-0 flex-col gap-3">
-                <span class="text-xs text-ink">Ringkasan status di semua gedung</span>
-                @php
-                    $tabs = [
-                        ['label' => 'Semua', 'count' => $summary['all'], 'href' => route('public.rooms', $tabQuery(null)), 'active' => $status === null],
-                        ['label' => 'Tersedia', 'count' => $summary['available'], 'href' => route('public.rooms', $tabQuery('tersedia')), 'active' => $status === 'tersedia'],
-                        ['label' => 'Digunakan', 'count' => $summary['busy'], 'href' => route('public.rooms', $tabQuery('digunakan')), 'active' => $status === 'digunakan'],
-                    ];
-                    if (($summary['closed'] ?? 0) > 0) {
-                        $tabs[] = ['label' => 'Tutup', 'count' => $summary['closed'], 'href' => route('public.rooms', $tabQuery('tutup')), 'active' => $status === 'tutup'];
-                    }
-                @endphp
-                <x-tabs :items="$tabs" />
-            </div>
+        <div class="flex min-w-0 flex-col gap-1.5 sm:gap-2.5">
+            <span class="text-xs text-muted sm:text-ink">Ringkasan status di semua gedung</span>
+            @php
+                $tabs = [
+                    ['label' => 'Semua', 'count' => $summary['all'], 'href' => route('public.rooms', $tabQuery(null)), 'active' => $status === null],
+                    ['label' => 'Tersedia', 'count' => $summary['available'], 'href' => route('public.rooms', $tabQuery('tersedia')), 'active' => $status === 'tersedia'],
+                    ['label' => 'Digunakan', 'count' => $summary['busy'], 'href' => route('public.rooms', $tabQuery('digunakan')), 'active' => $status === 'digunakan'],
+                ];
+                if (($summary['closed'] ?? 0) > 0) {
+                    $tabs[] = ['label' => 'Tutup', 'count' => $summary['closed'], 'href' => route('public.rooms', $tabQuery('tutup')), 'active' => $status === 'tutup'];
+                }
+            @endphp
+            <x-tabs :items="$tabs" scrollable />
         </div>
 
         @if ($rooms === [])

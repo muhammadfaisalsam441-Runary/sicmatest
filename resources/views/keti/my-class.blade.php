@@ -5,7 +5,7 @@
 @section('title', 'My Class')
 
 @section('content')
-    <div class="flex flex-col gap-6">
+    <div class="flex flex-col gap-4 sm:gap-6">
         <x-page-header title="My Class" :subtitle="'Jadwal dan perkuliahan Kelas '.$classGroup->name.'.'" />
 
         @if ($errors->any())
@@ -14,31 +14,35 @@
             </x-info-box>
         @endif
 
-        <div class="flex flex-wrap items-center justify-between gap-2">
-            <a href="{{ route('keti.my-class', ['tanggal' => $date->subWeek()->toDateString()]) }}" class="inline-flex min-h-11 items-center gap-1.5 rounded-control border border-border bg-surface px-3.5 py-2 text-xs font-semibold text-primary transition hover:bg-primary-soft/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
-                <i data-lucide="chevron-left" aria-hidden="true" class="size-4"></i>
-                <span>Minggu lalu</span>
+        <div class="grid grid-cols-[auto_1fr_auto] items-center gap-2">
+            <a href="{{ route('keti.my-class', ['tanggal' => $date->subWeek()->toDateString()]) }}"
+               aria-label="Minggu lalu"
+               class="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-control border border-border bg-surface px-3 py-2 text-xs font-semibold text-primary transition hover:bg-primary-soft/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:min-h-11 sm:px-3.5">
+                <i data-lucide="arrow-left" aria-hidden="true" class="size-4"></i>
+                <span class="hidden sm:inline">Minggu lalu</span>
             </a>
-            <span class="order-first w-full text-center text-xs font-semibold text-muted sm:order-none sm:w-auto">
+            <span class="truncate text-center text-xs font-semibold text-muted sm:text-sm">
                 {{ Wita::date($days->first()) }} – {{ Wita::date($days->last()) }}
             </span>
-            <a href="{{ route('keti.my-class', ['tanggal' => $date->addWeek()->toDateString()]) }}" class="inline-flex min-h-11 items-center gap-1.5 rounded-control border border-border bg-surface px-3.5 py-2 text-xs font-semibold text-primary transition hover:bg-primary-soft/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
-                <span>Minggu depan</span>
-                <i data-lucide="chevron-right" aria-hidden="true" class="size-4"></i>
+            <a href="{{ route('keti.my-class', ['tanggal' => $date->addWeek()->toDateString()]) }}"
+               aria-label="Minggu depan"
+               class="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-control border border-border bg-surface px-3 py-2 text-xs font-semibold text-primary transition hover:bg-primary-soft/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:min-h-11 sm:px-3.5">
+                <span class="hidden sm:inline">Minggu depan</span>
+                <i data-lucide="arrow-right" aria-hidden="true" class="size-4"></i>
             </a>
         </div>
 
-        <nav class="flex gap-2 overflow-x-auto pb-1.5 snap-x custom-scrollbar lg:grid lg:grid-cols-5 lg:gap-3 lg:overflow-visible lg:pb-0" aria-label="Pilih hari">
+        <nav class="flex gap-2 overflow-x-auto pb-1 snap-x custom-scrollbar lg:grid lg:grid-cols-5 lg:gap-3 lg:overflow-visible lg:pb-0" aria-label="Pilih hari">
             @foreach ($days as $day)
                 <a href="{{ route('keti.my-class', ['tanggal' => $day->toDateString()]) }}"
                    @if ($day->isSameDay($date)) aria-current="date" @endif
                    @class([
-                       'flex min-h-12 min-w-[6.75rem] shrink-0 snap-start flex-col items-center justify-center rounded-card border px-4 py-3 text-sm transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary lg:min-w-0',
+                       'flex min-h-11 min-w-[5.25rem] shrink-0 snap-start flex-col items-center justify-center rounded-card border px-3 py-2 text-xs transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:min-h-12 sm:min-w-[6.75rem] sm:px-4 sm:py-3 sm:text-sm lg:min-w-0',
                        'border-primary bg-primary text-white shadow-sm' => $day->isSameDay($date),
                        'border-border bg-surface text-ink hover:border-primary/50 hover:bg-primary-soft/40' => ! $day->isSameDay($date),
                    ])>
-                    <span class="font-semibold text-sm">{{ Wita::dayName($day) }}</span>
-                    <span @class(['text-xs mt-0.5', 'text-white/80' => $day->isSameDay($date), 'text-muted' => ! $day->isSameDay($date)])>
+                    <span class="font-semibold">{{ Wita::dayName($day) }}</span>
+                    <span @class(['text-[11px] sm:text-xs mt-0.5', 'text-white/80' => $day->isSameDay($date), 'text-muted' => ! $day->isSameDay($date)])>
                         {{ Wita::date($day) }}
                     </span>
                 </a>

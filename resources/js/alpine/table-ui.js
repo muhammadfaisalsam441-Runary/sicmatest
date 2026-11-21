@@ -79,9 +79,7 @@ export function tableScrollBox() {
                 this.hasAutoFitted = true;
             }
             this.$nextTick(() => {
-                if (window.refreshIcons) {
-                    window.refreshIcons();
-                }
+                window.renderIcons?.();
             });
         },
 

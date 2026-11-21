@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Admin;
 
 use App\Enums\RoomType;
+use App\Models\Room\Room;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Str;
@@ -26,10 +27,14 @@ class RoomRequest extends FormRequest
      */
     protected function prepareForValidation(): void
     {
+        $room = $this->route('room');
+
         $this->merge([
-            'code' => Str::upper(Str::slug((string) ($this->input('code') ?: $this->input('name')))),
+            'code' => Str::limit(Str::upper(Str::slug((string) ($this->input('code') ?: $this->input('name')))), 40, ''),
             'building' => Str::of((string) $this->input('building'))->squish()->toString() ?: null,
-            'is_bookable' => $this->boolean('is_bookable', true),
+            'is_bookable' => $this->has('is_bookable')
+                ? $this->boolean('is_bookable')
+                : ($room instanceof Room ? $room->is_bookable : true),
         ]);
     }
 

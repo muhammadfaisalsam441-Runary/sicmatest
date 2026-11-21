@@ -44,7 +44,7 @@ class RoomClosure extends Model
      */
     public function room(): BelongsTo
     {
-        return $this->belongsTo(Room::class);
+        return $this->belongsTo(Room::class)->withTrashed();
     }
 
     /**

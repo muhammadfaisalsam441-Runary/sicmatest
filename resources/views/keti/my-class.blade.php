@@ -222,7 +222,7 @@
                                     @endforelse
                                 </fieldset>
 
-                                <x-field label="Catatan dosen (opsional)" :name="'note-'.$session->id">
+                                <x-field label="Catatan dosen (opsional)" :name="'note-'.$session->id" error-key="note">
                                     <x-input :id="'note-'.$session->id" type="text" name="note" maxlength="255" placeholder="Contoh: Kuliah online via Zoom sesuai arahan dosen" />
                                 </x-field>
 

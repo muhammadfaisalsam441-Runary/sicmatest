@@ -15,7 +15,8 @@
             </button>
         </div>
 
-        @php($isRoomFormError = $errors->any() && ! in_array($oldForm, ['closure', 'batch_capacity', 'batch_facility'], true))
+        @php($oldForm ??= old('form'))
+        @php($isRoomFormError = $errors->any() && ($oldForm === 'add' || str_starts_with((string) $oldForm, 'edit-')))
         <form method="POST" action="{{ route('admin.rooms.store') }}"
               :action="formRoom.id ? @js(route('admin.rooms.update', '__ROOM_ID__')).replace('__ROOM_ID__', formRoom.id) : @js(route('admin.rooms.store'))"
               class="mt-4 flex flex-col gap-4">
@@ -87,6 +88,18 @@
                                 x-text="(formRoom.facilities || '').split(',').map(s => s.trim().toLowerCase()).includes(tag.toLowerCase()) ? '✓ ' + tag : '+ ' + tag"></button>
                     </template>
                 </div>
+            </div>
+
+            <div class="rounded-control border border-border bg-page/50 px-3 py-2.5">
+                <input type="hidden" name="is_bookable" value="0">
+                <label for="room-is-bookable" class="flex cursor-pointer select-none items-start gap-2.5 text-sm text-ink">
+                    <input type="checkbox" id="room-is-bookable" name="is_bookable" value="1" x-model="formRoom.is_bookable" class="mt-0.5 size-4 cursor-pointer rounded accent-primary">
+                    <span class="flex flex-col gap-0.5">
+                        <span class="font-medium">Dapat dipesan Keti</span>
+                        <span class="text-[11px] text-muted">Nonaktifkan jika ruang hanya dipakai untuk jadwal resmi atau penggunaan khusus.</span>
+                    </span>
+                </label>
+                @if ($isRoomFormError) @error('is_bookable') <p class="mt-1 text-xs font-medium text-danger">{{ $message }}</p> @enderror @endif
             </div>
 
             <div class="mt-2 flex items-center justify-between gap-3 border-t border-border pt-4">

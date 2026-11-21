@@ -2,7 +2,10 @@
 
 use App\Enums\LecturerHomebase;
 use App\Enums\LecturerProfileStatus;
+use App\Enums\RescheduleStatus;
 use App\Enums\ReservationStatus;
+use App\Enums\RoomBlockSource;
+use App\Enums\ScheduleSource;
 use App\Enums\ScheduleVersionStatus;
 use App\Enums\SessionMode;
 use App\Enums\SessionPhase;
@@ -11,18 +14,26 @@ use App\Models\Academic\ClassGroup;
 use App\Models\Academic\Course;
 use App\Models\Academic\CourseOffering;
 use App\Models\Academic\Period;
+use App\Models\Academic\SessionReschedule;
+use App\Models\Lecturer\LeadershipTerm;
 use App\Models\Lecturer\Lecturer;
 use App\Models\Lecturer\LecturerLoadTarget;
 use App\Models\Lecturer\TeachingAssignment;
 use App\Models\Reservation\Reservation;
 use App\Models\Room\Room;
+use App\Models\Room\RoomBlock;
 use App\Models\Scheduling\Import;
 use App\Models\Scheduling\ScheduleSession;
 use App\Models\Scheduling\ScheduleVersion;
 use App\Models\User\AuditLog;
 use App\Models\User\User;
+use App\Services\Academic\ClassScheduleService;
+use App\Services\Academic\LecturerService;
 use App\Services\Academic\TeachingLoadService;
 use App\Services\Academic\TeachingPhasePlanner;
+use App\Services\Scheduling\ScheduleBlockBuilder;
+use App\Services\Scheduling\ScheduleDraftService;
+use App\Services\Scheduling\SchedulePublisher;
 use App\Services\Scheduling\ScheduleValidator;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\UploadedFile;
@@ -1396,4 +1407,189 @@ test('jadwal resmi memaginasi 25 sesi per halaman sambil menjaga urutan blok ang
         ->assertViewHas('sessions', fn ($paginator): bool => $paginator->total() === 30
             && $paginator->count() === 30
             && $paginator->perPage() === 50);
+});
+
+test('penetapan ulang jadwal pada hari yang sama membuat officialVersionOn mengembalikan versi terbaru', function () {
+    $publisher = User::factory()->superAdmin()->create();
+    $classGroup = ClassGroup::factory()->create(['name' => 'PTIK A 2026']);
+    $roomA = Room::factory()->create(['name' => 'AE 101']);
+    $roomB = Room::factory()->create(['name' => 'AE 102']);
+    $publisherService = app(SchedulePublisher::class);
+
+    $draft1 = app(ScheduleDraftService::class)->create($this->period, ScheduleSource::Manual);
+    $session1 = ScheduleSession::factory()->for($draft1, 'version')->for($roomA)->create([
+        'title' => 'Algoritma v1',
+        'day_of_week' => 3,
+        'start_minute' => 480,
+        'end_minute' => 580,
+    ]);
+    $session1->participants()->sync([$classGroup->id]);
+    $v1 = $publisherService->publish($draft1, $publisher, now(), $draft1->lock_version);
+
+    $draft2 = app(ScheduleDraftService::class)->create($this->period, ScheduleSource::Manual, $v1);
+    $session2 = $draft2->sessions()->sole();
+    $session2->update(['title' => 'Algoritma v2', 'room_id' => $roomB->id]);
+    $v2 = $publisherService->publish($draft2, $publisher, now(), $draft2->lock_version);
+
+    $schedules = app(ClassScheduleService::class);
+    $activeVersion = $schedules->officialVersionOn(now());
+    $sessions = $schedules->sessionsFor($classGroup, now());
+
+    expect($v1->fresh()->status)->toBe(ScheduleVersionStatus::Superseded)
+        ->and($v1->fresh()->effective_to->toDateString())->toBe('2026-11-04')
+        ->and($v2->fresh()->status)->toBe(ScheduleVersionStatus::Official)
+        ->and($v2->fresh()->effective_from->toDateString())->toBe('2026-11-04')
+        ->and($activeVersion?->id)->toBe($v2->id)
+        ->and($sessions->pluck('title')->all())->toBe(['Algoritma v2']);
+});
+
+test('penawaran dua sesi per minggu yang satu sesinya dipindah tidak merusak blok sesi kedua saat rebuild', function () {
+    $period = Period::factory()->create([
+        'start_date' => '2026-11-02',
+        'end_date' => '2026-11-29',
+        'uts_start' => null,
+        'uts_end' => null,
+    ]);
+    $roomA = Room::factory()->create(['name' => 'AE 201']);
+    $roomB = Room::factory()->create(['name' => 'AE 202']);
+    $offering = CourseOffering::factory()->for($period)->create();
+    $official = ScheduleVersion::factory()->official()->for($period)->create(['effective_from' => '2026-11-02']);
+
+    $sessionMon = ScheduleSession::factory()->for($official, 'version')->for($roomA)->create([
+        'course_offering_id' => $offering->id,
+        'day_of_week' => 1,
+        'start_minute' => 480,
+        'end_minute' => 580,
+    ]);
+    $sessionThu = ScheduleSession::factory()->for($official, 'version')->for($roomB)->create([
+        'course_offering_id' => $offering->id,
+        'day_of_week' => 4,
+        'start_minute' => 600,
+        'end_minute' => 700,
+    ]);
+
+    $builder = app(ScheduleBlockBuilder::class);
+    $builder->rebuild($official);
+
+    $reschedule = SessionReschedule::factory()->create([
+        'schedule_session_id' => $sessionThu->id,
+        'course_offering_id' => $offering->id,
+        'original_start_at' => '2026-11-12 10:00:00',
+        'original_end_at' => '2026-11-12 11:40:00',
+        'original_room_id' => $roomB->id,
+        'status' => RescheduleStatus::Active,
+    ]);
+
+    $builder->rebuild($official);
+
+    $mondayBlock = RoomBlock::query()
+        ->whereBelongsTo($official, 'scheduleVersion')
+        ->where('source_type', RoomBlockSource::Schedule)
+        ->where('source_id', $sessionMon->id)
+        ->whereDate('start_at', '2026-11-09')
+        ->sole();
+    $thursdayBlock = RoomBlock::query()
+        ->whereBelongsTo($official, 'scheduleVersion')
+        ->where('source_type', RoomBlockSource::Schedule)
+        ->where('source_id', $sessionThu->id)
+        ->whereDate('start_at', '2026-11-12')
+        ->sole();
+
+    expect($mondayBlock->is_active)->toBeTrue()
+        ->and($thursdayBlock->is_active)->toBeFalse()
+        ->and($reschedule->fresh()->schedule_session_id)->toBe($sessionThu->id)
+        ->and($reschedule->fresh()->original_room_id)->toBe($roomB->id)
+        ->and($reschedule->fresh()->original_start_at->format('Y-m-d H:i'))->toBe('2026-11-12 10:00');
+});
+
+test('duplikat NIP pada bulk update dosen mengembalikan error validasi alih-alih 500', function () {
+    $alpha = Lecturer::factory()->create(['name' => 'Dr. Alpha', 'nip' => '198001012005011001']);
+    $beta = Lecturer::factory()->create(['name' => 'Dr. Beta', 'nip' => '198102022006022002']);
+
+    $this->actingAs($this->admin)
+        ->from(route('admin.lecturers.index'))
+        ->put(route('admin.lecturers.bulk-update'), [
+            'lecturers' => [
+                [
+                    'id' => $alpha->id,
+                    'name' => 'Dr. Alpha',
+                    'nip' => '198203032007031003',
+                    'profile_status' => LecturerProfileStatus::Verified->value,
+                ],
+                [
+                    'id' => $beta->id,
+                    'name' => 'Dr. Beta',
+                    'nip' => '198203032007031003',
+                    'profile_status' => LecturerProfileStatus::Verified->value,
+                ],
+            ],
+        ])
+        ->assertSessionHasErrors(['lecturers.0.nip', 'lecturers.1.nip']);
+
+    $this->actingAs($this->admin)
+        ->from(route('admin.lecturers.index'))
+        ->put(route('admin.lecturers.bulk-update'), [
+            'lecturers' => [
+                [
+                    'id' => $alpha->id,
+                    'name' => 'Dr. Alpha',
+                    'nip' => $beta->nip,
+                    'profile_status' => LecturerProfileStatus::Verified->value,
+                ],
+            ],
+        ])
+        ->assertSessionHasErrors('lecturers.0.nip');
+
+    expect($alpha->fresh()->nip)->toBe('198001012005011001')
+        ->and($beta->fresh()->nip)->toBe('198102022006022002');
+});
+
+test('mengosongkan jabatan pimpinan dosen tidak menghapus jabatan terjadwal masa depan dan tidak membuat rentang terbalik', function () {
+    $service = app(LecturerService::class);
+    $lecturer = Lecturer::factory()->create();
+
+    LeadershipTerm::factory()->for($lecturer)->create([
+        'position' => 'Sekretaris Jurusan',
+        'valid_from' => '2026-11-04',
+        'valid_to' => null,
+    ]);
+    $futureTerm = LeadershipTerm::factory()->for($lecturer)->create([
+        'position' => 'Ketua Jurusan',
+        'valid_from' => '2026-12-01',
+        'valid_to' => null,
+    ]);
+
+    $service->save($lecturer, [
+        'name' => $lecturer->name,
+        'profile_status' => LecturerProfileStatus::Verified->value,
+        'leadership_position' => '',
+    ]);
+
+    $fresh = $lecturer->fresh();
+
+    expect($fresh->isLeaderOn(now()))->toBeFalse()
+        ->and($fresh->isLeaderOn(CarbonImmutable::parse('2026-12-15')))->toBeTrue()
+        ->and($futureTerm->fresh())->not->toBeNull()
+        ->and($fresh->leadershipTerms()->whereNotNull('valid_to')->whereColumn('valid_to', '<', 'valid_from')->exists())->toBeFalse();
+});
+
+test('pembaruan kalender semester menyinkronkan blok ruang jadwal resmi', function () {
+    $official = ScheduleVersion::factory()->official()->for($this->period)->create(['effective_from' => '2026-09-01']);
+    $room = Room::factory()->create();
+    ScheduleSession::factory()->for($official, 'version')->for($room)->create(['day_of_week' => 1]);
+    app(ScheduleBlockBuilder::class)->rebuild($official);
+
+    $this->actingAs($this->admin)
+        ->from(route('admin.academic.index'))
+        ->put(route('admin.academic.periods.update', $this->period), [
+            'name' => $this->period->name,
+            'start_date' => '2026-11-02',
+            'end_date' => '2026-11-29',
+        ])
+        ->assertRedirect(route('admin.academic.index'))
+        ->assertSessionHasNoErrors();
+
+    $blockDates = $official->roomBlocks()->orderBy('start_at')->pluck('start_at')->map->toDateString()->all();
+
+    expect($blockDates)->toBe(['2026-11-02', '2026-11-09', '2026-11-16', '2026-11-23']);
 });

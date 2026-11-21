@@ -58,6 +58,10 @@
             </x-slot:actions>
         </x-page-header>
 
+        @if ($errors->any() && ! in_array($oldForm, ['lecturer', 'batch_target', 'import'], true))
+            <x-alert variant="danger">{{ $errors->first() }}</x-alert>
+        @endif
+
         {{-- Toolbar Filter & Pencarian Cepat --}}
         <x-card padding="p-4" class="admin-table-card flex flex-col gap-3">
             <div class="flex flex-wrap items-center gap-1.5 border-b border-border pb-2.5">
@@ -403,7 +407,7 @@
         </x-card>
 
         {{-- FLOATING BATCH ACTION BAR --}}
-        <x-batch-action-bar unit="dosen">
+        <x-batch-action-bar unit="dosen" show="selectedIds.length > 0 && !editMode">
             {{-- 1. Set Target SKS Modal --}}
             <button type="button" @click="batchTargetModalOpen = true" class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-primary px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:bg-primary/90">
                 <i data-lucide="target" class="size-3.5" aria-hidden="true"></i>
@@ -433,11 +437,13 @@
         <form id="bulkLecturerForm" method="POST" action="{{ route('admin.lecturers.bulk-update') }}" class="hidden">
             @csrf
             @method('PUT')
+            <input type="hidden" name="form" value="bulk_lecturers">
         </form>
 
         {{-- FORM TERSEMBUNYI UNTUK BATCH ACTION STANDARD --}}
         <form x-ref="batchForm" method="POST" action="{{ route('admin.lecturers.batch') }}" class="hidden">
             @csrf
+            <input type="hidden" name="form" value="batch_lecturers">
             <input type="hidden" name="action" x-model="batchAction">
             <template x-for="id in selectedIds" :key="id">
                 <input type="hidden" name="lecturer_ids[]" :value="id">

@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\RescheduleStatus;
 use App\Enums\ReservationStatus;
 use App\Enums\RoomBlockSource;
 use App\Enums\SessionPhase;
@@ -10,11 +11,14 @@ use App\Models\Lecturer\Lecturer;
 use App\Models\Reservation\Reservation;
 use App\Models\Room\Room;
 use App\Models\Room\RoomBlock;
+use App\Models\Room\RoomClosure;
 use App\Models\User\AppNotification;
 use App\Models\User\AuditLog;
 use App\Models\User\User;
 use App\Services\Academic\MeetingRescheduleService;
+use App\Services\Room\OverdueReservationService;
 use App\Services\Room\ReservationService;
+use App\Services\Room\RoomClosureService;
 use Carbon\CarbonImmutable;
 
 beforeEach(function () {
@@ -283,4 +287,206 @@ test('kelas pasangan dalam kelas gabungan terikat jadwal pengganti di SessionRes
     app(MeetingRescheduleService::class)->move($ketiA, $joint, CarbonImmutable::parse('2026-11-06'), CarbonImmutable::parse('2026-11-05 10:00'), $room1, [$lecturer->id], (string) str()->uuid());
 
     expectDomainError(fn () => reserveFor($ketiB, $room2, '2026-11-05 10:00', '2026-11-05 11:40'), 'CLASS_TIME_CONFLICT');
+});
+
+test('pembatalan Kuliah Pengganti di jam yang sama dengan jadwal asli tetap berhasil', function () {
+    $classGroup = ClassGroup::factory()->create(['name' => 'Tekom C']);
+    $keti = User::factory()->approvedKeti($classGroup)->create();
+    $lecturer = Lecturer::factory()->create();
+    $ae107 = Room::factory()->create(['name' => 'AE 107']);
+    $ae209 = Room::factory()->create(['name' => 'AE 209']);
+
+    $session = meetingSession(
+        [$classGroup],
+        ['title' => 'Pemrograman Web', 'day_of_week' => 5, 'start_minute' => 450, 'end_minute' => 550, 'room_id' => $ae107->id],
+        [[$lecturer, TeachingRole::Lead, SessionPhase::Full]],
+    );
+
+    $rescheduleService = app(MeetingRescheduleService::class);
+    $reschedule = $rescheduleService->move(
+        $keti,
+        $session,
+        CarbonImmutable::parse('2026-11-06'),
+        CarbonImmutable::parse('2026-11-06 07:30'),
+        $ae209,
+        [$lecturer->id],
+        (string) str()->uuid(),
+    );
+
+    $cancelled = $rescheduleService->cancel($reschedule->reservation, $keti);
+
+    $originalBlock = RoomBlock::query()
+        ->where('source_type', RoomBlockSource::Schedule)
+        ->where('source_id', $session->id)
+        ->where('start_at', '2026-11-06 07:30:00')
+        ->sole();
+
+    expect($cancelled->status)->toBe(ReservationStatus::Cancelled)
+        ->and($cancelled->block->is_active)->toBeFalse()
+        ->and($reschedule->fresh()->status)->toBe(RescheduleStatus::Cancelled)
+        ->and($originalBlock->is_active)->toBeTrue();
+});
+
+test('perpanjangan ditolak jika tepat di end_at kelas memiliki kuliah resmi', function () {
+    $class = ClassGroup::factory()->create(['name' => 'Tekom C']);
+    $keti = User::factory()->approvedKeti($class)->create();
+    $room1 = Room::factory()->create(['name' => 'AE 107']);
+    $room2 = Room::factory()->create(['name' => 'AE 209']);
+
+    meetingSession([$class], ['title' => 'Basis Data', 'day_of_week' => 3, 'start_minute' => 660, 'end_minute' => 760, 'room_id' => $room2->id]);
+
+    $reservation = reserveFor($keti, $room1, '2026-11-04 10:00', '2026-11-04 11:00');
+    $this->service->start($reservation, $keti);
+
+    expectDomainError(fn () => $this->service->extend($reservation->fresh(), $keti), 'CLASS_TIME_CONFLICT');
+    expect($reservation->fresh()->end_at->format('H:i'))->toBe('11:00')
+        ->and($reservation->fresh()->block->end_at->format('H:i'))->toBe('11:00');
+});
+
+test('perpanjangan Kuliah Pengganti mengabaikan sesi aslinya dan memperbarui target_end_at', function () {
+    $this->travelTo(CarbonImmutable::parse('2026-11-04 08:00'));
+
+    $class = ClassGroup::factory()->create(['name' => 'Tekom C']);
+    $keti = User::factory()->approvedKeti($class)->create();
+    $lecturer = Lecturer::factory()->create();
+    $room1 = Room::factory()->create(['name' => 'AE 107']);
+    $room2 = Room::factory()->create(['name' => 'AE 209']);
+
+    $session = meetingSession(
+        [$class],
+        ['title' => 'Pemrograman Web', 'day_of_week' => 3, 'start_minute' => 660, 'end_minute' => 760, 'room_id' => $room1->id],
+        [[$lecturer, TeachingRole::Lead, SessionPhase::Full]],
+    );
+
+    $reschedule = app(MeetingRescheduleService::class)->move(
+        $keti,
+        $session,
+        CarbonImmutable::parse('2026-11-04'),
+        CarbonImmutable::parse('2026-11-04 09:00'),
+        $room2,
+        [$lecturer->id],
+        (string) str()->uuid(),
+    );
+
+    $this->travelTo(CarbonImmutable::parse('2026-11-04 09:05'));
+    $this->service->start($reschedule->reservation, $keti);
+    $extended = $this->service->extend($reschedule->reservation->fresh(), $keti);
+
+    expect($extended->end_at->format('H:i'))->toBe('11:10')
+        ->and($extended->block->end_at->format('H:i'))->toBe('11:10')
+        ->and($reschedule->fresh()->target_end_at->format('H:i'))->toBe('11:10');
+});
+
+test('kedaluwarsa otomatis tidak membatalkan di batas tepat 15 menit dan tidak mengaktifkan blok asli jika sudah terpakai', function () {
+    config(['sicma.reservation.auto_expire_no_show' => true]);
+
+    $class = ClassGroup::factory()->create();
+    $keti = User::factory()->approvedKeti($class)->create();
+    $lecturer = Lecturer::factory()->create();
+    $originalRoom = Room::factory()->create(['name' => 'AE 107']);
+    $targetRoom = Room::factory()->create(['name' => 'AE 209']);
+
+    $this->travelTo(CarbonImmutable::parse('2026-11-04 09:45'));
+    $boundaryBooking = reserveFor(User::factory()->approvedKeti()->create(), Room::factory()->create(), '2026-11-04 09:45', '2026-11-04 11:00');
+
+    $this->travelTo(CarbonImmutable::parse('2026-11-04 10:00'));
+    expect(app(OverdueReservationService::class)->flag()['expired'])->toBe(0)
+        ->and($boundaryBooking->fresh()->status)->toBe(ReservationStatus::Booked);
+
+    $session = meetingSession(
+        [$class],
+        ['title' => 'Algoritma', 'day_of_week' => 5, 'start_minute' => 450, 'end_minute' => 550, 'room_id' => $originalRoom->id],
+        [[$lecturer, TeachingRole::Lead, SessionPhase::Full]],
+    );
+
+    $reschedule = app(MeetingRescheduleService::class)->move(
+        $keti,
+        $session,
+        CarbonImmutable::parse('2026-11-06'),
+        CarbonImmutable::parse('2026-11-04 10:00'),
+        $targetRoom,
+        [$lecturer->id],
+        (string) str()->uuid(),
+    );
+
+    // Kelas lain memesan ruang asli di slot asli sebelum pengganti kedaluwarsa.
+    reserveFor(User::factory()->approvedKeti()->create(), $originalRoom, '2026-11-06 07:30', '2026-11-06 09:10');
+
+    $this->travelTo(CarbonImmutable::parse('2026-11-04 10:16'));
+    app(OverdueReservationService::class)->flag();
+
+    $originalBlock = RoomBlock::query()
+        ->where('source_type', RoomBlockSource::Schedule)
+        ->where('source_id', $session->id)
+        ->where('start_at', '2026-11-06 07:30:00')
+        ->sole();
+
+    expect($reschedule->reservation->fresh()->status)->toBe(ReservationStatus::Cancelled)
+        ->and($reschedule->fresh()->status)->toBe(RescheduleStatus::Cancelled)
+        ->and($originalBlock->is_active)->toBeFalse();
+});
+
+test('penutupan ruang dengan cancel_impacted menyelesaikan reservasi aktif dan membatalkan Kuliah Pengganti yang jam aslinya sudah lewat', function () {
+    $this->travelTo(CarbonImmutable::parse('2026-11-04 08:00'));
+
+    $admin = User::factory()->admin()->create();
+    $class = ClassGroup::factory()->create();
+    $keti = User::factory()->approvedKeti($class)->create();
+    $lecturer = Lecturer::factory()->create();
+    $room1 = Room::factory()->create(['name' => 'AE 107']);
+    $room2 = Room::factory()->create(['name' => 'AE 209']);
+
+    // 1. Reservasi sedang digunakan di AE 107
+    $activeBooking = reserveFor($keti, $room1, '2026-11-04 08:00', '2026-11-04 09:00');
+    $this->service->start($activeBooking, $keti);
+
+    app(RoomClosureService::class)->create(
+        $room1,
+        CarbonImmutable::parse('2026-11-04 08:00'),
+        CarbonImmutable::parse('2026-11-04 12:00'),
+        'Perbaikan listrik',
+        $admin,
+        cancelImpacted: true,
+    );
+
+    expect($activeBooking->fresh()->status)->toBe(ReservationStatus::Finished);
+
+    // 2. Kuliah Pengganti ke AE 209 yang jam aslinya sudah lewat saat AE 209 ditutup
+    $session = meetingSession(
+        [$class],
+        ['title' => 'Basis Data', 'day_of_week' => 3, 'start_minute' => 600, 'end_minute' => 700, 'room_id' => Room::factory()->create()->id],
+        [[$lecturer, TeachingRole::Lead, SessionPhase::Full]],
+    );
+
+    $reschedule = app(MeetingRescheduleService::class)->move(
+        $keti,
+        $session,
+        CarbonImmutable::parse('2026-11-04'),
+        CarbonImmutable::parse('2026-11-06 10:00'),
+        $room2,
+        [$lecturer->id],
+        (string) str()->uuid(),
+    );
+
+    $this->travelTo(CarbonImmutable::parse('2026-11-04 12:00'));
+
+    app(RoomClosureService::class)->create(
+        $room2,
+        CarbonImmutable::parse('2026-11-06 09:00'),
+        CarbonImmutable::parse('2026-11-06 13:00'),
+        'Pemeliharaan AC',
+        $admin,
+        cancelImpacted: true,
+    );
+
+    $originalBlock = RoomBlock::query()
+        ->where('source_type', RoomBlockSource::Schedule)
+        ->where('source_id', $session->id)
+        ->where('start_at', '2026-11-04 10:00:00')
+        ->sole();
+
+    expect(RoomClosure::query()->whereBelongsTo($room2)->exists())->toBeTrue()
+        ->and($reschedule->reservation->fresh()->status)->toBe(ReservationStatus::Cancelled)
+        ->and($reschedule->fresh()->status)->toBe(RescheduleStatus::Cancelled)
+        ->and($originalBlock->is_active)->toBeFalse();
 });

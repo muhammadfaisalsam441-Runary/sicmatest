@@ -16,6 +16,7 @@
         <form method="POST" :action="@js(route('admin.rooms.destroy', '__ROOM_ID__')).replace('__ROOM_ID__', roomToDelete.id)" class="mt-4 flex flex-col gap-4">
             @csrf
             @method('DELETE')
+            <input type="hidden" name="form" value="delete_room">
             <div>
                 <label for="room-delete-reason" class="mb-1 block text-xs font-medium text-muted">Alasan Penghapusan (Opsional)</label>
                 <input id="room-delete-reason" type="text" name="reason" placeholder="Contoh: Ruang dialihfungsikan" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
@@ -61,6 +62,9 @@
                         <p id="capacity-error" class="mt-1 text-sm text-danger">{{ $message }}</p>
                     @enderror
                     @error('room_ids')
+                        <p class="mt-1 text-sm text-danger">{{ $message }}</p>
+                    @enderror
+                    @error('room_ids.*')
                         <p class="mt-1 text-sm text-danger">{{ $message }}</p>
                     @enderror
                 @endif
@@ -115,6 +119,7 @@
                 @if ($oldForm === 'batch_facility')
                     @error('facilities') <p class="mt-1 text-xs font-medium text-danger">{{ $message }}</p> @enderror
                     @error('room_ids') <p class="mt-1 text-xs font-medium text-danger">{{ $message }}</p> @enderror
+                    @error('room_ids.*') <p class="mt-1 text-xs font-medium text-danger">{{ $message }}</p> @enderror
                 @endif
             </div>
 

@@ -114,14 +114,20 @@ class AcademicController extends Controller
             $alignedEffectiveFrom = now()->startOfDay()->max($period->start_date)->min($period->end_date)->toDateString();
 
             $period->scheduleVersions()
-                ->drafts()
+                ->whereIn('status', [ScheduleVersionStatus::Draft, ScheduleVersionStatus::Ready])
                 ->where(fn ($query) => $query
                     ->whereDate('effective_from', '<', $period->start_date->toDateString())
                     ->orWhereDate('effective_from', '>', $period->end_date->toDateString()))
                 ->update(['effective_from' => $alignedEffectiveFrom]);
         }
 
+        $official = $period->scheduleVersions()->where('status', ScheduleVersionStatus::Official)->first();
+        if ($official) {
+            app(ScheduleBlockBuilder::class)->rebuild($official);
+        }
+
         $this->audit->log('period.updated', $period, $before, $period->only(array_keys($request->validated())));
+        AvailabilityCache::bust();
 
         return back()->with('toast', ['type' => 'success', 'title' => 'Kalender semester disimpan']);
     }

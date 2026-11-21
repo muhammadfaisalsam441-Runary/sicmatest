@@ -2,9 +2,11 @@
 
 namespace App\Services\Room;
 
+use App\Enums\RescheduleStatus;
 use App\Enums\ReservationStatus;
 use App\Enums\RoomBlockSource;
 use App\Exceptions\DomainException;
+use App\Models\Academic\SessionReschedule;
 use App\Models\Reservation\Reservation;
 use App\Models\Room\Room;
 use App\Models\Room\RoomBlock;
@@ -13,6 +15,7 @@ use App\Models\User\User;
 use App\Services\Account\AuditLogger;
 use App\Services\Account\NotificationService;
 use App\Support\AvailabilityCache;
+use App\Support\Wita;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
@@ -249,10 +252,10 @@ class RoomClosureService
      */
     private function handleImpacted(Room $room, Collection $impacted, string $reason, User $admin, bool $cancelImpacted): void
     {
+        $reservations = $cancelImpacted ? app(ReservationService::class) : null;
+
         foreach ($impacted as $reservation) {
-            if ($cancelImpacted) {
-                app(ReservationService::class)->cancel($reservation, $admin, "Penutupan ruang {$room->name}: {$reason}");
-            } else {
+            if (! $cancelImpacted) {
                 $this->notifications->notify(
                     $reservation->creator,
                     'room.closed',
@@ -260,7 +263,87 @@ class RoomClosureService
                     'Ruang yang kamu pesan ditutup: '.$reason.'. Hubungi admin atau cari ruangan lain.',
                     ['reservation_id' => $reservation->id],
                 );
+
+                continue;
+            }
+
+            if ($reservation->status === ReservationStatus::InUse) {
+                $reservations->finish($reservation, $admin);
+
+                continue;
+            }
+
+            $cancelReason = "Penutupan ruang {$room->name}: {$reason}";
+
+            try {
+                $reservations->cancel($reservation, $admin, $cancelReason);
+            } catch (DomainException $exception) {
+                if ($exception->errorCode !== 'RESTORE_NOT_POSSIBLE') {
+                    throw $exception;
+                }
+
+                $this->cancelUnrestorableReschedule($reservation, $room, $reason, $cancelReason, $admin);
             }
         }
+    }
+
+    private function cancelUnrestorableReschedule(Reservation $reservation, Room $room, string $reason, string $cancelReason, User $admin): void
+    {
+        $locked = Reservation::query()->whereKey($reservation->id)->lockForUpdate()->first();
+        if (! $locked || $locked->status !== ReservationStatus::Booked) {
+            return;
+        }
+
+        $before = $locked->only(['status']);
+        $locked->forceFill([
+            'status' => ReservationStatus::Cancelled,
+            'cancelled_at' => now(),
+            'cancelled_by' => $admin->id,
+            'cancel_reason' => $cancelReason,
+            'lock_version' => $locked->lock_version + 1,
+        ])->save();
+
+        $locked->block()->update(['is_active' => false]);
+
+        $reschedule = $locked->session_reschedule_id !== null
+            ? SessionReschedule::query()->whereKey($locked->session_reschedule_id)->lockForUpdate()->first()
+            : null;
+
+        if ($reschedule !== null && $reschedule->status === RescheduleStatus::Active) {
+            $reschedule->forceFill([
+                'status' => RescheduleStatus::Cancelled,
+                'cancelled_at' => now(),
+                'cancelled_by' => $admin->id,
+            ])->save();
+
+            $this->audit->log(
+                'meeting.reschedule_cancelled',
+                $reschedule,
+                ['status' => RescheduleStatus::Active->value],
+                ['status' => RescheduleStatus::Cancelled->value],
+                $cancelReason,
+            );
+
+            $classIds = array_map('intval', array_filter(explode(',', $reschedule->participant_key)));
+            $this->notifications->notify(
+                $this->notifications->ketisOf($classIds)->reject(fn (User $user): bool => in_array($user->id, [$admin->id, $locked->created_by], true)),
+                'meeting.reschedule_cancelled',
+                'Pemindahan pertemuan dibatalkan',
+                "{$reschedule->session_title} di {$room->name} dibatalkan karena penutupan ruang: {$reason}. Jadwal asli tidak dapat dipulihkan.",
+                ['reservation_id' => $locked->id],
+            );
+        }
+
+        AvailabilityCache::bust();
+
+        $this->audit->log('reservation.cancelled', $locked, $before, $locked->only(['status', 'cancelled_at', 'cancelled_by']), $cancelReason);
+
+        $this->notifications->notify(
+            $locked->creator,
+            'reservation.cancelled',
+            'Reservasi dibatalkan admin',
+            $room->name.' '.Wita::date($locked->start_at).' '.Wita::range($locked->start_at, $locked->end_at).' dibatalkan. Alasan: '.$cancelReason,
+            ['reservation_id' => $locked->id],
+        );
     }
 }

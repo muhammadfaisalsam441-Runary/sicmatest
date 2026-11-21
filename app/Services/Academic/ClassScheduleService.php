@@ -33,7 +33,9 @@ class ClassScheduleService
             ->whereDate('effective_from', '<=', $day)
             ->where(fn (Builder $query) => $query->whereNull('effective_to')->orWhereDate('effective_to', '>=', $day))
             ->with('period.calendarExceptions')
-            ->latest('effective_from')
+            ->orderByRaw("CASE WHEN status = 'official' THEN 0 ELSE 1 END")
+            ->orderByDesc('effective_from')
+            ->orderByDesc('version_no')
             ->first();
     }
 

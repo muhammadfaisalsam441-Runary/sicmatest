@@ -17,6 +17,10 @@
                     }"
                     @keydown.escape.window="batchModalOpen = false; deleteClassModalOpen = false; archiveConfirmModalOpen = false"
                 >
+                @if ($errors->any() && ! in_array(old('form'), ['class-new', 'class-edit'], true))
+                    <x-alert variant="danger">{{ $errors->first() }}</x-alert>
+                @endif
+
                 {{-- Toolbar Pencarian & Filter Prodi/Angkatan --}}
                 <x-card padding="p-4" class="admin-table-card flex flex-col gap-3">
                     <div class="flex flex-wrap items-center gap-1.5 border-b border-border pb-2.5">
@@ -363,6 +367,7 @@
                 {{-- FORM TERSEMBUNYI UNTUK BATCH ACTION --}}
                 <form x-ref="batchForm" method="POST" action="{{ route('admin.academic.classes.batch') }}" class="hidden">
                     @csrf
+                    <input type="hidden" name="form" value="batch_classes">
                     <input type="hidden" name="action" x-model="batchAction">
                     <input type="hidden" name="student_count" x-model="batchValue" :disabled="batchAction !== 'set_student_count'">
                     <input type="hidden" name="cohort_year" x-model="batchValue" :disabled="batchAction !== 'set_cohort_year'">
@@ -376,6 +381,7 @@
                 <form id="bulkClassForm" method="POST" action="{{ route('admin.academic.classes.bulk-update') }}" class="hidden">
                     @csrf
                     @method('PUT')
+                    <input type="hidden" name="form" value="bulk_classes">
                 </form>
 
                 @include('admin.academic.modals.class-batch-modals')

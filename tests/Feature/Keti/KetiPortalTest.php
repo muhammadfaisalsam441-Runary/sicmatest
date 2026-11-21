@@ -1,9 +1,12 @@
 <?php
 
 use App\Enums\ReservationStatus;
+use App\Enums\RoomType;
 use App\Models\Academic\ClassGroup;
 use App\Models\Reservation\Reservation;
+use App\Models\Room\Building;
 use App\Models\Room\Room;
+use App\Models\Room\RoomClosure;
 use App\Models\Scheduling\ScheduleSession;
 use App\Models\User\AppNotification;
 use App\Models\User\User;
@@ -288,3 +291,101 @@ test('halaman portal keti merender navigasi cepat mobile dan layout responsif', 
     'notifications' => ['keti.notifications'],
     'profile' => ['keti.profile'],
 ]);
+
+test('halaman aktivitas keti dan relasi penutupan tetap tampil setelah ruang dihapus lunak', function () {
+    $room = Room::factory()->create(['name' => 'AE 305']);
+    Reservation::factory()->for($room)->for($this->classGroup)->for($this->keti, 'creator')->create([
+        'status' => ReservationStatus::Finished,
+        'start_at' => '2026-11-04 08:00',
+        'end_at' => '2026-11-04 09:00',
+        'actual_start_at' => '2026-11-04 08:00',
+        'actual_end_at' => '2026-11-04 08:50',
+        'purpose' => 'Seminar hasil',
+    ]);
+    $closure = RoomClosure::factory()->for($room)->create();
+
+    $room->forceFill(['is_active' => false])->save();
+    $room->delete();
+
+    $this->actingAs($this->keti)
+        ->get(route('keti.activity'))
+        ->assertOk()
+        ->assertSee('AE 305');
+
+    expect($closure->fresh()->room)->not->toBeNull()
+        ->and($closure->fresh()->room->name)->toBe('AE 305');
+});
+
+test('mengubah ruang non-bookable tanpa field is_bookable mempertahankan status dan nama gedung atau ruang panjang tidak error', function () {
+    $admin = User::factory()->admin()->create();
+    $room = Room::factory()->create([
+        'name' => 'Ruang Rapat Khusus Jurusan',
+        'code' => 'RUANG-RAPAT-KHUSUS-JURUSAN',
+        'is_bookable' => false,
+    ]);
+
+    $longBuildingName = 'Gedung Kuliah Terpadu Fakultas Teknik Informatika';
+    $longRoomName = 'Ruang Kuliah Terpadu Lantai Dua Sayap Timur Satu';
+
+    $this->actingAs($admin)
+        ->put(route('admin.rooms.update', $room), [
+            'name' => $longRoomName,
+            'type' => RoomType::Classroom->value,
+            'capacity' => 40,
+            'building' => $longBuildingName,
+        ])
+        ->assertRedirect(route('admin.rooms.index'))
+        ->assertSessionHasNoErrors();
+
+    $room->refresh();
+    $building = $room->building;
+
+    expect($room->is_bookable)->toBeFalse()
+        ->and(strlen($room->code))->toBeLessThanOrEqual(40)
+        ->and($building)->not->toBeNull()
+        ->and($building->name)->toBe($longBuildingName)
+        ->and(strlen($building->code))->toBeLessThanOrEqual(20);
+
+    // Gedung yang sudah dihapus lunak dipulihkan otomatis saat dipakai kembali.
+    $building->delete();
+
+    $this->actingAs($admin)
+        ->post(route('admin.rooms.store'), [
+            'name' => 'Ruang Baru Uji Non-Bookable',
+            'type' => RoomType::Lab->value,
+            'building' => $longBuildingName,
+            'is_bookable' => '0',
+        ])
+        ->assertRedirect(route('admin.rooms.index'))
+        ->assertSessionHasNoErrors();
+
+    $created = Room::query()->where('name', 'Ruang Baru Uji Non-Bookable')->sole();
+    expect($created->is_bookable)->toBeFalse()
+        ->and($created->building_id)->toBe($building->id)
+        ->and(Building::query()->find($building->id)?->trashed())->toBeFalse();
+
+    // Edit massal dengan nama > 40 karakter tidak melebihi batas panjang kode 40 karakter.
+    $this->actingAs($admin)
+        ->put(route('admin.rooms.bulk-update'), [
+            'rooms' => [[
+                'id' => $created->id,
+                'name' => 'Ruang Laboratorium Praktikum Sistem Terdistribusi Lanjut',
+                'type' => RoomType::Lab->value,
+                'building' => $longBuildingName,
+                'floor' => 2,
+                'capacity' => 30,
+            ]],
+        ])
+        ->assertRedirect()
+        ->assertSessionHasNoErrors();
+
+    expect(strlen($created->fresh()->code))->toBeLessThanOrEqual(40);
+});
+
+test('pencarian ruang dengan jam mulai basi mengarahkan ke halaman cari tanpa query loop', function () {
+    $this->actingAs($this->keti)
+        ->from(route('keti.search', ['mulai' => '08:00']))
+        ->get(route('keti.search', ['mulai' => '08:00']))
+        ->assertRedirect(route('keti.search'))
+        ->assertSessionHasErrors('mulai');
+});

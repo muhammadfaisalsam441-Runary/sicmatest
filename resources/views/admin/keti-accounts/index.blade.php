@@ -385,12 +385,12 @@
                     <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
                         <label class="flex cursor-pointer items-start gap-2 rounded-control border p-3 text-xs transition"
                                :class="declineMode === 'reject' ? 'border-danger bg-danger-soft/40 text-ink' : 'border-border bg-surface text-muted'">
-                            <input type="radio" x-model="declineMode" value="reject" class="mt-0.5 accent-danger">
+                            <input type="radio" x-model="declineMode" value="reject" @change="$nextTick(() => window.renderIcons?.())" class="mt-0.5 accent-danger">
                             <span><strong class="block text-ink">Tolak permanen</strong>Pendaftar ditolak karena tidak memenuhi syarat.</span>
                         </label>
                         <label class="flex cursor-pointer items-start gap-2 rounded-control border p-3 text-xs transition"
                                :class="declineMode === 'revise' ? 'border-primary bg-primary-soft/40 text-ink' : 'border-border bg-surface text-muted'">
-                            <input type="radio" x-model="declineMode" value="revise" class="mt-0.5 accent-primary">
+                            <input type="radio" x-model="declineMode" value="revise" @change="$nextTick(() => window.renderIcons?.())" class="mt-0.5 accent-primary">
                             <span><strong class="block text-ink">Minta perbaikan</strong>Pendaftar diminta memperbaiki data dan ajukan ulang.</span>
                         </label>
                     </div>

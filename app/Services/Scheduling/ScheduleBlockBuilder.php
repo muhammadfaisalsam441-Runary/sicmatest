@@ -109,6 +109,9 @@ class ScheduleBlockBuilder
             ->whereBetween('original_start_at', [$from->startOfWeek(), $to->endOfWeek()->endOfDay()])
             ->get();
         $isOfficial = $version->status === ScheduleVersionStatus::Official;
+        $matchedRescheduleIds = [];
+        $versionSessionIds = $version->sessions->pluck('id')->flip();
+        $candidates = [];
 
         foreach ($version->sessions as $session) {
             if (! $session->blocksRoom() || ! in_array($session->day_of_week, config('sicma.scheduler.days'), true)) {
@@ -123,52 +126,98 @@ class ScheduleBlockBuilder
                 $start = $date->addMinutes($session->start_minute);
                 $end = $date->addMinutes($session->end_minute);
 
-                $matchingReschedule = $reschedules->first(fn (SessionReschedule $reschedule): bool => $reschedule->matches($session, $start));
+                $matchingReschedule = $reschedules->first(
+                    fn (SessionReschedule $reschedule): bool => ! in_array($reschedule->id, $matchedRescheduleIds, true)
+                        && $reschedule->schedule_session_id === $session->id
+                        && $reschedule->matches($session, $start),
+                ) ?? $reschedules->first(
+                    fn (SessionReschedule $reschedule): bool => ! in_array($reschedule->id, $matchedRescheduleIds, true)
+                        && $reschedule->matches($session, $start),
+                );
 
-                if (! $matchingReschedule) {
-                    $sameWeekReschedules = $reschedules->filter(function (SessionReschedule $r) use ($session, $date): bool {
-                        $sameOffering = ($r->course_offering_id !== null && $session->course_offering_id !== null)
-                            ? $r->course_offering_id === $session->course_offering_id
-                            : ($r->session_title === $session->title && $r->participant_key === SessionReschedule::participantKey($session->participants->modelKeys()));
-
-                        return $sameOffering && $r->original_start_at->startOfWeek()->equalTo($date->startOfWeek());
-                    });
-
-                    if ($sameWeekReschedules->count() === 1) {
-                        $matchingReschedule = $sameWeekReschedules->first();
-                    } elseif ($sameWeekReschedules->count() > 1) {
-                        $matchingReschedule = $sameWeekReschedules->firstWhere('schedule_session_id', $session->id)
-                            ?? $sameWeekReschedules->sortBy(fn ($r) => abs($r->original_start_at->dayOfWeekIso - $session->day_of_week))->first();
-                    }
+                if ($matchingReschedule !== null) {
+                    $matchedRescheduleIds[] = $matchingReschedule->id;
                 }
 
-                $moved = $matchingReschedule !== null;
-
-                if ($moved && $isOfficial) {
-                    if ($matchingReschedule->original_start_at->format('Y-m-d H:i') !== $start->format('Y-m-d H:i')
-                        || $matchingReschedule->original_room_id !== $session->room_id
-                        || $matchingReschedule->schedule_session_id !== $session->id) {
-                        $matchingReschedule->update([
-                            'original_start_at' => $start,
-                            'original_end_at' => $end,
-                            'original_room_id' => $session->room_id,
-                            'schedule_session_id' => $session->id,
-                        ]);
-                    }
-                }
-
-                $rows[] = [
-                    'room_id' => $session->room_id,
-                    'start_at' => $start->format('Y-m-d H:i:s'),
-                    'end_at' => $end->format('Y-m-d H:i:s'),
-                    'source_type' => RoomBlockSource::Schedule->value,
-                    'source_id' => $session->id,
-                    'schedule_version_id' => $version->id,
-                    'is_active' => ! $moved,
-                    'created_at' => $timestamp,
-                    'updated_at' => $timestamp,
+                $candidates[] = [
+                    'session' => $session,
+                    'date' => $date,
+                    'start' => $start,
+                    'end' => $end,
+                    'reschedule' => $matchingReschedule,
                 ];
             }
+        }
+
+        foreach ($candidates as $candidate) {
+            /** @var ScheduleSession $session */
+            $session = $candidate['session'];
+            /** @var CarbonImmutable $date */
+            $date = $candidate['date'];
+            /** @var CarbonImmutable $start */
+            $start = $candidate['start'];
+            /** @var CarbonImmutable $end */
+            $end = $candidate['end'];
+            /** @var SessionReschedule|null $matchingReschedule */
+            $matchingReschedule = $candidate['reschedule'];
+
+            if (! $matchingReschedule) {
+                $sameWeekReschedules = $reschedules->filter(function (SessionReschedule $r) use ($session, $date, $matchedRescheduleIds, $versionSessionIds): bool {
+                    if (in_array($r->id, $matchedRescheduleIds, true)) {
+                        return false;
+                    }
+
+                    if ($r->schedule_session_id !== null
+                        && $versionSessionIds->has($r->schedule_session_id)
+                        && $r->schedule_session_id !== $session->id) {
+                        return false;
+                    }
+
+                    $sameOffering = ($r->course_offering_id !== null && $session->course_offering_id !== null)
+                        ? $r->course_offering_id === $session->course_offering_id
+                        : ($r->session_title === $session->title && $r->participant_key === SessionReschedule::participantKey($session->participants->modelKeys()));
+
+                    return $sameOffering && $r->original_start_at->startOfWeek()->equalTo($date->startOfWeek());
+                });
+
+                if ($sameWeekReschedules->count() === 1) {
+                    $matchingReschedule = $sameWeekReschedules->first();
+                } elseif ($sameWeekReschedules->count() > 1) {
+                    $matchingReschedule = $sameWeekReschedules->firstWhere('schedule_session_id', $session->id)
+                        ?? $sameWeekReschedules->sortBy(fn ($r) => abs($r->original_start_at->dayOfWeekIso - $session->day_of_week))->first();
+                }
+
+                if ($matchingReschedule !== null) {
+                    $matchedRescheduleIds[] = $matchingReschedule->id;
+                }
+            }
+
+            $moved = $matchingReschedule !== null;
+
+            if ($moved && $isOfficial) {
+                if ($matchingReschedule->original_start_at->format('Y-m-d H:i') !== $start->format('Y-m-d H:i')
+                    || $matchingReschedule->original_room_id !== $session->room_id
+                    || $matchingReschedule->schedule_session_id !== $session->id) {
+                    $matchingReschedule->update([
+                        'original_start_at' => $start,
+                        'original_end_at' => $end,
+                        'original_room_id' => $session->room_id,
+                        'schedule_session_id' => $session->id,
+                    ]);
+                }
+            }
+
+            $rows[] = [
+                'room_id' => $session->room_id,
+                'start_at' => $start->format('Y-m-d H:i:s'),
+                'end_at' => $end->format('Y-m-d H:i:s'),
+                'source_type' => RoomBlockSource::Schedule->value,
+                'source_id' => $session->id,
+                'schedule_version_id' => $version->id,
+                'is_active' => ! $moved,
+                'created_at' => $timestamp,
+                'updated_at' => $timestamp,
+            ];
         }
 
         return $rows;

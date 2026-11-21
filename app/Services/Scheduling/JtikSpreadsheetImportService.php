@@ -101,7 +101,7 @@ class JtikSpreadsheetImportService
         }
 
         return DB::transaction(function () use ($sources, $calendars, $activeName, $actor): array {
-            $this->lecturers = Lecturer::query()->get()->keyBy('id');
+            $this->lecturers = Lecturer::query()->withTrashed()->get()->keyBy('id');
             foreach ($sources as $source) {
                 $this->synchronizeMasters($source);
             }
@@ -155,12 +155,15 @@ class JtikSpreadsheetImportService
     private function synchronizeMasters(array $source): void
     {
         foreach ($source['roster'] as $record) {
-            $lecturer = $record['nip'] !== null ? Lecturer::query()->where('nip', $record['nip'])->first() : null;
+            $lecturer = $record['nip'] !== null ? Lecturer::query()->withTrashed()->where('nip', $record['nip'])->first() : null;
             $lecturer ??= $this->findLecturer($record['name']);
             if ($record['nip'] !== null && $lecturer?->nip !== null && $lecturer->nip !== $record['nip']) {
                 $lecturer = null;
             }
             $lecturer ??= new Lecturer(['name' => $record['name'], 'source_name' => $record['name'], 'profile_status' => LecturerProfileStatus::Unverified, 'homebase' => LecturerHomebase::Jtik, 'is_active' => true]);
+            if ($lecturer->exists && $lecturer->trashed()) {
+                $lecturer->restore();
+            }
             if ($record['nip'] !== null && $lecturer->nip === null) {
                 $lecturer->nip = $record['nip'];
             }
@@ -176,17 +179,33 @@ class JtikSpreadsheetImportService
         foreach ($source['rows'] as $row) {
             $raw = $row['raw'];
             $className = Str::squish($raw['class'] ?? '');
-            $courseCode = trim($raw['course_code'] ?? '');
+            $courseCode = Str::limit(trim($raw['course_code'] ?? ''), 20, '');
             if ($className === '' || $courseCode === '' || ! is_numeric($raw['sks'] ?? null)) {
                 throw new InvalidArgumentException($source['name'].' baris '.$row['row_no'].': kelas, kode mata kuliah, atau SKS belum lengkap.');
             }
 
             preg_match('/\b(20\d{2})\b/', $className, $cohort);
-            ClassGroup::query()->firstOrCreate(['code' => Str::upper(Str::slug($className))], [
-                'name' => $className, 'study_program' => Str::startsWith(Str::upper($className), 'PTIK') ? 'PTIK' : 'TEKOM',
-                'cohort_year' => isset($cohort[1]) ? (int) $cohort[1] : null, 'student_count' => null, 'is_active' => true,
-            ]);
-            Course::query()->firstOrCreate(['code' => $courseCode], ['name' => $raw['course_name'], 'sks' => (int) $raw['sks']]);
+            $classCode = Str::limit(Str::upper(Str::slug($className)), 40, '');
+            $classGroup = ClassGroup::query()->withTrashed()->where('code', $classCode)->first();
+            if ($classGroup === null) {
+                ClassGroup::query()->create([
+                    'code' => $classCode,
+                    'name' => $className,
+                    'study_program' => Str::startsWith(Str::upper($className), 'PTIK') ? 'PTIK' : 'TEKOM',
+                    'cohort_year' => isset($cohort[1]) ? (int) $cohort[1] : null,
+                    'student_count' => null,
+                    'is_active' => true,
+                ]);
+            } elseif ($classGroup->trashed()) {
+                $classGroup->restore();
+            }
+
+            $course = Course::query()->withTrashed()->where('code', $courseCode)->first();
+            if ($course === null) {
+                Course::query()->create(['code' => $courseCode, 'name' => $raw['course_name'], 'sks' => (int) $raw['sks']]);
+            } elseif ($course->trashed()) {
+                $course->restore();
+            }
 
             $roomNames[] = $raw['room'] ?? '';
             foreach (['lecturer_lead', 'lecturer_partner', 'lecturer_partner_2'] as $key) {
@@ -195,6 +214,9 @@ class JtikSpreadsheetImportService
                     continue;
                 }
                 $lecturer = $this->findLecturer($name) ?? new Lecturer(['name' => $name, 'source_name' => $name, 'profile_status' => LecturerProfileStatus::Unverified, 'is_active' => true]);
+                if ($lecturer->exists && $lecturer->trashed()) {
+                    $lecturer->restore();
+                }
                 $metadata = $lecturer->source_data ?? [];
                 $metadata['aliases'] = array_values(array_unique([...($metadata['aliases'] ?? []), $name]));
                 $lecturer->source_data = $metadata;
@@ -208,8 +230,14 @@ class JtikSpreadsheetImportService
             if ($name === '' || in_array(Str::lower($name), ['online', 'daring', '-', 'hubungi dosen'], true)) {
                 continue;
             }
-            $code = Str::upper(Str::slug($name));
+            $code = Str::limit(Str::upper(Str::slug($name)), 40, '');
             if (Room::query()->where('code', $code)->orWhere('name', $name)->exists()) {
+                continue;
+            }
+            $trashedRoom = Room::query()->onlyTrashed()->where(fn ($query) => $query->where('code', $code)->orWhere('name', $name))->first();
+            if ($trashedRoom !== null) {
+                $trashedRoom->restore();
+
                 continue;
             }
             Room::query()->create(['name' => $name, 'code' => $code, 'type' => Str::startsWith(Str::lower($name), 'lab ') ? RoomType::Lab : RoomType::Other, 'capacity' => null, 'floor' => null, 'is_bookable' => true, 'is_active' => true]);
@@ -218,7 +246,17 @@ class JtikSpreadsheetImportService
 
     private function findLecturer(string $name): ?Lecturer
     {
-        $lecturers = $this->lecturers ??= Lecturer::query()->get()->keyBy('id');
+        $lecturers = $this->lecturers ??= Lecturer::query()->withTrashed()->get()->keyBy('id');
+
+        return $this->matchLecturerIn($lecturers->reject(fn (Lecturer $lecturer): bool => $lecturer->trashed()), $name)
+            ?? $this->matchLecturerIn($lecturers->filter(fn (Lecturer $lecturer): bool => $lecturer->trashed()), $name);
+    }
+
+    /**
+     * @param  Collection<int, Lecturer>  $lecturers
+     */
+    private function matchLecturerIn(Collection $lecturers, string $name): ?Lecturer
+    {
         $exact = $lecturers->first(fn (Lecturer $lecturer): bool => Str::lower($lecturer->name) === Str::lower($name)
             || Str::lower($lecturer->source_name ?? '') === Str::lower($name)
             || in_array($name, $lecturer->source_data['aliases'] ?? [], true));

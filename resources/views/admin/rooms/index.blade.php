@@ -12,17 +12,18 @@
 @section('content')
     @php
         $oldForm = old('form');
+        $isRoomFormError = $errors->any() && ($oldForm === 'add' || str_starts_with((string) $oldForm, 'edit-'));
         $oldRoomId = str_starts_with((string) $oldForm, 'edit-')
             ? (int) substr((string) $oldForm, 5)
             : (old('room_id') ? (int) old('room_id') : null);
         $roomManagerDefaults = [
-            'formModalOpen' => ($errors->any() && ! in_array($oldForm, ['closure', 'batch_capacity', 'batch_facility'], true)) || request()->boolean('tambah'),
+            'formModalOpen' => $isRoomFormError || request()->boolean('tambah'),
             'roomId' => $oldRoomId,
             'batchCapacityModalOpen' => $errors->any() && $oldForm === 'batch_capacity',
             'batchCapacity' => $oldForm === 'batch_capacity' ? old('capacity', '') : '',
             'batchFacilityModalOpen' => $errors->any() && $oldForm === 'batch_facility',
             'batchFacilities' => $oldForm === 'batch_facility' ? old('facilities', '') : '',
-            'selectedIds' => in_array($oldForm, ['batch_capacity', 'batch_facility'], true) ? old('room_ids', []) : [],
+            'selectedIds' => in_array($oldForm, ['batch_capacity', 'batch_facility', 'batch_rooms'], true) ? old('room_ids', []) : [],
             'closureModalOpen' => (bool) (session('closure_impact') || $oldForm === 'closure'),
             'closureMode' => old('mode', 'once'),
             'closureRoomId' => old('room_id', ''),
@@ -41,6 +42,7 @@
             'floor' => old('floor', ''),
             'building' => old('building', ''),
             'facilities' => old('facilities', ''),
+            'is_bookable' => (bool) old('is_bookable', true),
         ];
     @endphp
     <div class="flex flex-col gap-4 admin-page-stack"
@@ -72,6 +74,10 @@
                 <x-button size="sm" icon="plus" @click="openCreateModal()">Tambah ruang</x-button>
             </x-slot:actions>
         </x-page-header>
+
+        @if ($errors->any() && ! $isRoomFormError && ! in_array($oldForm, ['closure', 'batch_capacity', 'batch_facility'], true))
+            <x-alert variant="danger">{{ $errors->first() }}</x-alert>
+        @endif
 
         {{-- Toolbar Filter & Pencarian Cepat --}}
         <x-card padding="p-4" class="admin-table-card flex flex-col gap-3 shadow-xs">
@@ -495,6 +501,7 @@
         {{-- FORM TERSEMBUNYI UNTUK BATCH ACTION STANDARD --}}
         <form x-ref="batchForm" method="POST" action="{{ route('admin.rooms.batch') }}" class="hidden">
             @csrf
+            <input type="hidden" name="form" value="batch_rooms">
             <input type="hidden" name="action" x-model="batchAction">
             <input type="hidden" name="building" x-model="batchParams.building" :disabled="batchAction !== 'set_building'">
             <input type="hidden" name="type" x-model="batchParams.type" :disabled="batchAction !== 'set_type'">
@@ -507,6 +514,7 @@
         <form id="bulkRoomForm" method="POST" action="{{ route('admin.rooms.bulk-update') }}" class="hidden">
             @csrf
             @method('PUT')
+            <input type="hidden" name="form" value="bulk_rooms">
         </form>
 
         @include('admin.rooms.modals.form-modal')

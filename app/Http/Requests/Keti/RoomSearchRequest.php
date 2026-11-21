@@ -77,4 +77,9 @@ class RoomSearchRequest extends FormRequest
     {
         return (int) ($this->validated('durasi') ?? config('sicma.reservation.default_minutes'));
     }
+
+    protected function getRedirectUrl(): string
+    {
+        return route('keti.search');
+    }
 }

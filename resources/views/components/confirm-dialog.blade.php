@@ -17,6 +17,8 @@
           action="{{ $action }}"
           x-data="{ submitting: false }"
           x-on:submit="if (submitting) { $event.preventDefault(); return; } submitting = true"
+          x-on:sicma:form-error.window="submitting = false"
+          x-on:sicma:form-complete.window="submitting = false"
           class="flex flex-col gap-5">
         @csrf
         @unless (strtoupper($method) === 'POST')

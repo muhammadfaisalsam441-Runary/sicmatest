@@ -44,23 +44,23 @@ class SchedulePublisher
 
         $effectiveFrom = CarbonImmutable::instance($effectiveFrom)->setTimezone(config('app.timezone'))->startOfDay();
 
-        $this->assertPublishable($draft, $effectiveFrom, $expectedLockVersion);
+        $effectiveFrom = $this->assertPublishable($draft, $effectiveFrom, $expectedLockVersion);
 
         // Pemeriksaan pertama di luar transaksi agar daftar masalah tersimpan dan bisa ditinjau admin.
-        $draft->forceFill(['effective_from' => $effectiveFrom->max($draft->period->start_date)->toDateString()])->save();
-        $this->assertNoBlockingIssues($draft);
+        $this->assertNoBlockingIssues($draft, $effectiveFrom);
 
         $published = DB::transaction(function () use ($draft, $actor, $effectiveFrom, $expectedLockVersion, $note): ScheduleVersion {
             $draft = ScheduleVersion::query()->whereKey($draft->id)->lockForUpdate()->with('period')->firstOrFail();
 
             // Periksa ulang dengan data terbaru: reservasi baru atau perubahan draf serentak menghentikan penetapan.
-            $this->assertPublishable($draft, $effectiveFrom, $expectedLockVersion);
-            $this->assertNoBlockingIssues($draft);
+            $effectiveFrom = $this->assertPublishable($draft, $effectiveFrom, $expectedLockVersion);
+            $this->assertNoBlockingIssues($draft, $effectiveFrom);
 
             $this->supersedePrevious($draft, $effectiveFrom);
 
             $draft->forceFill([
                 'status' => ScheduleVersionStatus::Official,
+                'effective_from' => $effectiveFrom->toDateString(),
                 'effective_to' => null,
                 'published_by' => $actor->id,
                 'published_at' => now(),
@@ -86,7 +86,7 @@ class SchedulePublisher
         return $published;
     }
 
-    private function assertPublishable(ScheduleVersion $draft, CarbonImmutable $effectiveFrom, int $expectedLockVersion): void
+    private function assertPublishable(ScheduleVersion $draft, CarbonImmutable $effectiveFrom, int $expectedLockVersion): CarbonImmutable
     {
         $draft->loadMissing('period');
 
@@ -105,11 +105,16 @@ class SchedulePublisher
         if ($effectiveFrom->lessThan(CarbonImmutable::today()) || $effectiveFrom->greaterThan($draft->period->end_date)) {
             throw new DomainException('INVALID_DATE', 'Tanggal berlaku harus mulai hari ini dan berada dalam semester '.$draft->period->name.'.');
         }
+
+        return CarbonImmutable::instance($effectiveFrom->max($draft->period->start_date))->startOfDay();
     }
 
-    private function assertNoBlockingIssues(ScheduleVersion $draft): void
+    private function assertNoBlockingIssues(ScheduleVersion $draft, CarbonImmutable $effectiveFrom): void
     {
-        $blocking = $this->validator->validate($draft->fresh())
+        $fresh = $draft->fresh();
+        $fresh->effective_from = $effectiveFrom->toDateString();
+
+        $blocking = $this->validator->validate($fresh)
             ->filter(fn ($issue): bool => $issue->severity === IssueSeverity::Error);
 
         if ($blocking->isNotEmpty()) {

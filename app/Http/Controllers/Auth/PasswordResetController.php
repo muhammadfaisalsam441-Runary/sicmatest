@@ -8,7 +8,9 @@ use App\Http\Requests\Auth\ResetPasswordRequest;
 use App\Models\User\User;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 
@@ -67,9 +69,13 @@ class PasswordResetController extends Controller
     public function update(ResetPasswordRequest $request): RedirectResponse
     {
         $status = Password::reset(
-            $request->only('email', 'password', 'password_confirmation', 'token'),
+            [
+                ...$request->only('email', 'password', 'password_confirmation', 'token'),
+                'is_active' => true,
+            ],
             function (User $user, string $password): void {
                 $user->forceFill(['password' => $password, 'remember_token' => Str::random(60)])->save();
+                $this->invalidateUserSessions($user);
                 event(new PasswordReset($user));
             },
         );
@@ -85,5 +91,20 @@ class PasswordResetController extends Controller
     public function done(): View
     {
         return view('auth.password-updated');
+    }
+
+    /**
+     * Hapus seluruh sesi database milik pengguna setelah kata sandi diatur ulang.
+     */
+    private function invalidateUserSessions(User $user): void
+    {
+        $table = config('session.table', 'sessions') ?: 'sessions';
+        $connection = config('session.connection');
+
+        if (Schema::connection($connection)->hasTable($table)) {
+            DB::connection($connection)->table($table)
+                ->where('user_id', $user->id)
+                ->delete();
+        }
     }
 }

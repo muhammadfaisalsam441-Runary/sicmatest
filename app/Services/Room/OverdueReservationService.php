@@ -26,6 +26,7 @@ class OverdueReservationService
     public function __construct(
         private NotificationService $notifications,
         private AuditLogger $audit,
+        private AvailabilityService $availability,
     ) {}
 
     /**
@@ -38,7 +39,7 @@ class OverdueReservationService
         return Reservation::query()
             ->with(['room', 'classGroup', 'creator'])
             ->where('status', ReservationStatus::Booked)
-            ->where('start_at', '<=', now()->subMinutes((int) config('sicma.reservation.checkin_grace_minutes')))
+            ->where('start_at', '<', now()->subMinutes((int) config('sicma.reservation.checkin_grace_minutes')))
             ->orderBy('start_at')
             ->get();
     }
@@ -73,8 +74,7 @@ class OverdueReservationService
                 $counts['not_started']++;
             }
 
-            if (config('sicma.reservation.auto_expire_no_show')) {
-                $this->expire($reservation);
+            if (config('sicma.reservation.auto_expire_no_show') && $this->expire($reservation)) {
                 $counts['expired']++;
             }
         }
@@ -105,34 +105,46 @@ class OverdueReservationService
         return true;
     }
 
-    private function expire(Reservation $reservation): void
+    private function expire(Reservation $reservation): bool
     {
-        DB::transaction(function () use ($reservation): void {
-            $reservation->forceFill([
+        return DB::transaction(function () use ($reservation): bool {
+            $locked = Reservation::query()->whereKey($reservation->id)->lockForUpdate()->first();
+
+            if (! $locked || $locked->status !== ReservationStatus::Booked) {
+                return false;
+            }
+
+            $locked->forceFill([
                 'status' => ReservationStatus::Cancelled,
                 'cancelled_at' => now(),
                 'cancel_reason' => 'Tidak dimulai sampai jendela check-in berakhir (otomatis).',
-                'lock_version' => $reservation->lock_version + 1,
+                'lock_version' => $locked->lock_version + 1,
             ])->save();
 
-            $reservation->block()->update(['is_active' => false]);
+            $locked->block()->update(['is_active' => false]);
 
-            if ($reservation->session_reschedule_id !== null) {
-                $reschedule = SessionReschedule::query()->find($reservation->session_reschedule_id);
-                if ($reschedule && $reschedule->status !== RescheduleStatus::Cancelled) {
+            if ($locked->session_reschedule_id !== null) {
+                $reschedule = SessionReschedule::query()->whereKey($locked->session_reschedule_id)->lockForUpdate()->first();
+                if ($reschedule && $reschedule->status === RescheduleStatus::Active) {
                     $reschedule->forceFill([
                         'status' => RescheduleStatus::Cancelled,
                         'cancelled_at' => now(),
                     ])->save();
 
                     if ($reschedule->original_start_at->isFuture()) {
-                        $version = app(ClassScheduleService::class)->officialVersionOn($reschedule->original_start_at);
-                        RoomBlock::query()
-                            ->where('source_type', RoomBlockSource::Schedule)
-                            ->when($version, fn ($q) => $q->where('schedule_version_id', $version->id))
-                            ->where('room_id', $reschedule->original_room_id)
-                            ->where('start_at', $reschedule->original_start_at)
-                            ->update(['is_active' => true]);
+                        $occupyingBlocks = $this->availability
+                            ->blocksFor([$reschedule->original_room_id], $reschedule->original_start_at, $reschedule->original_end_at, lock: true)
+                            ->get($reschedule->original_room_id, collect());
+
+                        if ($occupyingBlocks->isEmpty()) {
+                            $version = app(ClassScheduleService::class)->officialVersionOn($reschedule->original_start_at);
+                            RoomBlock::query()
+                                ->where('source_type', RoomBlockSource::Schedule)
+                                ->when($version, fn ($q) => $q->where('schedule_version_id', $version->id))
+                                ->where('room_id', $reschedule->original_room_id)
+                                ->where('start_at', $reschedule->original_start_at)
+                                ->update(['is_active' => true]);
+                        }
                     }
 
                     $this->audit->log('meeting.reschedule_cancelled', $reschedule, ['status' => RescheduleStatus::Active->value], ['status' => RescheduleStatus::Cancelled->value], 'Reservasi pengganti kedaluwarsa (otomatis)');
@@ -141,7 +153,9 @@ class OverdueReservationService
 
             AvailabilityCache::bust();
 
-            $this->audit->log('reservation.expired', $reservation, ['status' => 'booked'], ['status' => 'cancelled'], 'Tidak dimulai (otomatis)');
+            $this->audit->log('reservation.expired', $locked, ['status' => 'booked'], ['status' => 'cancelled'], 'Tidak dimulai (otomatis)');
+
+            return true;
         });
     }
 }

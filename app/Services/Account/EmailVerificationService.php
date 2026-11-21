@@ -65,37 +65,52 @@ class EmailVerificationService
             return false;
         }
 
-        $record = $this->latestCode($user);
         $maxAttempts = (int) config('sicma.verification.max_attempts');
 
-        if ($record === null) {
-            throw new DomainException('VERIFICATION_CODE_INVALID', 'Kode belum sesuai. Kirim ulang kode verifikasi.');
-        }
+        $outcome = DB::transaction(function () use ($user, $code, $maxAttempts): DomainException|bool {
+            $lockedUser = User::query()->whereKey($user->id)->lockForUpdate()->first();
 
-        if ($record->attempts >= $maxAttempts) {
-            throw new DomainException('VERIFICATION_LOCKED', 'Kode salah terlalu sering. Kirim ulang kode verifikasi.');
-        }
+            if ($lockedUser !== null && $lockedUser->hasVerifiedEmail()) {
+                $user->forceFill(['email_verified_at' => $lockedUser->email_verified_at]);
 
-        if ($record->expires_at->isPast()) {
-            throw new DomainException('VERIFICATION_CODE_EXPIRED', 'Kode sudah kedaluwarsa. Kirim ulang kode verifikasi.');
-        }
+                return false;
+            }
 
-        if (! Hash::check($code, $record->code_hash)) {
-            $record->increment('attempts');
+            $record = $user->verificationCodes()->latest('id')->lockForUpdate()->first();
 
-            throw $record->attempts >= $maxAttempts
-                ? new DomainException('VERIFICATION_LOCKED', 'Kode salah terlalu sering. Kirim ulang kode verifikasi.')
-                : new DomainException('VERIFICATION_CODE_INVALID', 'Masukkan kode terbaru atau kirim ulang kode verifikasi.', [
-                    'remaining_attempts' => $maxAttempts - $record->attempts,
-                ]);
-        }
+            if ($record === null) {
+                return new DomainException('VERIFICATION_CODE_INVALID', 'Kode belum sesuai. Kirim ulang kode verifikasi.');
+            }
 
-        DB::transaction(function () use ($user): void {
+            if ($record->attempts >= $maxAttempts) {
+                return new DomainException('VERIFICATION_LOCKED', 'Kode salah terlalu sering. Kirim ulang kode verifikasi.');
+            }
+
+            if ($record->expires_at->isPast()) {
+                return new DomainException('VERIFICATION_CODE_EXPIRED', 'Kode sudah kedaluwarsa. Kirim ulang kode verifikasi.');
+            }
+
+            if (! Hash::check($code, $record->code_hash)) {
+                $record->increment('attempts');
+
+                return $record->attempts >= $maxAttempts
+                    ? new DomainException('VERIFICATION_LOCKED', 'Kode salah terlalu sering. Kirim ulang kode verifikasi.')
+                    : new DomainException('VERIFICATION_CODE_INVALID', 'Masukkan kode terbaru atau kirim ulang kode verifikasi.', [
+                        'remaining_attempts' => $maxAttempts - $record->attempts,
+                    ]);
+            }
+
             $user->markEmailAsVerified();
             $user->verificationCodes()->delete();
+
+            return true;
         });
 
-        return true;
+        if ($outcome instanceof DomainException) {
+            throw $outcome;
+        }
+
+        return $outcome;
     }
 
     /**
@@ -103,7 +118,15 @@ class EmailVerificationService
      */
     public function changeEmail(User $user, string $email): void
     {
-        $user->forceFill(['email' => $email, 'email_verified_at' => null])->save();
+        $normalized = strtolower(trim($email));
+
+        if ($normalized === strtolower((string) $user->email)) {
+            $this->send($user, ignoreCooldown: false);
+
+            return;
+        }
+
+        $user->forceFill(['email' => $normalized, 'email_verified_at' => null])->save();
 
         $this->send($user, ignoreCooldown: true);
     }

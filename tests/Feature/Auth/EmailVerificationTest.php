@@ -113,3 +113,47 @@ test('Keti yang emailnya belum terverifikasi diarahkan ke halaman verifikasi', f
         ->get(route('keti.search'))
         ->assertRedirect(route('verification.notice'));
 });
+
+test('mengubah email ke alamat yang sama tetap mematuhi jeda kirim ulang dan tidak menghapus kunci percobaan OTP', function () {
+    Mail::fake();
+    $keti = User::factory()->unverified()->pendingKeti()->create(['email' => 'dimas@sicma.test']);
+    $code = sendCodeTo($keti);
+    $wrong = $code === '000000' ? '111111' : '000000';
+
+    foreach (range(1, 5) as $attempt) {
+        $this->actingAs($keti)->post(route('verification.verify'), ['code' => $wrong]);
+    }
+
+    $lockedRecord = $keti->verificationCodes()->sole();
+    expect($lockedRecord->attempts)->toBe(5);
+
+    $this->actingAs($keti)
+        ->from(route('verification.email.edit'))
+        ->put(route('verification.email.update'), ['email' => ' DIMAS@sicma.test '])
+        ->assertRedirect(route('verification.email.edit'))
+        ->assertSessionHas('error_code', 'RESEND_TOO_SOON');
+
+    expect($keti->verificationCodes()->sole()->id)->toBe($lockedRecord->id)
+        ->and($keti->verificationCodes()->sole()->attempts)->toBe(5);
+
+    $this->actingAs($keti)
+        ->post(route('verification.verify'), ['code' => $code])
+        ->assertSessionHas('error_code', 'VERIFICATION_LOCKED');
+
+    expect($keti->fresh()->hasVerifiedEmail())->toBeFalse();
+});
+
+test('mengubah email ke alamat yang sama setelah jeda kirim ulang selesai akan mengirim kode baru', function () {
+    $keti = User::factory()->unverified()->pendingKeti()->create(['email' => 'dimas@sicma.test']);
+    sendCodeTo($keti);
+
+    $this->travel(61)->seconds();
+
+    $this->actingAs($keti)
+        ->put(route('verification.email.update'), ['email' => 'dimas@sicma.test'])
+        ->assertRedirect(route('verification.notice'))
+        ->assertSessionMissing('error_code');
+
+    Mail::assertSent(VerificationCodeMail::class, fn (VerificationCodeMail $mail) => $mail->hasTo('dimas@sicma.test') && $mail->code !== '');
+    expect($keti->verificationCodes()->sole()->attempts)->toBe(0);
+});

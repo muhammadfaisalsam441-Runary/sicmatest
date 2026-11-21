@@ -75,7 +75,7 @@
                                 {{-- Delete Button with inline confirmation --}}
                                 <template x-if="!member.is_locked && !confirmingDelete">
                                     <button type="button"
-                                            @click="confirmingDelete = true"
+                                            @click="confirmingDelete = true; $nextTick(() => window.renderIcons?.())"
                                             class="inline-flex cursor-pointer items-center gap-1 rounded-control border border-danger/30 bg-danger-soft/30 px-2.5 py-1 text-xs font-semibold text-danger transition hover:bg-danger hover:text-white"
                                             title="Hapus pengajar dari tim">
                                         <i data-lucide="trash-2" class="size-3.5" aria-hidden="true"></i>
@@ -84,7 +84,7 @@
                                 </template>
                                 <template x-if="!member.is_locked && confirmingDelete">
                                     <div class="inline-flex items-center gap-1">
-                                        <button type="button" @click="confirmingDelete = false" class="cursor-pointer rounded-control border border-border bg-surface px-2 py-1 text-[11px] font-medium text-muted hover:text-ink">Batal</button>
+                                        <button type="button" @click="confirmingDelete = false; $nextTick(() => window.renderIcons?.())" class="cursor-pointer rounded-control border border-border bg-surface px-2 py-1 text-[11px] font-medium text-muted hover:text-ink">Batal</button>
                                         <form method="POST" :action="@js($destroyUrlTemplate).replace('__ID__', member.id)" class="inline">
                                             @csrf
                                             @method('DELETE')
@@ -107,6 +107,12 @@
                 <input type="hidden" name="_method" value="PUT">
             </template>
             <input type="hidden" name="course_offering_id" :value="activeOffering.id">
+
+            <div x-show="(activeOffering.team || []).some((m) => Number(m.id) === Number(editingAssignmentId) && m.is_locked)"
+                 x-cloak
+                 class="rounded-lg border border-warning/40 bg-warning-soft/50 px-3 py-2 text-xs text-warning-ink">
+                Penugasan ini sedang terkunci. Buka kunci pada daftar tim di atas untuk mengubahnya, atau klik <strong>+ Tambah Anggota Baru</strong> untuk menambah dosen pendamping.
+            </div>
 
             <div>
                 <div class="mb-1.5 flex items-center justify-between">
@@ -172,7 +178,7 @@
 
             <div class="mt-2 flex items-center justify-end gap-2 border-t border-border pt-4">
                 <x-button variant="secondary" type="button" @click="quickModalOpen = false">Batal</x-button>
-                <x-button variant="primary" type="submit" icon="check">
+                <x-button variant="primary" type="submit" icon="check" x-bind:disabled="(activeOffering.team || []).some((m) => Number(m.id) === Number(editingAssignmentId) && m.is_locked)">
                     <span x-text="editingAssignmentId ? 'Simpan Perubahan' : 'Simpan Penugasan'"></span>
                 </x-button>
             </div>

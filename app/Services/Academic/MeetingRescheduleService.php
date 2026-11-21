@@ -452,7 +452,7 @@ class MeetingRescheduleService
             $meeting = $this->meetings->find($session, $start) ?? new Meeting($session, $start, $end, $reschedule);
 
             try {
-                $this->validator->assertClassesFree($meeting, $start, $end, replacing: null);
+                $this->validator->assertClassesFree($meeting, $start, $end, replacing: $reschedule);
                 $this->lecturers->assertFree($session->lecturers, $start, $end, excludeMeeting: $meeting, ignoreRescheduleId: $reschedule->id);
             } catch (DomainException $exception) {
                 throw new DomainException('RESTORE_NOT_POSSIBLE', $exception->getMessage(), $exception->context);

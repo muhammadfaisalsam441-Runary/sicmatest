@@ -61,20 +61,29 @@ class LecturerService
                 ...array_intersect_key($data, array_flip(self::OPTIONAL)),
             ])->save();
 
+            $today = now()->toDateString();
+            $yesterday = now()->subDay()->toDateString();
+
+            $terminateActiveTerms = function (?string $exceptPosition = null) use ($lecturer, $today, $yesterday): void {
+                $baseQuery = fn () => $lecturer->leadershipTerms()
+                    ->activeOn(now())
+                    ->when($exceptPosition !== null, fn ($query) => $query->where('position', '!=', $exceptPosition));
+
+                $baseQuery()->whereDate('valid_from', '<', $today)->update(['valid_to' => $yesterday]);
+                $baseQuery()->whereDate('valid_from', '>=', $today)->delete();
+            };
+
             if (! empty($data['leadership_position'])) {
-                $lecturer->leadershipTerms()
-                    ->where('position', '!=', $data['leadership_position'])
-                    ->where(fn ($q) => $q->whereNull('valid_to')->orWhere('valid_to', '>=', now()->toDateString()))
-                    ->update(['valid_to' => now()->subDay()->toDateString()]);
+                $terminateActiveTerms($data['leadership_position']);
 
                 $lecturer->leadershipTerms()->updateOrCreate(
                     ['position' => $data['leadership_position']],
                     ['valid_from' => $data['leadership_from'], 'valid_to' => $data['leadership_to'] ?? null],
                 );
+                $lecturer->unsetRelation('leadershipTerms');
             } elseif (array_key_exists('leadership_position', $data)) {
-                $lecturer->leadershipTerms()
-                    ->where(fn ($q) => $q->whereNull('valid_to')->orWhere('valid_to', '>=', now()->toDateString()))
-                    ->update(['valid_to' => now()->subDay()->toDateString()]);
+                $terminateActiveTerms();
+                $lecturer->unsetRelation('leadershipTerms');
             }
 
             $period = Period::query()->active()->first();
@@ -340,9 +349,13 @@ class LecturerService
                 $position = $value('functional_position');
 
                 $lecturer = match (true) {
-                    $nip !== null && ($found = Lecturer::query()->where('nip', $nip)->first()) !== null => $found,
-                    $nidn !== null && ($found = Lecturer::query()->where('nidn', $nidn)->first()) !== null => $found,
-                    default => Lecturer::query()->where('name', $name)->orWhere('source_name', $name)->first(),
+                    $nip !== null && ($found = Lecturer::query()->withTrashed()->where('nip', $nip)->first()) !== null => $found,
+                    $nidn !== null && ($found = Lecturer::query()->withTrashed()->where('nidn', $nidn)->first()) !== null => $found,
+                    default => Lecturer::query()
+                        ->withTrashed()
+                        ->where(fn ($query) => $query->where('name', $name)->orWhere('source_name', $name))
+                        ->orderByRaw('CASE WHEN deleted_at IS NULL THEN 0 ELSE 1 END')
+                        ->first(),
                 };
 
                 $attributes = array_filter([
@@ -364,6 +377,10 @@ class LecturerService
                     ]);
                     $result['created']++;
                 } else {
+                    if ($lecturer->trashed()) {
+                        $lecturer->restore();
+                    }
+
                     // Nama dari jadwal dipertahankan bila baris cocok lewat NIP/NIDN.
                     $lecturer->update($nip !== null || $nidn !== null ? $attributes : ['name' => $name, ...$attributes]);
                     $result['updated']++;

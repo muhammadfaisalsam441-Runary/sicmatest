@@ -91,18 +91,7 @@ class ReservationService
                 $this->assertAcademicBookingDay($purpose, $start);
                 $this->assertValidRequest($lockedRoom, $start, $end, $participants, $classGroup->id);
                 $this->assertClassFree($classGroup, $start, $end);
-
-                $clashMeeting = $this->meetings->meetingsOn($start)->first(fn (Meeting $other): bool => $other->start->lessThan($end)
-                    && $other->end->greaterThan($start)
-                    && ! $other->isMoved()
-                    && $other->session->participants->contains('id', $classGroup->id));
-
-                if ($clashMeeting !== null) {
-                    throw new DomainException(
-                        'CLASS_TIME_CONFLICT',
-                        "Kelas {$classGroup->name} sedang kuliah {$clashMeeting->session->title} pukul ".Wita::range($clashMeeting->start, $clashMeeting->end).'. Pilih jam lain.'
-                    );
-                }
+                $this->assertNoOfficialMeetingConflict($classGroup, $start, $end);
 
                 $this->assertRoomFree($lockedRoom, $start, $end);
 
@@ -385,11 +374,35 @@ class ReservationService
                 throw new DomainException('ROOM_CONFLICT', 'Tidak bisa diperpanjang: ruangan dipakai mulai '.Wita::clock($conflicts->min('start_at')).'.');
             }
 
-            $this->assertClassFree($reservation->classGroup, $currentEnd, $newEnd, ignoreReservationId: $reservation->id, hint: 'Tidak bisa diperpanjang.');
+            $this->assertClassFree(
+                $reservation->classGroup,
+                $currentEnd,
+                $newEnd,
+                ignoreReservationId: $reservation->id,
+                hint: 'Tidak bisa diperpanjang.',
+                ignoreRescheduleId: $reservation->session_reschedule_id,
+            );
+
+            $ignoreSessionId = $reservation->session_reschedule_id !== null
+                ? SessionReschedule::query()->whereKey($reservation->session_reschedule_id)->value('schedule_session_id')
+                : null;
+            $this->assertNoOfficialMeetingConflict(
+                $reservation->classGroup,
+                $currentEnd,
+                $newEnd,
+                hint: 'Tidak bisa diperpanjang.',
+                ignoreSessionId: $ignoreSessionId,
+            );
 
             $before = ['end_at' => $currentEnd->toDateTimeString()];
             $reservation->forceFill(['end_at' => $newEnd, 'lock_version' => $reservation->lock_version + 1])->save();
             $reservation->block()->update(['end_at' => $newEnd]);
+
+            if ($reservation->session_reschedule_id !== null) {
+                SessionReschedule::query()
+                    ->whereKey($reservation->session_reschedule_id)
+                    ->update(['target_end_at' => $newEnd]);
+            }
 
             AvailabilityCache::bust();
 
@@ -553,6 +566,27 @@ class ReservationService
                 'CLASS_TIME_CONFLICT',
                 "Kelas {$classGroup->name} sudah dijadwalkan kuliah online {$onlineClash->session_title} pukul ".Wita::range($onlineClash->effectiveStart(), $onlineClash->effectiveEnd()).'. '.$hint,
                 ['reschedule_id' => $onlineClash->id],
+            );
+        }
+    }
+
+    private function assertNoOfficialMeetingConflict(
+        ClassGroup $classGroup,
+        CarbonImmutable $start,
+        CarbonImmutable $end,
+        string $hint = 'Pilih jam lain.',
+        ?int $ignoreSessionId = null,
+    ): void {
+        $clashMeeting = $this->meetings->meetingsOn($start)->first(fn (Meeting $other): bool => $other->start->lessThan($end)
+            && $other->end->greaterThan($start)
+            && ! $other->isMoved()
+            && ($ignoreSessionId === null || $other->session->id !== $ignoreSessionId)
+            && $other->session->participants->contains('id', $classGroup->id));
+
+        if ($clashMeeting !== null) {
+            throw new DomainException(
+                'CLASS_TIME_CONFLICT',
+                "Kelas {$classGroup->name} sedang kuliah {$clashMeeting->session->title} pukul ".Wita::range($clashMeeting->start, $clashMeeting->end).'. '.$hint
             );
         }
     }

@@ -176,20 +176,51 @@ class LecturerController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'lecturers' => ['required', 'array', 'min:1'],
-            'lecturers.*.id' => ['required', 'integer', Rule::exists('lecturers', 'id')->whereNull('deleted_at')],
+            'lecturers.*.id' => ['required', 'integer', 'distinct', Rule::exists('lecturers', 'id')->whereNull('deleted_at')],
             'lecturers.*.name' => ['required', 'string', 'max:150'],
-            'lecturers.*.nip' => ['nullable', 'regex:/^\d{18}$/'],
-            'lecturers.*.nidn' => ['nullable', 'string', 'max:20'],
+            'lecturers.*.nip' => ['nullable', 'regex:/^\d{18}$/', 'distinct'],
+            'lecturers.*.nidn' => ['nullable', 'string', 'max:20', 'distinct'],
             'lecturers.*.homebase' => ['nullable', Rule::enum(LecturerHomebase::class)],
             'lecturers.*.profile_status' => ['required', Rule::enum(LecturerProfileStatus::class)],
             'lecturers.*.target_sks' => ['nullable', 'integer', 'min:0', 'max:60'],
             'lecturers.*.max_sks' => ['nullable', 'integer', 'min:0', 'max:60'],
         ], [
             'lecturers.*.nip.regex' => 'NIP harus terdiri atas 18 angka.',
+            'lecturers.*.nip.distinct' => 'NIP tidak boleh duplikat pada daftar.',
+            'lecturers.*.nidn.distinct' => 'NIDN tidak boleh duplikat pada daftar.',
         ]);
 
         $validator->after(function (\Illuminate\Validation\Validator $validator) use ($request): void {
-            foreach ((array) $request->input('lecturers', []) as $index => $item) {
+            $items = array_filter((array) $request->input('lecturers', []), 'is_array');
+            $nips = collect($items)->map(fn (array $item): string => trim((string) ($item['nip'] ?? '')))->filter()->unique()->values()->all();
+            $nidns = collect($items)->map(fn (array $item): string => trim((string) ($item['nidn'] ?? '')))->filter()->unique()->values()->all();
+
+            $ownersByNip = $nips !== []
+                ? Lecturer::query()->withTrashed()->whereIn('nip', $nips)->pluck('id', 'nip')->all()
+                : [];
+            $ownersByNidn = $nidns !== []
+                ? Lecturer::query()->withTrashed()->whereIn('nidn', $nidns)->pluck('id', 'nidn')->all()
+                : [];
+
+            foreach ($items as $index => $item) {
+                $rowId = is_numeric($item['id'] ?? null) ? (int) $item['id'] : null;
+                $nip = trim((string) ($item['nip'] ?? ''));
+                $nidn = trim((string) ($item['nidn'] ?? ''));
+
+                if ($nip !== '' && ! $validator->errors()->has("lecturers.{$index}.nip")) {
+                    $ownerId = $ownersByNip[$nip] ?? null;
+                    if ($ownerId !== null && $ownerId !== $rowId) {
+                        $validator->errors()->add("lecturers.{$index}.nip", 'NIP sudah terdaftar pada dosen lain.');
+                    }
+                }
+
+                if ($nidn !== '' && ! $validator->errors()->has("lecturers.{$index}.nidn")) {
+                    $ownerId = $ownersByNidn[$nidn] ?? null;
+                    if ($ownerId !== null && $ownerId !== $rowId) {
+                        $validator->errors()->add("lecturers.{$index}.nidn", 'NIDN sudah terdaftar pada dosen lain.');
+                    }
+                }
+
                 if (isset($item['target_sks'], $item['max_sks']) && $item['target_sks'] !== '' && $item['max_sks'] !== '' && (int) $item['max_sks'] < (int) $item['target_sks']) {
                     $validator->errors()->add("lecturers.{$index}.max_sks", 'Maksimum SKS harus lebih besar atau sama dengan target SKS.');
                 }

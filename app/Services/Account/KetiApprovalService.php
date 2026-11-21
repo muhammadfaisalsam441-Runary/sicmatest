@@ -9,6 +9,8 @@ use App\Models\User\ClassRepresentative;
 use App\Models\User\KetiApplication;
 use App\Models\User\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
 /**
  * Pemeriksaan pengajuan Keti oleh admin (Fase 7): setujui, minta perbaikan, tolak, nonaktifkan.
@@ -122,10 +124,30 @@ class KetiApprovalService
 
         DB::transaction(function () use ($keti, $reason): void {
             $keti->classRepresentatives()->activeOn(now())->update(['valid_to' => now()->subDay()->toDateString()]);
-            $keti->forceFill(['is_active' => false])->save();
+            $keti->forceFill([
+                'is_active' => false,
+                'remember_token' => Str::random(60),
+            ])->save();
+
+            $this->invalidateUserSessions($keti);
 
             $this->audit->log('keti.deactivated', $keti, ['is_active' => true], ['is_active' => false], $reason);
         });
+    }
+
+    /**
+     * Hapus seluruh sesi database milik akun Keti yang dinonaktifkan.
+     */
+    private function invalidateUserSessions(User $user): void
+    {
+        $table = config('session.table', 'sessions') ?: 'sessions';
+        $connection = config('session.connection');
+
+        if (Schema::connection($connection)->hasTable($table)) {
+            DB::connection($connection)->table($table)
+                ->where('user_id', $user->id)
+                ->delete();
+        }
     }
 
     private function assertPending(KetiApplication $application): void

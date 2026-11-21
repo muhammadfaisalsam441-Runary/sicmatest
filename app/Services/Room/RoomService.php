@@ -134,10 +134,11 @@ class RoomService
 
                 $code = $room->code;
                 if ($name !== $room->name) {
-                    $baseCode = Str::upper(Str::slug($name));
+                    $baseCode = Str::limit(Str::upper(Str::slug($name)), 40, '');
                     $code = $baseCode !== '' ? $baseCode : $room->code;
                     if (Room::withTrashed()->where('code', $code)->where('id', '!=', $room->id)->exists()) {
-                        $code = $code.'-'.$room->id;
+                        $suffix = '-'.$room->id;
+                        $code = Str::limit($code, 40 - strlen($suffix), '').$suffix;
                     }
                 }
 
@@ -213,12 +214,26 @@ class RoomService
 
     private function buildingId(?string $name): ?int
     {
-        if ($name === null || $name === '') {
+        $name = $name !== null ? Str::squish($name) : '';
+        if ($name === '') {
             return null;
         }
 
-        $building = Building::query()->where('name', $name)->orWhere('code', Str::upper(Str::slug($name)))->first();
+        $code = Str::limit(Str::upper(Str::slug($name)), 20, '');
 
-        return ($building ?? Building::create(['name' => $name, 'code' => Str::upper(Str::slug($name))]))->id;
+        $building = Building::withTrashed()
+            ->where('name', $name)
+            ->orWhere('code', $code)
+            ->first();
+
+        if ($building !== null) {
+            if ($building->trashed()) {
+                $building->restore();
+            }
+
+            return $building->id;
+        }
+
+        return Building::create(['name' => $name, 'code' => $code])->id;
     }
 }

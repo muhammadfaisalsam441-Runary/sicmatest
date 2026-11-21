@@ -143,6 +143,7 @@
                     'kelas' => $classGroupId,
                     'dosen' => $lecturerId,
                     'ruang' => $roomId,
+                    'per_page' => $perPage !== 25 ? $perPage : null,
                 ]);
                 $activeChips = collect([
                     $prodi !== '' ? ['key' => 'prodi', 'label' => 'Prodi: '.($studyPrograms[$prodi] ?? $prodi)] : null,
@@ -177,7 +178,7 @@
                     <nav aria-label="Filter hari kuliah" class="inline-flex flex-wrap items-center gap-0.5 rounded-control border border-border bg-page p-0.5">
                         @foreach ([null => 'Semua', 1 => 'Senin', 2 => 'Selasa', 3 => 'Rabu', 4 => 'Kamis', 5 => 'Jumat'] as $key => $label)
                             @php($dayActive = (int) $day === (int) $key)
-                            <a href="{{ route('admin.schedules.index', array_filter(['versi' => request('versi'), 'ruang' => $roomId, 'q' => $keyword, 'prodi' => $prodi, 'angkatan' => $cohortYear, 'kelas' => $classGroupId, 'dosen' => $lecturerId, 'hari' => $key ?: null])) }}"
+                            <a href="{{ route('admin.schedules.index', array_filter(['versi' => request('versi'), 'ruang' => $roomId, 'q' => $keyword, 'prodi' => $prodi, 'angkatan' => $cohortYear, 'kelas' => $classGroupId, 'dosen' => $lecturerId, 'per_page' => $perPage !== 25 ? $perPage : null, 'hari' => $key ?: null])) }}"
                                @if ($dayActive) aria-current="page" @endif
                                @class([
                                    'rounded-[6px] px-2.5 py-1 text-xs font-semibold transition',
@@ -186,6 +187,15 @@
                                ])>{{ $label }}</a>
                         @endforeach
                     </nav>
+
+                    <select name="per_page"
+                            aria-label="Baris per halaman"
+                            @change="$el.form.requestSubmit()"
+                            class="rounded-control border border-border bg-surface px-2.5 py-1.5 text-xs text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary">
+                        @foreach ([25, 50, 100] as $n)
+                            <option value="{{ $n }}" @selected($perPage === $n)>{{ $n }} baris</option>
+                        @endforeach
+                    </select>
 
                     <button type="button"
                             @click="toggle()"
@@ -242,7 +252,7 @@
                 </x-empty-state>
             @else
                 <x-table-scroll>
-                    <x-slot:title>{{ $sessions->count() }} sesi • Jadwal perkuliahan resmi v{{ $official->version_no }}</x-slot:title>
+                    <x-slot:title>{{ $sessions->total() }} sesi • Jadwal perkuliahan resmi v{{ $official->version_no }}</x-slot:title>
                     <x-slot:headerActions>
                         <x-table-density-toggle />
                     </x-slot:headerActions>
@@ -327,6 +337,11 @@
                         </tbody>
                     </table>
                 </x-table-scroll>
+                @if ($sessions->hasPages())
+                    <div class="border-t border-border pt-3">
+                        {{ $sessions->links() }}
+                    </div>
+                @endif
             @endif
         </x-card>
 

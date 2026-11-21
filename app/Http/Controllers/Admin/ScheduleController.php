@@ -14,6 +14,7 @@ use App\Services\Scheduling\ScheduleValidator;
 use App\Support\CsvStream;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\View\View;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
@@ -78,26 +79,59 @@ class ScheduleController extends Controller
             $classGroupId = null;
         }
 
-        $sessions = $official === null ? collect() : ScheduleSession::query()
-            ->whereBelongsTo($official, 'version')
-            ->with(['room', 'participants', 'lecturers'])
-            ->when($day, fn (Builder $query, int $day) => $query->where('day_of_week', $day))
-            ->when($prodi !== '', fn (Builder $query) => $query->whereHas('participants', fn (Builder $query) => $query->whereStudyProgramMatches($prodi)))
-            ->when($cohortYear, fn (Builder $query, int $year) => $query->whereHas('participants', fn (Builder $query) => $query->where('cohort_year', $year)))
-            ->when($classGroupId, fn (Builder $query, int $id) => $query->whereHas('participants', fn (Builder $query) => $query->whereKey($id)))
-            ->when($lecturerId, fn (Builder $query, int $id) => $query->whereHas('lecturers', fn (Builder $query) => $query->whereKey($id)))
-            ->when($roomId, fn (Builder $query, int $id) => $query->where('room_id', $id))
-            ->when($keyword !== '', fn (Builder $query) => $query->where(fn (Builder $query) => $query
-                ->where('title', 'like', "%{$keyword}%")
-                ->orWhereHas('room', fn (Builder $query) => $query->where('name', 'like', "%{$keyword}%"))
-                ->orWhereHas('participants', fn (Builder $query) => $query->where('name', 'like', "%{$keyword}%"))
-                ->orWhereHas('lecturers', fn (Builder $query) => $query->where('name', 'like', "%{$keyword}%"))))
-            ->orderByRaw('day_of_week is null')
-            ->orderBy('day_of_week')
-            ->orderBy('start_minute')
-            ->get();
+        $perPage = in_array((int) $request->query('per_page'), [25, 50, 100], true) ? (int) $request->query('per_page') : 25;
 
-        [$sessions, $cohortBlockAlternate] = $this->orderSessionsByCohortBlock($sessions);
+        if ($official === null) {
+            $sessions = new LengthAwarePaginator(collect(), 0, $perPage, 1, [
+                'path' => $request->url(),
+                'query' => $request->query(),
+            ]);
+            $cohortBlockAlternate = [];
+        } else {
+            $lightSessions = ScheduleSession::query()
+                ->whereBelongsTo($official, 'version')
+                ->select(['id', 'day_of_week', 'start_minute', 'end_minute', 'title'])
+                ->with(['participants:id,name,cohort_year'])
+                ->when($day, fn (Builder $query, int $day): Builder => $query->where('day_of_week', $day))
+                ->when($prodi !== '', fn (Builder $query): Builder => $query->whereHas('participants', fn (Builder $query): Builder => $query->whereStudyProgramMatches($prodi)))
+                ->when($cohortYear, fn (Builder $query, int $year): Builder => $query->whereHas('participants', fn (Builder $query): Builder => $query->where('cohort_year', $year)))
+                ->when($classGroupId, fn (Builder $query, int $id): Builder => $query->whereHas('participants', fn (Builder $query): Builder => $query->whereKey($id)))
+                ->when($lecturerId, fn (Builder $query, int $id): Builder => $query->whereHas('lecturers', fn (Builder $query): Builder => $query->whereKey($id)))
+                ->when($roomId, fn (Builder $query, int $id): Builder => $query->where('room_id', $id))
+                ->when($keyword !== '', fn (Builder $query): Builder => $query->where(fn (Builder $query): Builder => $query
+                    ->where('title', 'like', "%{$keyword}%")
+                    ->orWhereHas('room', fn (Builder $query): Builder => $query->where('name', 'like', "%{$keyword}%"))
+                    ->orWhereHas('participants', fn (Builder $query): Builder => $query->where('name', 'like', "%{$keyword}%"))
+                    ->orWhereHas('lecturers', fn (Builder $query): Builder => $query->where('name', 'like', "%{$keyword}%"))))
+                ->orderByRaw('day_of_week is null')
+                ->orderBy('day_of_week')
+                ->orderBy('start_minute')
+                ->get();
+
+            [$sortedLight, $cohortBlockAlternate] = $this->orderSessionsByCohortBlock($lightSessions);
+
+            $currentPage = LengthAwarePaginator::resolveCurrentPage();
+            $total = $sortedLight->count();
+            $pageIds = $sortedLight->forPage($currentPage, $perPage)->pluck('id')->all();
+
+            $hydratedById = $pageIds === []
+                ? collect()
+                : ScheduleSession::query()
+                    ->with(['room', 'participants', 'lecturers'])
+                    ->whereIn('id', $pageIds)
+                    ->get()
+                    ->keyBy('id');
+
+            $pageItems = collect($pageIds)
+                ->map(fn (int $id): ?ScheduleSession => $hydratedById->get($id))
+                ->filter()
+                ->values();
+
+            $sessions = new LengthAwarePaginator($pageItems, $total, $perPage, $currentPage, [
+                'path' => $request->url(),
+                'query' => $request->query(),
+            ]);
+        }
 
         return view('admin.schedules.index', [
             'period' => $period,
@@ -125,6 +159,7 @@ class ScheduleController extends Controller
             'keyword' => $keyword,
             'classGroups' => $classGroups,
             'lecturers' => Lecturer::query()->orderBy('name')->pluck('name', 'id'),
+            'perPage' => $perPage,
         ]);
     }
 

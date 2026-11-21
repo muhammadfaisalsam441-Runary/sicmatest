@@ -62,5 +62,11 @@
         @empty
             <x-empty-state title="Belum ada notifikasi" message="Reservasi baru, pengajuan Keti, dan hasil impor jadwal akan muncul di sini." icon="bell" />
         @endforelse
+
+        @if ($notifications->hasPages())
+            <div class="pt-2">
+                {{ $notifications->links() }}
+            </div>
+        @endif
     </div>
 @endsection

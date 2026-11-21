@@ -18,11 +18,11 @@
         ][$tab];
 
         $unverifiedPendingCount = $tab === 'pending'
-            ? $applications->filter(fn ($app): bool => ! $app->user->hasVerifiedEmail())->count()
+            ? $applications->getCollection()->filter(fn ($app): bool => ! $app->user->hasVerifiedEmail())->count()
             : 0;
 
         $approvablePageIds = $tab === 'pending'
-            ? $applications->filter(fn ($app): bool => $app->user->hasVerifiedEmail())->pluck('id')->values()->all()
+            ? $applications->getCollection()->filter(fn ($app): bool => $app->user->hasVerifiedEmail())->pluck('id')->values()->all()
             : [];
     @endphp
 
@@ -101,6 +101,11 @@
                         <option value="{{ $cgId }}" @selected($classGroupFilter == $cgId)>{{ $cgName }}</option>
                     @endforeach
                 </select>
+                <select name="per_page" aria-label="Baris per halaman" @change="$el.form.requestSubmit()" class="rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs">
+                    @foreach ([25, 50, 100] as $n)
+                        <option value="{{ $n }}" @selected(($perPage ?? 25) == $n)>{{ $n }} baris</option>
+                    @endforeach
+                </select>
                 @if ($keyword !== '' || $classGroupFilter !== null)
                     <a href="{{ route('admin.keti-accounts.index', ['status' => $tab]) }}"
                        class="inline-flex h-[38px] items-center gap-1.5 rounded-control border border-border bg-surface px-3 text-xs font-medium text-muted hover:text-ink hover:bg-page transition shadow-2xs"
@@ -127,7 +132,7 @@
                 </x-empty-state>
             @else
                 <x-table-scroll>
-                    <x-slot:title>{{ $applications->count() }} akun ditampilkan</x-slot:title>
+                    <x-slot:title>{{ $applications->total() }} akun ditampilkan</x-slot:title>
                     <x-slot:headerActions>
                         <x-table-density-toggle />
                     </x-slot:headerActions>
@@ -252,6 +257,11 @@
                         </tbody>
                     </table>
                 </x-table-scroll>
+                @if ($applications->hasPages())
+                    <div class="border-t border-border pt-3">
+                        {{ $applications->links() }}
+                    </div>
+                @endif
             @endif
         </x-card>
 

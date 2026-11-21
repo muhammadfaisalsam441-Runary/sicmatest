@@ -1332,3 +1332,68 @@ test('tombol Atur Tim dan Tugaskan pada pembagian SKS tidak merender @js mentah'
         ->assertSee('Atur Tim')
         ->assertSee('Tugaskan');
 });
+
+test('jadwal resmi memaginasi 25 sesi per halaman sambil menjaga urutan blok angkatan dan warna selang-seling', function () {
+    $official = ScheduleVersion::factory()->official()->for($this->period)->create(['version_no' => 1]);
+    $room = Room::factory()->create(['name' => 'AE 107']);
+    $class2026 = ClassGroup::factory()->create(['cohort_year' => 2026, 'name' => 'PTIK A 2026']);
+    $class2025 = ClassGroup::factory()->create(['cohort_year' => 2025, 'name' => 'PTIK A 2025']);
+
+    $createdSessions = [];
+    for ($i = 1; $i <= 30; $i++) {
+        $label = sprintf('Sesi Jadwal %02d', $i);
+        $session = ScheduleSession::factory()
+            ->for($official, 'version')
+            ->for($room)
+            ->create([
+                'title' => $label,
+                'day_of_week' => 1,
+                'start_minute' => 450 + ($i * 10),
+                'end_minute' => 455 + ($i * 10),
+            ]);
+        $session->participants()->attach($i <= 20 ? $class2026 : $class2025);
+        $createdSessions[$i] = $session;
+    }
+
+    $page1 = $this->actingAs($this->admin)
+        ->get(route('admin.schedules.index'))
+        ->assertOk()
+        ->assertSee('30 sesi • Jadwal perkuliahan resmi v1')
+        ->assertSee('Sesi Jadwal 01')
+        ->assertSee('Sesi Jadwal 25')
+        ->assertDontSee('Sesi Jadwal 26')
+        ->assertViewHas('sessions', fn ($paginator): bool => $paginator->total() === 30
+            && $paginator->count() === 25
+            && $paginator->perPage() === 25
+            && $paginator->currentPage() === 1)
+        ->assertViewHas('cohortBlockAlternate', fn (array $map): bool => $map[$createdSessions[1]->id] === false
+            && $map[$createdSessions[20]->id] === false
+            && $map[$createdSessions[21]->id] === true
+            && $map[$createdSessions[25]->id] === true
+            && $map[$createdSessions[26]->id] === true);
+
+    $page1->assertSeeInOrder(['Sesi Jadwal 01', 'Sesi Jadwal 20', 'Sesi Jadwal 21', 'Sesi Jadwal 25']);
+
+    $this->actingAs($this->admin)
+        ->get(route('admin.schedules.index', ['page' => 2]))
+        ->assertOk()
+        ->assertSee('30 sesi • Jadwal perkuliahan resmi v1')
+        ->assertSee('Sesi Jadwal 26')
+        ->assertSee('Sesi Jadwal 30')
+        ->assertDontSee('Sesi Jadwal 01')
+        ->assertDontSee('Sesi Jadwal 25')
+        ->assertViewHas('sessions', fn ($paginator): bool => $paginator->total() === 30
+            && $paginator->count() === 5
+            && $paginator->perPage() === 25
+            && $paginator->currentPage() === 2)
+        ->assertSee('bg-primary-soft/45', false);
+
+    $this->actingAs($this->admin)
+        ->get(route('admin.schedules.index', ['per_page' => 50]))
+        ->assertOk()
+        ->assertSee('Sesi Jadwal 01')
+        ->assertSee('Sesi Jadwal 30')
+        ->assertViewHas('sessions', fn ($paginator): bool => $paginator->total() === 30
+            && $paginator->count() === 30
+            && $paginator->perPage() === 50);
+});

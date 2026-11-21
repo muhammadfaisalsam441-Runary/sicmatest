@@ -37,6 +37,7 @@ class KetiAccountController extends Controller
         $tab = array_key_exists((string) $request->query('status'), self::TABS) ? (string) $request->query('status') : 'pending';
         $keyword = trim((string) $request->query('q'));
         $classGroupFilter = $request->integer('kelas') ?: null;
+        $perPage = in_array((int) $request->query('per_page'), [25, 50, 100], true) ? (int) $request->query('per_page') : 25;
 
         $latestIds = KetiApplication::query()->selectRaw('MAX(id)')->groupBy('user_id');
 
@@ -53,7 +54,9 @@ class KetiAccountController extends Controller
             ->when($classGroupFilter !== null, fn (Builder $query) => $query->where('class_group_id', $classGroupFilter))
             ->with(['user', 'classGroup', 'reviewer'])
             ->latest()
-            ->get();
+            ->orderByDesc('id')
+            ->paginate($perPage)
+            ->withQueryString();
 
         $counts = collect(self::TABS)->map(fn (array $statuses): int => KetiApplication::query()
             ->whereIn('id', $latestIds)
@@ -67,6 +70,7 @@ class KetiAccountController extends Controller
             'keyword' => $keyword,
             'classGroupFilter' => $classGroupFilter,
             'classGroups' => ClassGroup::query()->where('is_active', true)->orderedForSelection()->pluck('name', 'id'),
+            'perPage' => $perPage,
         ]);
     }
 

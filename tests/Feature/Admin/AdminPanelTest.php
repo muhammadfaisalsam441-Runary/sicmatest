@@ -784,3 +784,64 @@ test('halaman akun keti menampilkan peringatan dan menonaktifkan setujui bagi pe
     expect($html)->toMatch('/<button\b[^>]*\sdisabled(?=[\s>])[^>]*aria-label="Setujui Unverified Applicant"/');
     expect($html)->toMatch('/<button\b(?![^>]*\sdisabled(?=[\s>]))[^>]*aria-label="Setujui Verified Applicant"/');
 });
+
+test('halaman akun keti melakukan paginasi 25 baris per halaman dan mendukung per_page', function () {
+    $classGroup = ClassGroup::factory()->create(['name' => 'PTIK A']);
+
+    for ($i = 1; $i <= 28; $i++) {
+        User::factory()->pendingKeti($classGroup)->create([
+            'name' => sprintf('Pendaftar %02d', $i),
+        ]);
+    }
+
+    $this->actingAs($this->admin)
+        ->get(route('admin.keti-accounts.index'))
+        ->assertOk()
+        ->assertSee('28 akun ditampilkan')
+        ->assertSee('Pendaftar 28')
+        ->assertDontSee('Pendaftar 01')
+        ->assertSee('page=2')
+        ->assertViewHas('applications', fn ($applications): bool => $applications->count() === 25 && $applications->total() === 28);
+
+    $this->get(route('admin.keti-accounts.index', ['page' => 2]))
+        ->assertOk()
+        ->assertSee('Pendaftar 01')
+        ->assertDontSee('Pendaftar 28')
+        ->assertViewHas('applications', fn ($applications): bool => $applications->count() === 3 && $applications->total() === 28);
+
+    $this->get(route('admin.keti-accounts.index', ['per_page' => 50]))
+        ->assertOk()
+        ->assertSee('Pendaftar 01')
+        ->assertSee('Pendaftar 28')
+        ->assertViewHas('applications', fn ($applications): bool => $applications->count() === 28 && $applications->total() === 28);
+
+    $this->get(route('admin.keti-accounts.index', ['per_page' => 10]))
+        ->assertOk()
+        ->assertViewHas('applications', fn ($applications): bool => $applications->count() === 25 && $applications->total() === 28);
+});
+
+test('halaman notifikasi admin melakukan paginasi 25 notifikasi per halaman', function () {
+    for ($i = 1; $i <= 28; $i++) {
+        AppNotification::create([
+            'user_id' => $this->admin->id,
+            'type' => 'system.info',
+            'title' => sprintf('Notifikasi %02d', $i),
+            'body' => sprintf('Isi notifikasi %02d', $i),
+            'data' => [],
+        ]);
+    }
+
+    $this->actingAs($this->admin)
+        ->get(route('admin.notifications'))
+        ->assertOk()
+        ->assertSee('Notifikasi 28')
+        ->assertDontSee('Notifikasi 01')
+        ->assertSee('page=2')
+        ->assertViewHas('notifications', fn ($notifications): bool => $notifications->count() === 25 && $notifications->total() === 28);
+
+    $this->get(route('admin.notifications', ['page' => 2]))
+        ->assertOk()
+        ->assertSee('Notifikasi 01')
+        ->assertDontSee('Notifikasi 28')
+        ->assertViewHas('notifications', fn ($notifications): bool => $notifications->count() === 3 && $notifications->total() === 28);
+});

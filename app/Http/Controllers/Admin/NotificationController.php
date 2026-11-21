@@ -38,8 +38,9 @@ class NotificationController extends Controller
                 }
             }))
             ->latest()
-            ->limit(50)
-            ->get();
+            ->orderByDesc('id')
+            ->paginate(25)
+            ->withQueryString();
 
         return view('admin.notifications', [
             'notifications' => $list,

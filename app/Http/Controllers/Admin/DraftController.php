@@ -38,7 +38,7 @@ class DraftController extends Controller
         $existing = $period->resolveActiveDraft();
 
         if ($existing !== null) {
-            return to_route('admin.drafts.show', $existing)->with('toast', ['type' => 'info', 'title' => "Draf v{$existing->version_no} masih terbuka", 'message' => 'Lanjutkan draf ini atau tetapkan dulu sebelum membuat revisi baru.']);
+            return to_route('admin.drafts.show', $existing)->with('toast', ['type' => 'info', 'title' => "Draf v{$existing->version_no} masih terbuka", 'message' => 'Lanjutkan draf ini, arsipkan dulu, atau tetapkan sebelum membuat revisi baru.']);
         }
 
         $draft = $drafts->create($period, ScheduleSource::Manual, $period->scheduleVersions()->official()->latest('version_no')->first());
@@ -65,17 +65,35 @@ class DraftController extends Controller
         ]);
     }
 
-    public function activate(ScheduleVersion $version, ScheduleDraftService $drafts): RedirectResponse
+    public function activate(Request $request, ScheduleVersion $version, ScheduleDraftService $drafts): RedirectResponse
     {
         $period = Period::query()->active()->first();
         abort_if($period === null || $version->period_id !== $period->id, 404);
 
         $drafts->activateDraft($version);
 
-        return to_route('admin.drafts.inspections')->with('toast', [
+        $target = $request->input('redirect') === 'workspace' ? 'admin.scheduler.create' : 'admin.drafts.inspections';
+
+        return to_route($target)->with('toast', [
             'type' => 'success',
             'title' => "Draf v{$version->version_no} dijadikan draf aktif",
             'message' => 'Draf ini sekarang menjadi dasar Susun Otomatis dan draf kerja utama. Jadwal resmi tidak berubah.',
+        ]);
+    }
+
+    public function archive(Request $request, ScheduleVersion $version, ScheduleDraftService $drafts): RedirectResponse
+    {
+        $period = Period::query()->active()->first();
+        abort_if($period === null || $version->period_id !== $period->id, 404);
+
+        $drafts->archiveDraft($version);
+
+        $target = $request->input('redirect') === 'inspections' ? 'admin.drafts.inspections' : 'admin.scheduler.create';
+
+        return to_route($target)->with('toast', [
+            'type' => 'success',
+            'title' => "Draf v{$version->version_no} diarsipkan",
+            'message' => 'Draf dipindahkan ke arsip dan tidak lagi tampil di daftar kerja.',
         ]);
     }
 

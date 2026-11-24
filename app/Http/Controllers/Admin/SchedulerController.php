@@ -2,12 +2,16 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\ScheduleVersionStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StartSchedulingRequest;
 use App\Models\Academic\ClassGroup;
 use App\Models\Academic\Period;
+use App\Models\Scheduling\Import;
 use App\Models\Scheduling\OptimizationJob;
+use App\Models\Scheduling\ScheduleVersion;
 use App\Services\Scheduling\SchedulerService;
+use App\Services\Scheduling\ScheduleValidator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,17 +22,33 @@ use Illuminate\View\View;
  */
 class SchedulerController extends Controller
 {
-    public function create(Request $request, SchedulerService $scheduler): View
+    public function create(Request $request, SchedulerService $scheduler, ScheduleValidator $validator): View
     {
         $period = Period::query()->active()->first();
+        $activeDraft = $period?->resolveActiveDraft();
+
+        $versions = ($period?->scheduleVersions()
+            ->whereIn('status', [ScheduleVersionStatus::Draft, ScheduleVersionStatus::Ready])
+            ->withCount(['sessions', 'issues' => fn ($query) => $query->whereNull('resolved_at')->where('severity', 'error')])
+            ->latest('version_no')
+            ->get() ?? collect())
+            ->sort(fn (ScheduleVersion $a, ScheduleVersion $b): int => [($b->id === $activeDraft?->id ? 1 : 0), $b->version_no] <=> [($a->id === $activeDraft?->id ? 1 : 0), $a->version_no])
+            ->values();
 
         return view('admin.scheduler.create', [
             'period' => $period,
             'base' => $period ? $scheduler->baseVersion($period) : null,
             'official' => $period?->scheduleVersions()->official()->latest('version_no')->first(),
+            'versions' => $versions,
+            'activeDraft' => $activeDraft,
+            'activeDraftId' => $activeDraft?->id,
+            'activeReviewStatus' => $activeDraft ? $validator->reviewStatus($activeDraft) : null,
             'classGroups' => ClassGroup::query()->where('is_active', true)->orderBy('study_program')->orderByDesc('cohort_year')->orderBy('name')->get(['id', 'name', 'study_program', 'cohort_year']),
             'readiness' => session('readiness'),
             'lastJob' => OptimizationJob::query()->latest()->first(),
+            'recentJobs' => OptimizationJob::query()->with(['creator', 'version'])->latest()->limit(8)->get(),
+            'periods' => Period::query()->orderByDesc('start_date')->pluck('name', 'id'),
+            'recentImports' => Import::query()->with('scheduleVersion')->latest()->limit(5)->get(),
         ]);
     }
 

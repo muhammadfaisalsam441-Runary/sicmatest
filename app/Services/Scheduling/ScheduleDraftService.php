@@ -90,6 +90,45 @@ class ScheduleDraftService
     }
 
     /**
+     * Arsipkan draf yang tidak lagi dipakai agar tidak menumpuk di daftar kerja.
+     */
+    public function archiveDraft(ScheduleVersion $version): ScheduleVersion
+    {
+        $version->loadMissing('period');
+        $this->assertDraft($version);
+
+        return DB::transaction(function () use ($version): ScheduleVersion {
+            $period = Period::query()->whereKey($version->period_id)->lockForUpdate()->firstOrFail();
+            $version = ScheduleVersion::query()->whereKey($version->id)->lockForUpdate()->firstOrFail();
+            $this->assertDraft($version);
+
+            $beforeStatus = $version->status->value;
+
+            $version->forceFill([
+                'status' => ScheduleVersionStatus::Archived,
+                'lock_version' => $version->lock_version + 1,
+            ])->save();
+
+            if ($period->active_draft_version_id === $version->id) {
+                $nextActiveId = $period->scheduleVersions()
+                    ->whereIn('status', [ScheduleVersionStatus::Draft, ScheduleVersionStatus::Ready])
+                    ->whereKeyNot($version->id)
+                    ->latest('version_no')
+                    ->value('id');
+
+                $period->forceFill(['active_draft_version_id' => $nextActiveId])->save();
+            }
+
+            $this->audit->log('schedule.draft_archived', $version, ['status' => $beforeStatus], [
+                'status' => ScheduleVersionStatus::Archived->value,
+                'version_no' => $version->version_no,
+            ]);
+
+            return $version;
+        });
+    }
+
+    /**
      * Salin seluruh sesi (beserta peserta & pengajar) dari satu versi ke versi lain.
      *
      * @return array<int, int> Peta id sesi asal → id sesi salinan.

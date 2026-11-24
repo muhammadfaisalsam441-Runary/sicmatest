@@ -8,12 +8,13 @@ use App\Models\Academic\ClassGroup;
 use App\Models\User\ClassRepresentative;
 use App\Models\User\KetiApplication;
 use App\Models\User\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 /**
- * Pemeriksaan pengajuan Keti oleh admin (Fase 7): setujui, minta perbaikan, tolak, nonaktifkan.
+ * Pemeriksaan pengajuan Keti oleh admin (Fase 7): setujui, minta perbaikan, tolak, nonaktifkan, aktifkan kembali.
  */
 class KetiApprovalService
 {
@@ -23,13 +24,59 @@ class KetiApprovalService
     ) {}
 
     /**
-     * Setujui pengajuan dan hubungkan Keti ke kelas. Satu kelas hanya punya satu Keti aktif per tanggal.
+     * Batas maksimal akun Keti aktif dalam satu kelas.
+     */
+    public function maxPerClass(): int
+    {
+        return max(1, (int) config('sicma.keti.max_per_class', 2));
+    }
+
+    /**
+     * Peta jumlah Keti aktif saat ini per ID kelas.
+     *
+     * @return array<int, int>
+     */
+    public function activeKetiCountsByClass(): array
+    {
+        return ClassRepresentative::query()
+            ->activeOn(now())
+            ->whereHas('user', fn (Builder $query): Builder => $query->where('is_active', true))
+            ->selectRaw('class_group_id, COUNT(DISTINCT user_id) as total')
+            ->groupBy('class_group_id')
+            ->pluck('total', 'class_group_id')
+            ->map(fn (mixed $total): int => (int) $total)
+            ->all();
+    }
+
+    /**
+     * Format label pilihan kelas dengan informasi kuota Keti aktif.
+     */
+    public function formatClassOptionLabel(ClassGroup $classGroup, int $activeCount): string
+    {
+        $maxPerClass = $this->maxPerClass();
+
+        if ($activeCount >= $maxPerClass) {
+            return "{$classGroup->name} (Kuota Keti penuh {$activeCount}/{$maxPerClass})";
+        }
+
+        if ($activeCount > 0) {
+            return "{$classGroup->name} ({$activeCount}/{$maxPerClass} Keti aktif)";
+        }
+
+        return $classGroup->name;
+    }
+
+    /**
+     * Setujui pengajuan dan hubungkan Keti ke kelas hingga batas kuota Keti aktif per kelas.
      */
     public function approve(KetiApplication $application, User $admin, ?ClassGroup $classGroup = null): KetiApplication
     {
         return DB::transaction(function () use ($application, $admin, $classGroup): KetiApplication {
             $application = KetiApplication::query()->whereKey($application->id)->lockForUpdate()->with('user')->firstOrFail();
-            $this->assertPending($application);
+
+            if ($application->status === KetiApplicationStatus::Approved) {
+                throw new DomainException('INVALID_STATUS_TRANSITION', 'Pengajuan ini sudah disetujui.');
+            }
 
             $classGroup ??= $application->classGroup;
             $classGroup = ClassGroup::query()->whereKey($classGroup->id)->lockForUpdate()->firstOrFail();
@@ -43,15 +90,14 @@ class KetiApprovalService
                 throw new DomainException('DATA_INCOMPLETE', 'Kelas '.$classGroup->name.' sudah tidak aktif.');
             }
 
-            $existing = ClassRepresentative::query()
-                ->whereBelongsTo($classGroup)
-                ->activeOn(now())
-                ->where('user_id', '!=', $applicant->id)
-                ->with('user')
-                ->first();
+            $maxPerClass = $this->maxPerClass();
+            $activeCount = $this->activeKetiCountForClass($classGroup, $applicant->id);
 
-            if ($existing !== null) {
-                throw new DomainException('CLASS_ALREADY_REPRESENTED', "Kelas {$classGroup->name} sudah memiliki Keti aktif ({$existing->user->name}). Nonaktifkan dulu sebelum menyetujui Keti baru.");
+            if ($activeCount >= $maxPerClass) {
+                throw new DomainException(
+                    'CLASS_ALREADY_REPRESENTED',
+                    "Kuota Keti untuk kelas {$classGroup->name} sudah penuh ({$activeCount}/{$maxPerClass} Keti aktif). Nonaktifkan salah satu Keti dulu sebelum menyetujui Keti baru."
+                );
             }
 
             $before = $application->only(['status', 'class_group_id']);
@@ -133,6 +179,82 @@ class KetiApprovalService
 
             $this->audit->log('keti.deactivated', $keti, ['is_active' => true], ['is_active' => false], $reason);
         });
+    }
+
+    /**
+     * Aktifkan kembali akun Keti yang pernah disetujui jika kuota kelas masih tersedia.
+     */
+    public function reactivate(User $keti, User $admin): KetiApplication
+    {
+        return DB::transaction(function () use ($keti): KetiApplication {
+            $keti = User::query()->whereKey($keti->id)->lockForUpdate()->firstOrFail();
+
+            if (! $keti->isKeti()) {
+                throw new DomainException('INVALID_STATUS_TRANSITION', 'Akun ini bukan akun Keti.');
+            }
+
+            if ($keti->is_active) {
+                throw new DomainException('INVALID_STATUS_TRANSITION', 'Akun Keti ini sudah aktif.');
+            }
+
+            if (! $keti->hasVerifiedEmail()) {
+                throw new DomainException('DATA_INCOMPLETE', 'Email pendaftar belum terverifikasi.');
+            }
+
+            $latest = $keti->latestKetiApplication()->with('classGroup')->first();
+
+            if ($latest === null || $latest->status !== KetiApplicationStatus::Approved) {
+                throw new DomainException('INVALID_STATUS_TRANSITION', 'Hanya akun Keti yang pernah disetujui yang dapat diaktifkan kembali.');
+            }
+
+            $classGroup = ClassGroup::query()->whereKey($latest->class_group_id)->lockForUpdate()->firstOrFail();
+
+            if (! $classGroup->is_active) {
+                throw new DomainException('DATA_INCOMPLETE', 'Kelas '.$classGroup->name.' sudah tidak aktif.');
+            }
+
+            $maxPerClass = $this->maxPerClass();
+            $activeCount = $this->activeKetiCountForClass($classGroup, $keti->id);
+
+            if ($activeCount >= $maxPerClass) {
+                throw new DomainException(
+                    'CLASS_ALREADY_REPRESENTED',
+                    "Kuota Keti untuk kelas {$classGroup->name} sudah penuh ({$activeCount}/{$maxPerClass} Keti aktif)."
+                );
+            }
+
+            $keti->classRepresentatives()->activeOn(now())->update(['valid_to' => now()->subDay()->toDateString()]);
+            $keti->classRepresentatives()->create([
+                'class_group_id' => $classGroup->id,
+                'valid_from' => now()->toDateString(),
+                'valid_to' => null,
+            ]);
+            $keti->forceFill(['is_active' => true])->save();
+
+            $this->audit->log('keti.reactivated', $keti, ['is_active' => false], ['is_active' => true, 'class_group_id' => $classGroup->id]);
+            $this->notifications->notify(
+                $keti,
+                'keti.reactivated',
+                'Akun Keti diaktifkan kembali',
+                "Akses Keti untuk kelas {$classGroup->name} telah diaktifkan kembali.",
+                ['keti_application_id' => $latest->id],
+            );
+
+            return $latest;
+        });
+    }
+
+    /**
+     * Hitung jumlah Keti aktif pada kelas tertentu selain akun yang sedang diperiksa.
+     */
+    private function activeKetiCountForClass(ClassGroup $classGroup, int $excludeUserId): int
+    {
+        return ClassRepresentative::query()
+            ->whereBelongsTo($classGroup)
+            ->activeOn(now())
+            ->where('user_id', '!=', $excludeUserId)
+            ->whereHas('user', fn (Builder $query): Builder => $query->where('is_active', true))
+            ->count();
     }
 
     /**

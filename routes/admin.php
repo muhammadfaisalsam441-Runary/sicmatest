@@ -54,6 +54,7 @@ Route::post('/akun-keti/{application}/setujui', [KetiAccountController::class, '
 Route::post('/akun-keti/{application}/perbaiki', [KetiAccountController::class, 'requestRevision'])->name('keti-accounts.revise');
 Route::post('/akun-keti/{application}/tolak', [KetiAccountController::class, 'reject'])->name('keti-accounts.reject');
 Route::post('/akun-keti/pengguna/{user}/nonaktifkan', [KetiAccountController::class, 'deactivate'])->name('keti-accounts.deactivate');
+Route::post('/akun-keti/pengguna/{user}/aktifkan', [KetiAccountController::class, 'reactivate'])->name('keti-accounts.reactivate');
 
 Route::get('/notifikasi', [NotificationController::class, 'index'])->name('notifications');
 Route::post('/notifikasi/baca-semua', [NotificationController::class, 'readAll'])->name('notifications.read-all');

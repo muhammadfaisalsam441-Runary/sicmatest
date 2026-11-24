@@ -98,7 +98,7 @@
                     </nav>
 
                     @if ($groups->isNotEmpty())
-                        <div class="relative min-w-[200px] sm:w-64">
+                        <div class="relative w-full sm:w-64">
                             <i data-lucide="search" class="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted" aria-hidden="true"></i>
                             <input type="search"
                                    x-model.debounce.200ms="searchQuery"
@@ -158,7 +158,7 @@
                             <span class="ml-1.5 inline-flex items-center rounded-full bg-danger-soft px-2 py-0.5 text-xs font-semibold text-danger">{{ $issueCount }} perhatian</span>
                         @endif
                     </h3>
-                    <span class="inline-flex items-center gap-1 text-xs font-medium text-muted">
+                    <span class="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-muted">
                         <span x-text="collapsedGroups['{{ $groupKey }}'] ? 'Buka' : 'Ringkas'"></span>
                         <i data-lucide="chevron-down" class="size-4 transition-transform" :class="collapsedGroups['{{ $groupKey }}'] ? '-rotate-90' : ''" aria-hidden="true"></i>
                     </span>
@@ -279,7 +279,7 @@
                 <x-field label="Catatan revisi (opsional)" name="note">
                     <x-input name="note" placeholder="Contoh: perbaikan bentrok AE 107 Senin" />
                 </x-field>
-                <div class="flex justify-end gap-3">
+                <div class="flex flex-wrap justify-end gap-3">
                     <x-button variant="secondary" :href="route('admin.drafts.show', [$version, 'tinjau' => $view])">Batal</x-button>
                     <x-button type="submit">Simpan ke draf</x-button>
                 </div>

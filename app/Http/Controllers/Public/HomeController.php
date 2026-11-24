@@ -21,7 +21,7 @@ class HomeController extends Controller
 
             return [
                 'availableCount' => $available->count(),
-                'preview' => $available->take(3)->map(RoomCardPresenter::card(...))->values()->all(),
+                'preview' => RoomCardPresenter::cards($available->take(3)),
             ];
         });
 

@@ -4,13 +4,13 @@
      @keydown.escape.window="if (formModalOpen) formModalOpen = false"
      class="fixed inset-0 z-50 flex items-center justify-center p-4">
     <div class="absolute inset-0 bg-ink/80 backdrop-blur-sm" @click="formModalOpen = false"></div>
-    <div class="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-surface p-6 shadow-2xl">
+    <div class="relative max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-2xl bg-surface p-6 shadow-2xl">
         <div class="flex items-start justify-between border-b border-border pb-3">
             <div>
                 <span class="text-xs font-semibold text-primary" x-text="formRoom.id ? 'Perbarui Data Ruangan' : 'Ruang Baru'"></span>
                 <h3 id="room-form-title" class="text-lg font-bold text-ink" x-text="formRoom.id ? 'Ubah Ruang: ' + formRoom.name : 'Tambah Ruang Baru'"></h3>
             </div>
-            <button type="button" @click="formModalOpen = false" aria-label="Tutup modal ruang" class="cursor-pointer text-muted hover:text-ink">
+            <button type="button" @click="formModalOpen = false" aria-label="Tutup modal ruang" class="inline-flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-control text-muted transition hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
                 <i data-lucide="x" class="size-5" aria-hidden="true"></i>
             </button>
         </div>
@@ -102,14 +102,14 @@
                 @if ($isRoomFormError) @error('is_bookable') <p class="mt-1 text-xs font-medium text-danger">{{ $message }}</p> @enderror @endif
             </div>
 
-            <div class="mt-2 flex items-center justify-between gap-3 border-t border-border pt-4">
+            <div class="mt-2 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
                 <template x-if="formRoom.id">
                     <x-button variant="danger-outline" type="button" icon="trash-2" @click="openDeleteFromEdit()">Hapus ruang</x-button>
                 </template>
                 <template x-if="!formRoom.id">
-                    <div></div>
+                    <div class="hidden sm:block"></div>
                 </template>
-                <div class="flex gap-2">
+                <div class="ml-auto flex flex-wrap items-center justify-end gap-2">
                     <x-button variant="secondary" type="button" @click="formModalOpen = false">Batal</x-button>
                     <x-button variant="primary" type="submit" icon="check">Simpan Data Ruang</x-button>
                 </div>

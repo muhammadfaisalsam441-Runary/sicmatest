@@ -3,7 +3,13 @@
 @extends('layouts.admin')
 
 @section('title', 'Akun Keti')
-@section('breadcrumb', 'Akun Keti|'.$tab)
+@section('breadcrumb', 'Akun Keti|'.match ($tab) {
+    'pending' => 'Menunggu',
+    'approved' => 'Aktif',
+    'inactive' => 'Nonaktif',
+    'rejected' => 'Ditolak',
+    default => $tab,
+})
 
 @section('breadcrumb-actions')
     <x-button variant="secondary" :href="route('admin.dashboard')">Dashboard</x-button>
@@ -11,10 +17,13 @@
 
 @section('content')
     @php
+        $maxPerClass = (int) ($maxKetiPerClass ?? 2);
+
         $summary = [
             'pending' => [$counts['pending'].' pengajuan menunggu pemeriksaan', 'Periksa status verifikasi email dan kecocokan kelas sebelum menyetujui.'],
-            'approved' => [$counts['approved'].' akun Keti aktif', 'Akses Keti diberikan untuk kelas yang sudah diverifikasi.'],
-            'rejected' => [$counts['rejected'].' pengajuan ditolak atau perlu diperbaiki', 'Alasan penolakan dapat dibaca dan pengajuan bisa diperbaiki.'],
+            'approved' => [$counts['approved'].' akun Keti aktif', 'Akses Keti aktif diberikan untuk kelas yang sudah diverifikasi. Maksimal '.$maxPerClass.' Keti aktif per kelas.'],
+            'inactive' => [$counts['inactive'].' akun Keti dinonaktifkan', 'Akun nonaktif dapat diaktifkan kembali jika kuota kelas masih tersedia.'],
+            'rejected' => [$counts['rejected'].' pengajuan ditolak atau perlu diperbaiki', 'Alasan penolakan dapat dibaca dan pengajuan dapat disetujui langsung oleh admin jika memenuhi syarat.'],
         ][$tab];
 
         $unverifiedPendingCount = $tab === 'pending'
@@ -65,6 +74,7 @@
                     @foreach ([
                         ['key' => 'pending', 'label' => 'Menunggu persetujuan', 'count' => $counts['pending']],
                         ['key' => 'approved', 'label' => 'Aktif', 'count' => $counts['approved']],
+                        ['key' => 'inactive', 'label' => 'Nonaktif', 'count' => $counts['inactive']],
                         ['key' => 'rejected', 'label' => 'Ditolak', 'count' => $counts['rejected']],
                     ] as $pill)
                         <a href="{{ route('admin.keti-accounts.index', ['status' => $pill['key']]) }}"
@@ -123,8 +133,8 @@
             @endif
 
             @if ($applications->isEmpty())
-                <x-empty-state :title="$keyword !== '' || $classGroupFilter !== null ? 'Tidak ada pengajuan yang cocok' : ($tab === 'pending' ? 'Tidak ada pengajuan baru' : 'Belum ada data')"
-                               message="{{ $keyword !== '' || $classGroupFilter !== null ? 'Coba kata kunci atau kelas lain.' : 'Pengajuan Keti yang sudah memverifikasi email akan muncul di sini.' }}"
+                <x-empty-state :title="$keyword !== '' || $classGroupFilter !== null ? 'Tidak ada pengajuan yang cocok' : ($tab === 'pending' ? 'Tidak ada pengajuan baru' : ($tab === 'inactive' ? 'Tidak ada akun nonaktif' : 'Belum ada data'))"
+                               message="{{ $keyword !== '' || $classGroupFilter !== null ? 'Coba kata kunci atau kelas lain.' : ($tab === 'inactive' ? 'Akun Keti yang dinonaktifkan akan muncul di sini.' : 'Pengajuan Keti yang sudah memverifikasi email akan muncul di sini.') }}"
                                icon="users">
                     @if ($keyword !== '' || $classGroupFilter !== null)
                         <x-button variant="soft" :href="route('admin.keti-accounts.index', ['status' => $tab])">Hapus filter</x-button>
@@ -149,11 +159,11 @@
                                                class="size-4 rounded border-border text-primary focus:ring-primary cursor-pointer">
                                     </th>
                                 @endif
-                                <th scope="col" class="px-4 py-3 font-medium">Nama / NIM</th>
-                                <th scope="col" class="px-4 py-3 font-medium">Kelas</th>
-                                <th scope="col" class="px-4 py-3 font-medium">Email</th>
-                                <th scope="col" class="px-4 py-3 font-medium">Status</th>
-                                <th scope="col" class="px-4 py-3 text-right font-medium">Aksi</th>
+                                <th scope="col" class="px-4 py-3 font-medium whitespace-nowrap">Nama / NIM</th>
+                                <th scope="col" class="px-4 py-3 font-medium whitespace-nowrap">Kelas</th>
+                                <th scope="col" class="px-4 py-3 font-medium whitespace-nowrap">Email</th>
+                                <th scope="col" class="px-4 py-3 font-medium whitespace-nowrap">Status</th>
+                                <th scope="col" class="px-4 py-3 text-right font-medium whitespace-nowrap">Aksi</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-border">
@@ -163,6 +173,8 @@
                                     $emailVerified = $applicant->hasVerifiedEmail();
                                     $unverifiedPending = $application->status === KetiApplicationStatus::Pending && ! $emailVerified;
                                     $inactive = $application->status === KetiApplicationStatus::Approved && ! $applicant->is_active;
+                                    $classActiveCount = (int) ($classActiveKetiCounts[$application->class_group_id] ?? 0);
+                                    $classQuotaFull = $classActiveCount >= $maxPerClass;
                                     $appPayload = [
                                         'id' => $application->id,
                                         'name' => $applicant->name,
@@ -171,6 +183,9 @@
                                         'emailVerified' => $emailVerified,
                                         'classGroupName' => $application->classGroup->name,
                                         'classGroupId' => (string) $application->class_group_id,
+                                        'classActiveCount' => $classActiveCount,
+                                        'maxPerClass' => $maxPerClass,
+                                        'classQuotaFull' => $classQuotaFull,
                                         'createdStamp' => Wita::stamp($application->created_at),
                                         'status' => $application->status->value,
                                         'isActive' => (bool) $applicant->is_active,
@@ -179,6 +194,7 @@
                                         'reviewNote' => $application->review_note ?? '—',
                                         'approveUrl' => route('admin.keti-accounts.approve', $application),
                                         'deactivateUrl' => route('admin.keti-accounts.deactivate', $applicant),
+                                        'reactivateUrl' => route('admin.keti-accounts.reactivate', $applicant),
                                         'rejectUrl' => route('admin.keti-accounts.reject', $application),
                                         'reviseUrl' => route('admin.keti-accounts.revise', $application),
                                     ];
@@ -199,16 +215,25 @@
                                         <span class="block font-semibold">{{ $applicant->name }}</span>
                                         <span class="text-xs text-muted">{{ $applicant->nim ?? '—' }}</span>
                                     </td>
-                                    <td class="px-4 py-3">{{ $application->classGroup->name }}</td>
+                                    <td class="px-4 py-3">
+                                        <div class="flex flex-wrap items-center gap-1.5">
+                                            <span>{{ $application->classGroup->name }}</span>
+                                            <span @class([
+                                                'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap',
+                                                'bg-warning-soft text-warning-ink' => $classQuotaFull,
+                                                'bg-page text-muted ring-1 ring-border' => ! $classQuotaFull,
+                                            ])>{{ $classQuotaFull ? "{$classActiveCount}/{$maxPerClass} penuh" : "{$classActiveCount}/{$maxPerClass} Keti" }}</span>
+                                        </div>
+                                    </td>
                                     <td class="px-4 py-3">
                                         <span class="block text-muted">{{ $applicant->email }}</span>
                                         @if ($emailVerified)
-                                            <span class="mt-0.5 inline-flex items-center gap-1 text-[11px] font-medium text-success">
+                                            <span class="mt-0.5 inline-flex items-center gap-1 text-[11px] font-medium whitespace-nowrap text-success">
                                                 <i data-lucide="circle-check" class="size-3 shrink-0" aria-hidden="true"></i>
                                                 <span>Email terverifikasi</span>
                                             </span>
                                         @else
-                                            <span class="mt-0.5 inline-flex items-center gap-1 text-[11px] font-semibold text-warning-ink">
+                                            <span class="mt-0.5 inline-flex items-center gap-1 text-[11px] font-semibold whitespace-nowrap text-warning-ink">
                                                 <i data-lucide="triangle-alert" class="size-3 shrink-0 text-warning" aria-hidden="true"></i>
                                                 <span>Belum verifikasi email</span>
                                             </span>
@@ -276,12 +301,12 @@
                  x-transition:leave="transition ease-in duration-150"
                  x-transition:leave-start="opacity-100 translate-y-0"
                  x-transition:leave-end="opacity-0 translate-y-4"
-                 class="fixed bottom-6 left-1/2 z-40 flex w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 flex-wrap items-center gap-3 rounded-xl border border-primary/30 bg-ink px-6 py-3.5 text-surface shadow-2xl">
+                 class="fixed bottom-[calc(1rem+env(safe-area-inset-bottom,0px))] left-1/2 z-40 flex max-h-[45dvh] w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 flex-wrap items-center gap-3 overflow-y-auto rounded-xl border border-primary/30 bg-ink px-4 py-3 text-surface shadow-2xl sm:px-6 sm:py-3.5">
                 <div class="flex items-center gap-2">
-                    <i data-lucide="circle-check" class="size-5 text-success" aria-hidden="true"></i>
+                    <i data-lucide="circle-check" class="size-5 shrink-0 text-success" aria-hidden="true"></i>
                     <span class="text-sm font-semibold"><span x-text="selectedIds.length"></span> pengajuan dipilih</span>
                 </div>
-                <div class="h-4 w-px bg-surface/20"></div>
+                <div class="hidden h-4 w-px bg-surface/20 sm:block" aria-hidden="true"></div>
                 <form method="POST" action="{{ route('admin.keti-accounts.batch-approve') }}" class="inline-flex items-center">
                     @csrf
                     <template x-for="id in selectedIds" :key="id">
@@ -292,7 +317,7 @@
                         Setujui Sekaligus
                     </button>
                 </form>
-                <button type="button" @click="selectedIds = []" class="ml-1 cursor-pointer text-xs text-surface/70 transition hover:text-white">
+                <button type="button" @click="selectedIds = []" class="cursor-pointer text-xs text-surface/70 transition hover:text-white sm:ml-1">
                     Batalkan Pilihan
                 </button>
             </div>
@@ -302,8 +327,8 @@
             <template x-if="activeApp">
                 <div class="flex flex-col gap-4">
                     <div class="flex items-start justify-between gap-4">
-                        <h2 class="text-xl font-semibold text-ink" x-text="activeApp.status === 'pending' ? activeApp.name : (activeApp.status === 'approved' ? 'Akun Keti aktif' : (activeApp.status === 'needs_revision' ? 'Pengajuan perlu diperbaiki' : 'Pengajuan ditolak'))"></h2>
-                        <button type="button" x-on:click="$dispatch('close-modal', 'application-detail')" aria-label="Tutup dialog" class="text-muted hover:text-ink cursor-pointer">
+                        <h2 class="text-xl font-semibold text-ink" x-text="activeApp.status === 'pending' ? activeApp.name : (activeApp.status === 'approved' ? (activeApp.isActive ? 'Akun Keti aktif' : 'Akun Keti nonaktif') : (activeApp.status === 'needs_revision' ? 'Pengajuan perlu diperbaiki' : 'Pengajuan ditolak'))"></h2>
+                        <button type="button" x-on:click="$dispatch('close-modal', 'application-detail')" aria-label="Tutup dialog" class="inline-flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-control text-muted transition hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
                             <i data-lucide="x" class="size-5" aria-hidden="true"></i>
                         </button>
                     </div>
@@ -312,6 +337,7 @@
                         <span x-show="activeApp.status !== 'pending'" class="text-base font-semibold text-ink" x-text="activeApp.name"></span>
                         <span class="text-muted">NIM <span x-text="activeApp.nim"></span> • <span x-text="activeApp.email"></span></span>
                         <span class="text-muted">Kelas yang diajukan: <span class="font-medium text-ink" x-text="activeApp.classGroupName"></span></span>
+                        <span class="text-muted">Kuota kelas saat ini: <span class="font-medium text-ink" x-text="`${activeApp.classActiveCount}/${activeApp.maxPerClass} Keti aktif`"></span></span>
                         <span class="text-xs text-muted">Diajukan <span x-text="activeApp.createdStamp"></span></span>
                     </div>
 
@@ -334,9 +360,9 @@
                                 </x-field>
                                 <x-button type="submit" icon="check" x-bind:disabled="!activeApp.emailVerified">Setujui dan aktifkan akun</x-button>
                             </form>
-                            <div class="flex gap-3">
-                                <x-button variant="danger-outline" class="flex-1" x-on:click="openDecline()">Tolak / Minta Perbaikan</x-button>
-                                <x-button variant="secondary" class="flex-1" x-on:click="$dispatch('close-modal', 'application-detail')">Batal</x-button>
+                            <div class="flex flex-col gap-3 sm:flex-row">
+                                <x-button variant="danger-outline" class="w-full sm:flex-1" x-on:click="openDecline()">Tolak / Minta Perbaikan</x-button>
+                                <x-button variant="secondary" class="w-full sm:flex-1" x-on:click="$dispatch('close-modal', 'application-detail')">Batal</x-button>
                             </div>
                         </div>
                     </template>
@@ -361,16 +387,42 @@
                                     <x-button type="submit" variant="danger-outline" icon="user-x" x-bind:disabled="!deactivateConfirmed">Nonaktifkan akun</x-button>
                                 </form>
                             </template>
+                            <template x-if="!activeApp.isActive">
+                                <div class="flex flex-col gap-3">
+                                    <template x-if="activeApp.classQuotaFull">
+                                        <x-info-box variant="warning" title="Kuota kelas sudah penuh">
+                                            <p><span x-text="`${activeApp.classActiveCount}/${activeApp.maxPerClass} Keti aktif.`"></span> Nonaktifkan salah satu Keti aktif kelas ini terlebih dahulu sebelum mengaktifkan kembali akun ini.</p>
+                                        </x-info-box>
+                                    </template>
+                                    <form method="POST" :action="activeApp.reactivateUrl" class="flex flex-col gap-3">
+                                        @csrf
+                                        <x-button type="submit" icon="user-check" x-bind:disabled="activeApp.classQuotaFull">Aktifkan kembali</x-button>
+                                    </form>
+                                </div>
+                            </template>
                             <x-button variant="secondary" x-on:click="$dispatch('close-modal', 'application-detail')">Tutup</x-button>
                         </div>
                     </template>
 
-                    <template x-if="activeApp.status !== 'pending' && activeApp.status !== 'approved'">
+                    <template x-if="activeApp.status === 'rejected' || activeApp.status === 'needs_revision'">
                         <div class="flex flex-col gap-4">
                             <div class="rounded-card border border-danger/30 bg-danger-soft/50 p-4 text-sm">
                                 <p class="font-semibold text-danger">Alasan untuk pendaftar</p>
                                 <p class="mt-1 text-ink" x-text="activeApp.reviewNote"></p>
+                                <p x-show="activeApp.reviewerName" class="mt-1 text-xs text-muted">Ditinjau <span x-text="activeApp.reviewerName"></span> • <span x-text="activeApp.reviewedStamp"></span></p>
                             </div>
+                            <template x-if="!activeApp.emailVerified">
+                                <x-info-box variant="warning" title="Email pendaftar belum terverifikasi">
+                                    <p>Pendaftar belum memasukkan kode verifikasi 6 digit dari emailnya. Akun belum dapat disetujui sampai email diverifikasi.</p>
+                                </x-info-box>
+                            </template>
+                            <form method="POST" :action="activeApp.approveUrl" class="flex flex-col gap-4">
+                                @csrf
+                                <x-field label="Kelas yang ditetapkan" name="class_group_id" for="reapprove-class-group-id" hint="Admin dapat menyetujui dan mengaktifkan akun ini secara langsung untuk kelas yang dipilih.">
+                                    <x-select id="reapprove-class-group-id" name="class_group_id" :options="$classGroups" x-model="activeApp.classGroupId" />
+                                </x-field>
+                                <x-button type="submit" icon="check" x-bind:disabled="!activeApp.emailVerified">Setujui dan aktifkan akun</x-button>
+                            </form>
                             <x-button variant="secondary" x-on:click="$dispatch('close-modal', 'application-detail')">Tutup</x-button>
                         </div>
                     </template>

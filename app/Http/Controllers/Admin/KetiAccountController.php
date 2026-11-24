@@ -17,51 +17,51 @@ use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 /**
- * Akun Keti: pemeriksaan pengajuan (setujui, minta perbaikan, tolak) dan penonaktifan akun.
+ * Akun Keti: pemeriksaan pengajuan (setujui, minta perbaikan, tolak), penonaktifan, dan pengaktifan kembali.
  */
 class KetiAccountController extends Controller
 {
     /**
-     * Tab URL → status pengajuan. "Ditolak" juga memuat pengajuan yang diminta diperbaiki.
+     * Daftar tab URL yang valid pada halaman manajemen akun Keti.
      *
-     * @var array<string, list<KetiApplicationStatus>>
+     * @var list<string>
      */
-    private const TABS = [
-        'pending' => [KetiApplicationStatus::Pending],
-        'approved' => [KetiApplicationStatus::Approved],
-        'rejected' => [KetiApplicationStatus::Rejected, KetiApplicationStatus::NeedsRevision],
-    ];
+    private const VALID_TABS = ['pending', 'approved', 'inactive', 'rejected'];
 
-    public function index(Request $request): View
+    public function index(Request $request, KetiApprovalService $approvals): View
     {
-        $tab = array_key_exists((string) $request->query('status'), self::TABS) ? (string) $request->query('status') : 'pending';
+        $requestedTab = (string) $request->query('status');
+        $tab = in_array($requestedTab, self::VALID_TABS, true) ? $requestedTab : 'pending';
         $keyword = trim((string) $request->query('q'));
         $classGroupFilter = $request->integer('kelas') ?: null;
         $perPage = in_array((int) $request->query('per_page'), [25, 50, 100], true) ? (int) $request->query('per_page') : 25;
 
         $latestIds = KetiApplication::query()->selectRaw('MAX(id)')->groupBy('user_id');
 
-        $applications = KetiApplication::query()
-            ->whereIn('id', $latestIds)
-            ->whereIn('status', self::TABS[$tab])
-            ->when($keyword !== '', fn (Builder $query) => $query->where(fn (Builder $q) => $q
-                ->whereHas('user', fn (Builder $uq) => $uq
+        $applications = $this->applyTabFilter(
+            KetiApplication::query()->whereIn('id', $latestIds),
+            $tab,
+        )
+            ->when($keyword !== '', fn (Builder $query): Builder => $query->where(fn (Builder $q): Builder => $q
+                ->whereHas('user', fn (Builder $uq): Builder => $uq
                     ->where('name', 'like', "%{$keyword}%")
                     ->orWhere('nim', 'like', "%{$keyword}%")
                     ->orWhere('email', 'like', "%{$keyword}%"))
-                ->orWhereHas('classGroup', fn (Builder $cq) => $cq->where('name', 'like', "%{$keyword}%"))
+                ->orWhereHas('classGroup', fn (Builder $cq): Builder => $cq->where('name', 'like', "%{$keyword}%"))
             ))
-            ->when($classGroupFilter !== null, fn (Builder $query) => $query->where('class_group_id', $classGroupFilter))
+            ->when($classGroupFilter !== null, fn (Builder $query): Builder => $query->where('class_group_id', $classGroupFilter))
             ->with(['user', 'classGroup', 'reviewer'])
             ->latest()
             ->orderByDesc('id')
             ->paginate($perPage)
             ->withQueryString();
 
-        $counts = collect(self::TABS)->map(fn (array $statuses): int => KetiApplication::query()
-            ->whereIn('id', $latestIds)
-            ->whereIn('status', $statuses)
-            ->count());
+        $counts = collect(self::VALID_TABS)->mapWithKeys(fn (string $tabKey): array => [
+            $tabKey => $this->applyTabFilter(
+                KetiApplication::query()->whereIn('id', $latestIds),
+                $tabKey,
+            )->count(),
+        ]);
 
         return view('admin.keti-accounts.index', [
             'tab' => $tab,
@@ -71,7 +71,29 @@ class KetiAccountController extends Controller
             'classGroupFilter' => $classGroupFilter,
             'classGroups' => ClassGroup::query()->where('is_active', true)->orderedForSelection()->pluck('name', 'id'),
             'perPage' => $perPage,
+            'maxKetiPerClass' => $approvals->maxPerClass(),
+            'classActiveKetiCounts' => $approvals->activeKetiCountsByClass(),
         ]);
+    }
+
+    /**
+     * Terapkan filter tab pada query pengajuan terbaru.
+     *
+     * @param  Builder<KetiApplication>  $query
+     * @return Builder<KetiApplication>
+     */
+    private function applyTabFilter(Builder $query, string $tab): Builder
+    {
+        return match ($tab) {
+            'approved' => $query
+                ->where('status', KetiApplicationStatus::Approved)
+                ->whereHas('user', fn (Builder $uq): Builder => $uq->where('is_active', true)),
+            'inactive' => $query
+                ->where('status', KetiApplicationStatus::Approved)
+                ->whereHas('user', fn (Builder $uq): Builder => $uq->where('is_active', false)),
+            'rejected' => $query->whereIn('status', [KetiApplicationStatus::Rejected, KetiApplicationStatus::NeedsRevision]),
+            default => $query->where('status', KetiApplicationStatus::Pending),
+        };
     }
 
     public function batchApprove(Request $request, KetiApprovalService $approvals): RedirectResponse
@@ -154,5 +176,18 @@ class KetiAccountController extends Controller
         $approvals->deactivate($user, $request->user(), $validated['reason']);
 
         return back()->with('toast', ['type' => 'success', 'title' => "Akun {$user->name} dinonaktifkan", 'message' => 'Hak pemesanan dicabut. Riwayat tetap tersimpan.']);
+    }
+
+    public function reactivate(Request $request, User $user, KetiApprovalService $approvals): RedirectResponse
+    {
+        abort_unless($user->isKeti(), 404);
+
+        $application = $approvals->reactivate($user, $request->user());
+
+        return to_route('admin.keti-accounts.index', ['status' => 'approved'])->with('toast', [
+            'type' => 'success',
+            'title' => "Akun {$user->name} diaktifkan kembali",
+            'message' => "Akses pemesanan untuk {$application->classGroup->name} aktif kembali.",
+        ]);
     }
 }

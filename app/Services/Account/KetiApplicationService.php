@@ -71,14 +71,18 @@ class KetiApplicationService
     }
 
     /**
-     * Ajukan ulang setelah diminta perbaikan/ditolak. Riwayat pengajuan lama tetap tersimpan.
+     * Ajukan ulang setelah diminta perbaikan. Pengajuan yang ditolak permanen tidak dapat diajukan ulang.
      */
     public function resubmit(User $user, ClassGroup $classGroup, ?string $name = null, ?string $nim = null): KetiApplication
     {
         $application = DB::transaction(function () use ($user, $classGroup, $name, $nim): KetiApplication {
             $latest = $user->ketiApplications()->lockForUpdate()->latest('id')->first();
 
-            if (! in_array($latest?->status, [KetiApplicationStatus::NeedsRevision, KetiApplicationStatus::Rejected], true)) {
+            if ($latest?->status === KetiApplicationStatus::Rejected) {
+                throw new DomainException('INVALID_STATUS_TRANSITION', 'Pengajuan yang ditolak permanen tidak dapat diajukan ulang.');
+            }
+
+            if ($latest?->status !== KetiApplicationStatus::NeedsRevision) {
                 throw new DomainException('INVALID_STATUS_TRANSITION', 'Pengajuan ini tidak dapat diajukan ulang.');
             }
 

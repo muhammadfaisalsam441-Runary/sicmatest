@@ -18,11 +18,13 @@
                     @endif
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                         @foreach ($period->timeSlots as $slot)
-                            <div class="flex items-center gap-2 rounded-control border border-border px-3 py-2">
-                                <span class="w-10 text-sm font-semibold">{{ $slot->label }}</span>
-                                <input type="time" name="slots[{{ $slot->id }}][start]" min="{{ config('sicma.operating_hours.start') }}" max="{{ config('sicma.operating_hours.end') }}" value="{{ $clock($slot->start_minute) }}" class="w-full rounded border border-border px-2 py-1 text-sm" aria-label="Mulai slot {{ $slot->label }}">
-                                <span class="text-muted">–</span>
-                                <input type="time" name="slots[{{ $slot->id }}][end]" min="{{ config('sicma.operating_hours.start') }}" max="{{ config('sicma.operating_hours.end') }}" value="{{ $clock($slot->end_minute) }}" class="w-full rounded border border-border px-2 py-1 text-sm" aria-label="Selesai slot {{ $slot->label }}">
+                            <div class="flex flex-wrap items-center gap-2 rounded-control border border-border px-3 py-2">
+                                <span class="w-10 shrink-0 text-sm font-semibold">{{ $slot->label }}</span>
+                                <div class="flex min-w-[13.5rem] flex-1 items-center gap-2 sm:min-w-0">
+                                    <input type="time" name="slots[{{ $slot->id }}][start]" min="{{ config('sicma.operating_hours.start') }}" max="{{ config('sicma.operating_hours.end') }}" value="{{ $clock($slot->start_minute) }}" class="min-w-0 flex-1 rounded border border-border px-2 py-1 text-sm" aria-label="Mulai slot {{ $slot->label }}">
+                                    <span class="shrink-0 text-muted">–</span>
+                                    <input type="time" name="slots[{{ $slot->id }}][end]" min="{{ config('sicma.operating_hours.start') }}" max="{{ config('sicma.operating_hours.end') }}" value="{{ $clock($slot->end_minute) }}" class="min-w-0 flex-1 rounded border border-border px-2 py-1 text-sm" aria-label="Selesai slot {{ $slot->label }}">
+                                </div>
                             </div>
                         @endforeach
                     </div>

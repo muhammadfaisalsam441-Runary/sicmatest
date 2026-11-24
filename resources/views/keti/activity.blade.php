@@ -13,10 +13,10 @@
                 ['label' => 'Saya • '.$myCount, 'href' => route('keti.activity', ['cakupan' => 'saya', 'tanggal' => $date->toDateString()]), 'active' => $scope === 'saya'],
             ]" scrollable />
             <search>
-                <form method="GET" action="{{ route('keti.activity') }}" class="grid grid-cols-[1fr_auto] items-center gap-2 sm:flex sm:items-center">
+                <form method="GET" action="{{ route('keti.activity') }}" class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <input type="hidden" name="cakupan" value="{{ $scope }}">
-                    <span class="truncate text-xs text-muted sm:text-sm">{{ $date->isToday() ? 'Hari ini • ' : '' }}{{ Wita::longDate($date) }}</span>
-                    <x-input type="date" name="tanggal" :value="$date->toDateString()" class="w-40 py-2 sm:w-44 sm:py-3" aria-label="Tanggal" onchange="this.form.requestSubmit()" />
+                    <span class="text-xs text-muted sm:text-sm">{{ $date->isToday() ? 'Hari ini • ' : '' }}{{ Wita::longDate($date) }}</span>
+                    <x-input type="date" name="tanggal" :value="$date->toDateString()" class="w-full py-2 sm:w-44 sm:py-3" aria-label="Tanggal" onchange="this.form.requestSubmit()" />
                 </form>
             </search>
         </div>

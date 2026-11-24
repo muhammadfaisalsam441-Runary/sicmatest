@@ -43,11 +43,11 @@ class RoomController extends Controller
                 'tutup' => 'closed',
                 default => null,
             },
-            sort: SearchCriteria::SORT_NAME,
+            sort: SearchCriteria::SORT_LONGEST,
         ));
 
         return view('keti.rooms.index', [
-            'rooms' => $results->map(RoomCardPresenter::card(...))->values()->all(),
+            'rooms' => RoomCardPresenter::cards($results),
             'totalRooms' => Room::query()->where('is_active', true)->count(),
             'buildings' => Building::query()->orderBy('name')->get(),
             'floors' => Room::query()->whereNotNull('floor')->distinct()->orderBy('floor')->pluck('floor'),

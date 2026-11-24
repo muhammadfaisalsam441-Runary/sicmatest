@@ -127,6 +127,15 @@
         }
     }
 
+    .sicma-no-scrollbar {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+
+    .sicma-no-scrollbar::-webkit-scrollbar {
+        display: none;
+    }
+
     [data-ui-density='compact'] .admin-page-stack {
         gap: 0.75rem;
     }
@@ -145,9 +154,9 @@
 }
 
 @media (pointer: coarse) {
-    body:is([data-portal="public"], [data-portal="auth"], [data-portal="keti"]) input:not([type="checkbox"]):not([type="radio"]),
-    body:is([data-portal="public"], [data-portal="auth"], [data-portal="keti"]) select,
-    body:is([data-portal="public"], [data-portal="auth"], [data-portal="keti"]) textarea {
+    body:is([data-portal="public"], [data-portal="auth"], [data-portal="keti"], [data-portal="admin"]) input:not([type="checkbox"]):not([type="radio"]),
+    body:is([data-portal="public"], [data-portal="auth"], [data-portal="keti"], [data-portal="admin"]) select,
+    body:is([data-portal="public"], [data-portal="auth"], [data-portal="keti"], [data-portal="admin"]) textarea {
         font-size: max(1rem, 1em);
         min-block-size: 44px;
     }

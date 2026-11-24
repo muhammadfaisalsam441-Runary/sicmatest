@@ -78,7 +78,7 @@
                     @yield('content')
                 </main>
 
-                <footer class="flex flex-wrap items-center justify-between gap-4 px-4 pb-24 text-xs text-muted sm:px-6 lg:px-8 lg:pb-6">
+                <footer class="flex flex-wrap items-center justify-between gap-4 px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] text-xs text-muted sm:px-6 lg:px-8 lg:pb-8">
                     <span>JTIK • SICMA</span>
                     <div class="flex flex-wrap items-center gap-2.5">
                         <button type="button"

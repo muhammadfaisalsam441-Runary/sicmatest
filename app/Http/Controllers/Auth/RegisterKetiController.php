@@ -5,20 +5,17 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\RegisterKetiRequest;
 use App\Models\Academic\ClassGroup;
-use App\Models\User\ClassRepresentative;
 use App\Services\Account\KetiApplicationService;
+use App\Services\Account\KetiApprovalService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
 class RegisterKetiController extends Controller
 {
-    public function create(): View
+    public function create(KetiApprovalService $approvals): View
     {
-        $takenIds = ClassRepresentative::query()
-            ->activeOn(now())
-            ->pluck('class_group_id')
-            ->all();
+        $activeCounts = $approvals->activeKetiCountsByClass();
 
         $classes = ClassGroup::query()
             ->where('is_active', true)
@@ -28,7 +25,7 @@ class RegisterKetiController extends Controller
         return view('auth.register', [
             'classGroups' => ClassGroup::groupedOptions(
                 $classes,
-                fn (ClassGroup $class): string => in_array($class->id, $takenIds, true) ? $class->name.' (Sudah ada Keti)' : $class->name,
+                fn (ClassGroup $class): string => $approvals->formatClassOptionLabel($class, $activeCounts[$class->id] ?? 0),
             ),
         ]);
     }

@@ -6,13 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\ResubmitApplicationRequest;
 use App\Models\Academic\ClassGroup;
 use App\Services\Account\KetiApplicationService;
+use App\Services\Account\KetiApprovalService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class ApplicationStatusController extends Controller
 {
-    public function show(Request $request): View|RedirectResponse
+    public function show(Request $request, KetiApprovalService $approvals): View|RedirectResponse
     {
         $user = $request->user();
 
@@ -24,6 +25,8 @@ class ApplicationStatusController extends Controller
             return redirect()->route('verification.notice');
         }
 
+        $activeCounts = $approvals->activeKetiCountsByClass();
+
         return view('auth.application-status', [
             'user' => $user,
             'application' => $user->latestKetiApplication()->with('classGroup')->first(),
@@ -31,6 +34,7 @@ class ApplicationStatusController extends Controller
             'isApproved' => $user->isApprovedKeti(),
             'classGroups' => ClassGroup::groupedOptions(
                 ClassGroup::query()->where('is_active', true)->orderedForSelection()->get(),
+                fn (ClassGroup $class): string => $approvals->formatClassOptionLabel($class, $activeCounts[$class->id] ?? 0),
             ),
         ]);
     }

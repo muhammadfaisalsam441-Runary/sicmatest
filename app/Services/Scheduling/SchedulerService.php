@@ -25,6 +25,7 @@ use App\Models\User\User;
 use App\Services\Account\AuditLogger;
 use App\Services\Account\NotificationService;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
@@ -46,6 +47,23 @@ class SchedulerService
         'kelas' => 'Kelas tertentu',
         'belum-terjadwal' => 'Belum terjadwal',
         'terdampak' => 'Bagian terdampak',
+    ];
+
+    /**
+     * @var list<string>
+     */
+    private const AFFECTED_ISSUE_CODES = [
+        'ROOM_CONFLICT',
+        'LECTURER_CONFLICT',
+        'CLASS_CONFLICT',
+        'RESERVATION_CONFLICT',
+        'ROOM_CLOSED',
+        'LEADERSHIP_THURSDAY',
+        'LECTURER_UNAVAILABLE',
+        'FRIDAY_BREAK_CONFLICT',
+        'TEACHING_DAY_NOT_ALLOWED',
+        'SESSION_WITHOUT_TIME',
+        'SESSION_WITHOUT_ROOM',
     ];
 
     public function __construct(
@@ -128,6 +146,27 @@ class SchedulerService
             if ($inScope->contains(fn (ScheduleSession $session): bool => $session->is_locked && ! $this->isTimed($session))) {
                 $errors[] = 'Lengkapi waktu sesi terkunci atau buka kuncinya sebelum menyusun jadwal.';
             }
+
+            $lockedTimed = $inScope->filter(fn (ScheduleSession $session): bool => $session->is_locked && $this->isTimed($session))->values();
+            $fixedTimed = $fixed->filter(fn (ScheduleSession $session): bool => $this->isTimed($session))->values();
+
+            $conflictingLockedCount = $lockedTimed->filter(
+                fn (ScheduleSession $locked): bool => $lockedTimed->contains(
+                    fn (ScheduleSession $other): bool => $other->id !== $locked->id && $this->sessionsConflict($locked, $other)
+                ) || $fixedTimed->contains(
+                    fn (ScheduleSession $other): bool => $this->sessionsConflict($locked, $other)
+                )
+            )->count();
+
+            if ($conflictingLockedCount > 0) {
+                $errors[] = "{$conflictingLockedCount} sesi terkunci saling bertabrakan atau bentrok dengan sesi di luar cakupan. Buka kunci sesi terkait atau perluas cakupan sebelum menyusun jadwal.";
+            }
+
+            $fixedConflictPairs = $this->countConflictPairs($fixedTimed);
+            if ($fixedConflictPairs > 0) {
+                $warnings[] = "Terdapat {$fixedConflictPairs} bentrok bawaan pada sesi di luar cakupan yang akan terbawa ke draf baru. Gunakan cakupan \"Seluruh semester\" atau \"Bagian terdampak\" agar bentrok tersebut ikut ditata ulang.";
+            }
+
             if ($withoutLecturer > 0) {
                 $warnings[] = "{$withoutLecturer} sesi belum punya pengajar; bentrok dosen tidak dapat diperiksa untuk sesi tersebut.";
             }
@@ -489,7 +528,14 @@ class SchedulerService
         $sessions = $base->sessions()->with(['participants', 'lecturers.leadershipTerms', 'courseOffering.course'])->orderBy('id')->get();
 
         $problemIds = $scope['type'] === 'terdampak'
-            ? $base->issues()->whereNull('resolved_at')->where('severity', IssueSeverity::Error)->pluck('session_ids')->flatten()->unique()
+            ? $base->issues()
+                ->whereNull('resolved_at')
+                ->where(fn (Builder $query): Builder => $query->where('severity', IssueSeverity::Error)->orWhereIn('code', self::AFFECTED_ISSUE_CODES))
+                ->pluck('session_ids')
+                ->flatten()
+                ->merge($this->conflictingSessionIds($sessions))
+                ->unique()
+                ->values()
             : collect();
 
         $inScope = $sessions->filter(fn (ScheduleSession $session): bool => match ($scope['type']) {
@@ -609,6 +655,89 @@ class SchedulerService
         $isMaba = $session->participants->contains(fn ($class): bool => $class->cohort_year !== null && $class->cohort_year >= $periodYear);
 
         return $isMaba ? 'maba' : 'reguler';
+    }
+
+    private function phasesOverlap(SessionPhase $a, SessionPhase $b): bool
+    {
+        return $a === SessionPhase::Full || $b === SessionPhase::Full || $a === $b;
+    }
+
+    private function sessionsConflict(ScheduleSession $a, ScheduleSession $b): bool
+    {
+        if ($a === $b || ($a->id !== null && $a->id === $b->id)) {
+            return false;
+        }
+
+        if (! $this->isTimed($a)
+            || ! $this->isTimed($b)
+            || $a->day_of_week !== $b->day_of_week
+            || ! ($a->start_minute < $b->end_minute && $b->start_minute < $a->end_minute)
+            || ! $this->phasesOverlap($a->phase, $b->phase)) {
+            return false;
+        }
+
+        if ($a->blocksRoom() && $b->blocksRoom() && $a->room_id === $b->room_id) {
+            return true;
+        }
+
+        if ($a->lecturers->pluck('id')->intersect($b->lecturers->pluck('id'))->isNotEmpty()) {
+            return true;
+        }
+
+        return $a->participants->pluck('id')->intersect($b->participants->pluck('id'))->isNotEmpty();
+    }
+
+    /**
+     * @param  Collection<int, ScheduleSession>  $sessions
+     * @return Collection<int, array{0: ScheduleSession, 1: ScheduleSession}>
+     */
+    private function conflictPairs(Collection $sessions): Collection
+    {
+        $pairs = collect();
+        $timed = $sessions->filter(fn (ScheduleSession $session): bool => $this->isTimed($session))->values();
+
+        foreach ($timed->groupBy('day_of_week') as $daySessions) {
+            $ordered = $daySessions->sortBy('start_minute')->values();
+            $count = $ordered->count();
+
+            for ($i = 0; $i < $count; $i++) {
+                $a = $ordered[$i];
+
+                for ($j = $i + 1; $j < $count; $j++) {
+                    $b = $ordered[$j];
+
+                    if ($b->start_minute >= $a->end_minute) {
+                        break;
+                    }
+
+                    if ($this->sessionsConflict($a, $b)) {
+                        $pairs->push([$a, $b]);
+                    }
+                }
+            }
+        }
+
+        return $pairs;
+    }
+
+    /**
+     * @param  Collection<int, ScheduleSession>  $sessions
+     * @return Collection<int, int>
+     */
+    private function conflictingSessionIds(Collection $sessions): Collection
+    {
+        return $this->conflictPairs($sessions)
+            ->flatMap(fn (array $pair): array => [$pair[0]->id, $pair[1]->id])
+            ->unique()
+            ->values();
+    }
+
+    /**
+     * @param  Collection<int, ScheduleSession>  $sessions
+     */
+    private function countConflictPairs(Collection $sessions): int
+    {
+        return $this->conflictPairs($sessions)->count();
     }
 
     private function isTimed(ScheduleSession $session): bool

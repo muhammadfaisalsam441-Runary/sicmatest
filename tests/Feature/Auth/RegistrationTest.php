@@ -8,15 +8,20 @@ use App\Models\User\ClassRepresentative;
 use App\Models\User\User;
 use Illuminate\Support\Facades\Mail;
 
-test('halaman pendaftaran menampilkan kelas aktif dan menandai kelas yang sudah memiliki Keti aktif', function (): void {
+test('halaman pendaftaran menampilkan kelas aktif dan menandai kuota Keti per kelas', function (): void {
     $this->withoutVite();
 
     $availableClass = ClassGroup::factory()->create(['name' => 'Tekom A', 'is_active' => true]);
-    $takenClass = ClassGroup::factory()->create(['name' => 'Tekom B', 'is_active' => true]);
-    $expiredClass = ClassGroup::factory()->create(['name' => 'Tekom C', 'is_active' => true]);
+    $oneKetiClass = ClassGroup::factory()->create(['name' => 'Tekom B', 'is_active' => true]);
+    $fullClass = ClassGroup::factory()->create(['name' => 'Tekom C', 'is_active' => true]);
+    $expiredClass = ClassGroup::factory()->create(['name' => 'Tekom D', 'is_active' => true]);
     ClassGroup::factory()->inactive()->create(['name' => 'Tekom Nonaktif']);
 
-    ClassRepresentative::factory()->for($takenClass)->create([
+    ClassRepresentative::factory()->for($oneKetiClass)->create([
+        'valid_from' => now()->subDays(10)->toDateString(),
+        'valid_to' => null,
+    ]);
+    ClassRepresentative::factory()->for($fullClass)->count(2)->create([
         'valid_from' => now()->subDays(10)->toDateString(),
         'valid_to' => null,
     ]);
@@ -28,10 +33,11 @@ test('halaman pendaftaran menampilkan kelas aktif dan menandai kelas yang sudah 
     $this->get(route('register'))
         ->assertOk()
         ->assertSee($availableClass->name)
-        ->assertDontSee($availableClass->name.' (Sudah ada Keti)')
-        ->assertSee($takenClass->name.' (Sudah ada Keti)')
+        ->assertDontSee($availableClass->name.' (')
+        ->assertSee($oneKetiClass->name.' (1/2 Keti aktif)')
+        ->assertSee($fullClass->name.' (Kuota Keti penuh 2/2)')
         ->assertSee($expiredClass->name)
-        ->assertDontSee($expiredClass->name.' (Sudah ada Keti)')
+        ->assertDontSee($expiredClass->name.' (')
         ->assertDontSee('Tekom Nonaktif');
 });
 

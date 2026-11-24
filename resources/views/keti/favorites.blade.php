@@ -3,7 +3,7 @@
 @section('title', 'Ruangan Favorit')
 
 @section('content')
-    <div class="flex flex-col gap-6">
+    <div class="flex min-w-0 flex-col gap-6">
         <x-page-header title="Ruangan Favorit" subtitle="Buka kembali ruangan yang sering digunakan." />
 
         @if ($counts['all'] === 0)
@@ -21,7 +21,7 @@
                     $tabItems[] = ['label' => 'Tutup', 'href' => route('keti.favorites.index', ['status' => 'tutup']), 'active' => $status === 'tutup'];
                 }
             @endphp
-            <x-tabs :items="$tabItems" />
+            <x-tabs :items="$tabItems" scrollable />
             <h2 class="text-lg font-semibold">{{ match ($status) {
                 'tersedia' => $counts['available'].' ruangan tersedia',
                 'digunakan' => $counts['busy'].' ruangan digunakan',
@@ -35,7 +35,8 @@
                 <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
                     @foreach ($rooms as $room)
                         <x-room-card :name="$room['name']" :badge="$room['badge']" :location="$room['location']" :capacity="$room['capacity']" :facilities="$room['facilities']"
-                                     :time-label="$room['time_label']" :time="$room['time']" :note="$room['note']"
+                                     :time-label="$room['time_label']" :time="$room['time']" :remaining="$room['remaining'] ?? null" :note="$room['note']"
+                                     :agenda-title="$room['agenda_title'] ?? null" :agenda-class="$room['agenda_class'] ?? null" :agenda-range="$room['agenda_range'] ?? null" :agenda-is-upcoming="$room['agenda_is_upcoming'] ?? false"
                                      style="--stagger: {{ $loop->index }}">
                             <div class="flex w-full flex-wrap gap-2">
                                 <x-button variant="secondary" :href="route('keti.rooms.show', $room['id'])" class="min-h-11 flex-1 sm:min-h-0">Detail</x-button>

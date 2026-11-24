@@ -14,7 +14,7 @@
     $errorId = $resolvedFor.'-error';
 @endphp
 
-<div {{ $attributes->merge(['class' => 'flex flex-col gap-2']) }}>
+<div {{ $attributes->merge(['class' => 'flex min-w-0 flex-col gap-2']) }}>
     <label for="{{ $resolvedFor }}" class="text-sm font-medium text-ink">
         {{ $label }}@if ($required) <span class="text-danger" aria-hidden="true">*</span>@endif
     </label>

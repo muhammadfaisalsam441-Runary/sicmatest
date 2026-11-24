@@ -389,3 +389,37 @@ test('pencarian ruang dengan jam mulai basi mengarahkan ke halaman cari tanpa qu
         ->assertRedirect(route('keti.search'))
         ->assertSessionHasErrors('mulai');
 });
+
+test('daftar ruangan dan favorit keti menampilkan mata kuliah, kegiatan, dan kelas tanpa membocorkan identitas pemesan', function () {
+    $scheduledRoom = Room::factory()->create(['name' => 'AE 107']);
+    $reservedRoom = Room::factory()->create(['name' => 'AE 209']);
+    $scheduledClass = ClassGroup::factory()->create(['name' => 'PTIK A 2025']);
+    meetingSession([$scheduledClass], [
+        'title' => 'Pemrograman Web',
+        'room_id' => $scheduledRoom->id,
+        'day_of_week' => 3,
+        'start_minute' => 540,
+        'end_minute' => 690,
+    ]);
+
+    $otherClass = ClassGroup::factory()->create(['name' => 'TEKOM B 2025']);
+    $otherKeti = User::factory()->approvedKeti($otherClass)->create([
+        'name' => 'Pemesan Lain Rahasia',
+        'nim' => '2508888888',
+        'email' => 'rahasia.keti@sicma.test',
+    ]);
+    app(ReservationService::class)->create($otherKeti, $reservedRoom, now(), now()->addHour(), 'Rapat himpunan', 15, 'kunci-keti-card');
+
+    $this->keti->favoriteRooms()->syncWithoutDetaching([$scheduledRoom->id, $reservedRoom->id]);
+
+    foreach ([route('keti.rooms.index'), route('keti.favorites.index')] as $url) {
+        $this->actingAs($this->keti)
+            ->get($url)
+            ->assertOk()
+            ->assertSeeInOrder(['AE 107', 'Digunakan', 'Pemrograman Web', 'PTIK A 2025'])
+            ->assertSeeInOrder(['AE 209', 'Digunakan', 'Rapat himpunan', 'TEKOM B 2025'])
+            ->assertDontSee('Pemesan Lain Rahasia')
+            ->assertDontSee('2508888888')
+            ->assertDontSee('rahasia.keti@sicma.test');
+    }
+});

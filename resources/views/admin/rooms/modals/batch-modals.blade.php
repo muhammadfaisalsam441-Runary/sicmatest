@@ -4,10 +4,10 @@
      @keydown.escape.window="if (deleteModalOpen) deleteModalOpen = false"
      class="fixed inset-0 z-50 flex items-center justify-center p-4">
     <div class="absolute inset-0 bg-ink/80 backdrop-blur-sm" @click="deleteModalOpen = false"></div>
-    <div class="relative w-full max-w-md rounded-2xl bg-surface p-6 shadow-2xl">
+    <div class="relative max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-2xl bg-surface p-6 shadow-2xl">
         <div class="flex items-start justify-between border-b border-border pb-3">
             <h3 id="room-delete-title" class="text-lg font-bold text-ink">Hapus ruang <span x-text="roomToDelete.name"></span>?</h3>
-            <button type="button" @click="deleteModalOpen = false" aria-label="Tutup konfirmasi hapus ruang" class="cursor-pointer text-muted hover:text-ink">
+            <button type="button" @click="deleteModalOpen = false" aria-label="Tutup konfirmasi hapus ruang" class="inline-flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-control text-muted transition hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
                 <i data-lucide="x" class="size-5" aria-hidden="true"></i>
             </button>
         </div>
@@ -22,7 +22,7 @@
                 <input id="room-delete-reason" type="text" name="reason" placeholder="Contoh: Ruang dialihfungsikan" class="w-full rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none">
             </div>
 
-            <div class="mt-2 flex items-center justify-end gap-2 border-t border-border pt-4">
+            <div class="mt-2 flex flex-wrap items-center justify-end gap-2 border-t border-border pt-4">
                 <x-button variant="secondary" type="button" @click="deleteModalOpen = false">Batal</x-button>
                 <x-button variant="danger" type="submit" icon="trash-2">Hapus Ruang</x-button>
             </div>
@@ -34,13 +34,13 @@
 <div x-show="batchCapacityModalOpen" x-cloak data-modal-name="room-batch-capacity" role="dialog" aria-modal="true" aria-labelledby="batch-capacity-title"
      @keydown.escape.window="if (batchCapacityModalOpen) batchCapacityModalOpen = false" class="fixed inset-0 z-50 flex items-center justify-center p-4">
     <div class="absolute inset-0 bg-ink/80 backdrop-blur-sm" @click="batchCapacityModalOpen = false"></div>
-    <div class="relative w-full max-w-md rounded-2xl bg-surface p-6 shadow-2xl">
+    <div class="relative max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-2xl bg-surface p-6 shadow-2xl">
         <div class="flex items-start justify-between border-b border-border pb-3">
             <div>
                 <span class="text-xs font-semibold text-primary">Penyesuaian Massal</span>
                 <h3 id="batch-capacity-title" class="text-lg font-bold text-ink">Atur Kapasitas (<span x-text="selectedIds.length"></span> Ruang Terpilih)</h3>
             </div>
-            <button type="button" @click="batchCapacityModalOpen = false" aria-label="Tutup pengaturan kapasitas" class="cursor-pointer text-muted hover:text-ink">
+            <button type="button" @click="batchCapacityModalOpen = false" aria-label="Tutup pengaturan kapasitas" class="inline-flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-control text-muted transition hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
                 <i data-lucide="x" class="size-5" aria-hidden="true"></i>
             </button>
         </div>
@@ -90,13 +90,13 @@
      @keydown.escape.window="if (batchFacilityModalOpen) batchFacilityModalOpen = false"
      class="fixed inset-0 z-50 flex items-center justify-center p-4">
     <div class="absolute inset-0 bg-ink/80 backdrop-blur-sm" @click="batchFacilityModalOpen = false"></div>
-    <div class="relative w-full max-w-md rounded-2xl bg-surface p-6 shadow-2xl">
+    <div class="relative max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-2xl bg-surface p-6 shadow-2xl">
         <div class="flex items-start justify-between border-b border-border pb-3">
             <div>
                 <span class="text-xs font-semibold text-primary">Penyesuaian Massal</span>
                 <h3 id="batch-facility-title" class="text-lg font-bold text-ink">Tambah Fasilitas (<span x-text="selectedIds.length"></span> Ruang Terpilih)</h3>
             </div>
-            <button type="button" @click="batchFacilityModalOpen = false" aria-label="Tutup modal tambah fasilitas" class="cursor-pointer text-muted hover:text-ink">
+            <button type="button" @click="batchFacilityModalOpen = false" aria-label="Tutup modal tambah fasilitas" class="inline-flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-control text-muted transition hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
                 <i data-lucide="x" class="size-5" aria-hidden="true"></i>
             </button>
         </div>
@@ -127,7 +127,7 @@
                 Fasilitas baru akan ditambahkan ke <strong x-text="selectedIds.length"></strong> ruangan terpilih tanpa menghapus fasilitas yang sudah ada.
             </div>
 
-            <div class="mt-1 flex items-center justify-end gap-2 border-t border-border pt-4">
+            <div class="mt-1 flex flex-wrap items-center justify-end gap-2 border-t border-border pt-4">
                 <x-button variant="secondary" type="button" @click="batchFacilityModalOpen = false">Batal</x-button>
                 <x-button variant="primary" type="submit" icon="check" x-bind:disabled="selectedIds.length === 0">Terapkan ke Ruang Terpilih</x-button>
             </div>
@@ -141,15 +141,15 @@
      @keydown.escape.window="if (reopenModalOpen) reopenModalOpen = false"
      class="fixed inset-0 z-50 flex items-center justify-center p-4">
     <div class="absolute inset-0 bg-ink/80 backdrop-blur-sm" @click="reopenModalOpen = false"></div>
-    <div class="relative w-full max-w-md rounded-2xl bg-surface p-6 shadow-2xl">
+    <div class="relative max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-2xl bg-surface p-6 shadow-2xl">
         <div class="flex items-start justify-between border-b border-border pb-3">
             <h3 id="room-reopen-title" class="text-lg font-bold text-ink">Buka kembali ruang <span x-text="closureToReopen.name"></span>?</h3>
-            <button type="button" @click="reopenModalOpen = false" aria-label="Tutup konfirmasi buka ruang" class="cursor-pointer text-muted hover:text-ink">
+            <button type="button" @click="reopenModalOpen = false" aria-label="Tutup konfirmasi buka ruang" class="inline-flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-control text-muted transition hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
                 <i data-lucide="x" class="size-5" aria-hidden="true"></i>
             </button>
         </div>
         <p class="mt-3 text-xs text-muted">Penutupan ruang akan dihapus sehingga ruang kembali tersedia untuk pemesanan.</p>
-        <form method="POST" :action="closureToReopen.url" class="mt-5 flex justify-end gap-2">
+        <form method="POST" :action="closureToReopen.url" class="mt-5 flex flex-wrap justify-end gap-2">
             @csrf
             @method('DELETE')
             <x-button variant="secondary" type="button" @click="reopenModalOpen = false">Batal</x-button>

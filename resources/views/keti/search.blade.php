@@ -98,7 +98,7 @@
                 </div>
 
                 <div id="search-advanced-filters"
-                     class="hidden grid-cols-2 items-end gap-2.5 border-t border-border/70 pt-2.5 lg:contents lg:border-0 lg:pt-0"
+                     class="hidden grid-cols-1 items-end gap-2.5 border-t border-border/70 pt-2.5 sm:grid-cols-2 lg:contents lg:border-0 lg:pt-0"
                      :class="{ 'hidden': ! filtersOpen, 'grid': filtersOpen }">
                     <x-field label="Tanggal" name="tanggal" class="lg:col-span-2">
                         <x-input type="date" name="tanggal" :value="$selectedDate" :min="$todayStr" :max="now()->addDays((int) config('sicma.reservation.max_days_ahead'))->toDateString()" />
@@ -112,7 +112,7 @@
                     <x-field label="Jumlah orang" name="orang" class="lg:col-span-1">
                         <x-input type="number" name="orang" min="1" max="500" :value="$selectedPeople" placeholder="Bebas" />
                     </x-field>
-                    <div class="col-span-2 lg:hidden">
+                    <div class="sm:col-span-2 lg:hidden">
                         <x-button type="submit" icon="search" class="min-h-11 w-full">Terapkan filter</x-button>
                     </div>
                 </div>

@@ -39,11 +39,11 @@ class RoomController extends Controller
                 keyword: $keyword,
                 building: $buildingFilter,
                 status: $status,
-                sort: SearchCriteria::SORT_NAME,
+                sort: SearchCriteria::SORT_LONGEST,
             ));
 
             return [
-                'rooms' => $results->map(RoomCardPresenter::card(...))->values()->all(),
+                'rooms' => RoomCardPresenter::cards($results),
                 'summary' => $availability->summary($now),
             ];
         });

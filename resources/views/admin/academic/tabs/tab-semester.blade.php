@@ -48,8 +48,8 @@
                         </form>
                         <div class="flex flex-col divide-y divide-border">
                             @forelse ($period->calendarExceptions as $exception)
-                                <div class="flex items-center justify-between gap-2 py-2 text-sm">
-                                    <span><span class="font-medium">{{ Wita::dayName($exception->date) }}, {{ Wita::date($exception->date) }}</span> <span class="text-muted">• {{ $exception->note ?? $exception->type->label() }}</span></span>
+                                <div class="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+                                    <span class="min-w-0"><span class="font-medium">{{ Wita::dayName($exception->date) }}, {{ Wita::date($exception->date) }}</span> <span class="text-muted">• {{ $exception->note ?? $exception->type->label() }}</span></span>
                                     <button
                                         type="button"
                                         @click="confirmDeleteException('{{ route('admin.academic.exceptions.destroy', $exception) }}', @js(Wita::date($exception->date)))"
@@ -74,17 +74,17 @@
                         aria-labelledby="delete-exception-modal-title"
                         class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-[2px]"
                     >
-                        <div @click.outside="deleteExceptionModalOpen = false" class="w-full max-w-md rounded-2xl border border-border bg-white p-6 shadow-2xl">
+                        <div @click.outside="deleteExceptionModalOpen = false" class="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-2xl border border-border bg-white p-6 shadow-2xl">
                             <div class="mb-3 flex items-center justify-between">
                                 <h3 id="delete-exception-modal-title" class="text-base font-bold text-ink">Hapus hari libur?</h3>
-                                <button type="button" @click="deleteExceptionModalOpen = false" aria-label="Tutup dialog" class="cursor-pointer rounded-md p-1 text-muted hover:bg-slate-100 hover:text-ink">
+                                <button type="button" @click="deleteExceptionModalOpen = false" aria-label="Tutup dialog" class="inline-flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-control text-muted transition hover:bg-slate-100 hover:text-ink">
                                     <i data-lucide="x" class="size-4" aria-hidden="true"></i>
                                 </button>
                             </div>
                             <p class="mb-5 text-sm text-muted">
                                 Pengecualian tanggal <strong class="text-ink" x-text="deleteExceptionLabel"></strong> akan dihapus dari kalender akademik.
                             </p>
-                            <form method="POST" :action="deleteExceptionUrl" class="flex justify-end gap-2">
+                            <form method="POST" :action="deleteExceptionUrl" class="flex flex-wrap items-center justify-end gap-2">
                                 @csrf
                                 @method('DELETE')
                                 <x-button type="button" variant="ghost" @click="deleteExceptionModalOpen = false">Batal</x-button>

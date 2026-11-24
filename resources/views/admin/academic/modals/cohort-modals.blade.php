@@ -59,7 +59,7 @@
             <template x-if="preview && !loading">
                 <div class="flex flex-col gap-3">
                     {{-- Mini Strip 3 Metrik (Kompak & Ramping) --}}
-                    <div class="grid grid-cols-3 divide-x divide-border rounded-lg border border-border bg-page/70 text-center">
+                    <div class="grid grid-cols-1 divide-y divide-border rounded-lg border border-border bg-page/70 text-center sm:grid-cols-3 sm:divide-x sm:divide-y-0">
                         <div class="px-2 py-1.5">
                             <span class="block text-[10px] font-semibold uppercase tracking-wider text-muted">Kelas Aktif</span>
                             <div class="mt-0.5 flex items-baseline justify-center gap-1">
@@ -170,7 +170,7 @@
             </label>
 
             {{-- Tombol Aksi Modal (Kompak) --}}
-            <div class="flex items-center justify-end gap-2 border-t border-border pt-3">
+            <div class="flex flex-wrap items-center justify-end gap-2 border-t border-border pt-3">
                 <button type="button" class="rounded-control border border-border bg-surface px-3.5 py-1.5 text-xs font-semibold text-muted hover:text-ink transition cursor-pointer" x-on:click="$dispatch('close-modal', 'modal-graduate-cohort')">
                     Batal
                 </button>
@@ -375,7 +375,7 @@
             </template>
 
             {{-- Tombol Aksi Modal (Kompak) --}}
-            <div class="flex items-center justify-between gap-3 border-t border-border pt-3">
+            <div class="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
                 <div class="text-xs text-muted">
                     <span x-show="sourceCohort && targetCohort && sourceCohort == targetCohort" class="text-danger">
                         Tahun angkatan target harus berbeda dari angkatan sumber.
@@ -387,7 +387,7 @@
                         Pilih minimal 1 kelas.
                     </span>
                 </div>
-                <div class="flex items-center gap-2">
+                <div class="ml-auto flex flex-wrap items-center justify-end gap-2">
                     <button type="button" class="rounded-control border border-border bg-surface px-3.5 py-1.5 text-xs font-semibold text-muted hover:text-ink transition cursor-pointer" x-on:click="$dispatch('close-modal', 'modal-generate-cohort')">
                         Batal
                     </button>

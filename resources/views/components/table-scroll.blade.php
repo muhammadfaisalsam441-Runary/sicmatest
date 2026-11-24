@@ -1,5 +1,5 @@
 @props([
-    'maxHeight' => 'max-h-[70vh]',
+    'maxHeight' => 'max-h-[70dvh]',
     'title' => null,
     'headerActions' => null,
 ])

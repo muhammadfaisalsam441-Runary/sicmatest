@@ -148,25 +148,25 @@
 
                         <div class="mt-auto flex flex-wrap items-center justify-end gap-2 border-t border-border/60 pt-3">
                             @if ($replacement)
-                                <x-button size="sm" variant="soft" :href="route('keti.reservations.show', $replacement)" class="min-h-11 flex-1 sm:min-h-0 sm:flex-none">Lihat pengganti</x-button>
+                                <x-button size="sm" variant="soft" :href="route('keti.reservations.show', $replacement)" class="min-h-11 min-w-[8.5rem] flex-1 sm:min-h-0 sm:min-w-0 sm:flex-none">Lihat pengganti</x-button>
                             @elseif ($movedOnline)
-                                <x-button size="sm" variant="soft" :href="route('keti.my-class', ['tanggal' => $reschedule->effectiveStart()->toDateString()])" class="min-h-11 flex-1 sm:min-h-0 sm:flex-none">Lihat jadwal online</x-button>
+                                <x-button size="sm" variant="soft" :href="route('keti.my-class', ['tanggal' => $reschedule->effectiveStart()->toDateString()])" class="min-h-11 min-w-[8.5rem] flex-1 sm:min-h-0 sm:min-w-0 sm:flex-none">Lihat jadwal online</x-button>
                             @elseif ($meeting['status'] === 'switched_online')
                                 @if ($meeting['canRestoreOnline'])
-                                    <form method="POST" action="{{ route('keti.meetings.online.cancel', $reschedule) }}" class="flex-1 sm:flex-none">
+                                    <form method="POST" action="{{ route('keti.meetings.online.cancel', $reschedule) }}" class="min-w-[8.5rem] flex-1 sm:min-w-0 sm:flex-none">
                                         @csrf
                                         <x-button size="sm" type="submit" variant="secondary" class="min-h-11 w-full sm:min-h-0 sm:w-auto">Kembalikan ke luring</x-button>
                                     </form>
-                                    <x-button size="sm" variant="soft" :href="route('keti.meetings.reschedule', ['sesi' => $session->id, 'tanggal' => $date->toDateString(), 'pengganti_online' => $reschedule->id])" class="min-h-11 flex-1 sm:min-h-0 sm:flex-none">Pindahkan</x-button>
+                                    <x-button size="sm" variant="soft" :href="route('keti.meetings.reschedule', ['sesi' => $session->id, 'tanggal' => $date->toDateString(), 'pengganti_online' => $reschedule->id])" class="min-h-11 min-w-[8.5rem] flex-1 sm:min-h-0 sm:min-w-0 sm:flex-none">Pindahkan</x-button>
                                 @endif
                             @elseif ($meeting['status'] === 'ongoing' && $session->blocksRoom())
-                                <x-button size="sm" type="button" variant="primary" icon="check" class="min-h-11 flex-1 sm:min-h-0 sm:flex-none" x-data="" x-on:click="$dispatch('open-modal', 'finish-session-{{ $session->id }}')">Selesaikan kelas</x-button>
+                                <x-button size="sm" type="button" variant="primary" icon="check" class="min-h-11 min-w-[8.5rem] flex-1 sm:min-h-0 sm:min-w-0 sm:flex-none" x-data="" x-on:click="$dispatch('open-modal', 'finish-session-{{ $session->id }}')">Selesaikan kelas</x-button>
                             @elseif ($meeting['status'] === 'upcoming' && $session->blocksRoom())
-                                <x-button size="sm" type="button" variant="soft" class="min-h-11 flex-1 sm:min-h-0 sm:flex-none" x-data="" x-on:click="$dispatch('open-modal', 'online-{{ $session->id }}')">Jadikan Online</x-button>
-                                <x-button size="sm" variant="secondary" :href="route('keti.meetings.reschedule', ['sesi' => $session->id, 'tanggal' => $date->toDateString()])" class="min-h-11 flex-1 sm:min-h-0 sm:flex-none">Pindahkan</x-button>
+                                <x-button size="sm" type="button" variant="soft" class="min-h-11 min-w-[8.5rem] flex-1 sm:min-h-0 sm:min-w-0 sm:flex-none" x-data="" x-on:click="$dispatch('open-modal', 'online-{{ $session->id }}')">Jadikan Online</x-button>
+                                <x-button size="sm" variant="secondary" :href="route('keti.meetings.reschedule', ['sesi' => $session->id, 'tanggal' => $date->toDateString()])" class="min-h-11 min-w-[8.5rem] flex-1 sm:min-h-0 sm:min-w-0 sm:flex-none">Pindahkan</x-button>
                             @endif
                             @if ($session->room && ! $reschedule)
-                                <x-button size="sm" variant="soft" :href="route('keti.rooms.show', $session->room)" class="min-h-11 flex-1 sm:min-h-0 sm:flex-none">Detail ruangan</x-button>
+                                <x-button size="sm" variant="soft" :href="route('keti.rooms.show', $session->room)" class="min-h-11 min-w-[8.5rem] flex-1 sm:min-h-0 sm:min-w-0 sm:flex-none">Detail ruangan</x-button>
                             @endif
                         </div>
                     </x-card>
@@ -260,13 +260,13 @@
                         <div class="mt-auto flex flex-wrap items-center justify-end gap-2 border-t border-border/60 pt-3">
                             @if ($reservation->status->value === 'in_use')
                                 @can('manage', $reservation)
-                                    <form method="POST" action="{{ route('keti.reservations.finish', $reservation) }}" class="flex-1 sm:flex-none">
+                                    <form method="POST" action="{{ route('keti.reservations.finish', $reservation) }}" class="min-w-[8.5rem] flex-1 sm:min-w-0 sm:flex-none">
                                         @csrf
                                         <x-button size="sm" type="submit" icon="check" class="min-h-11 w-full sm:min-h-0 sm:w-auto">Selesai menggunakan</x-button>
                                     </form>
                                 @endcan
                             @endif
-                            <x-button size="sm" variant="soft" :href="route('keti.reservations.show', $reservation)" class="min-h-11 flex-1 sm:min-h-0 sm:flex-none">Lihat pengganti</x-button>
+                            <x-button size="sm" variant="soft" :href="route('keti.reservations.show', $reservation)" class="min-h-11 min-w-[8.5rem] flex-1 sm:min-h-0 sm:min-w-0 sm:flex-none">Lihat pengganti</x-button>
                         </div>
                     </x-card>
                 @endforeach
@@ -312,13 +312,13 @@
                         </div>
                         <div class="mt-auto flex flex-wrap justify-end gap-2 border-t border-border/60 pt-3">
                             @if ($origStart->greaterThan($nowTime))
-                                <form method="POST" action="{{ route('keti.meetings.online.cancel', $onlineReschedule) }}" class="flex-1 sm:flex-none">
+                                <form method="POST" action="{{ route('keti.meetings.online.cancel', $onlineReschedule) }}" class="min-w-[8.5rem] flex-1 sm:min-w-0 sm:flex-none">
                                     @csrf
                                     <x-button size="sm" type="submit" variant="secondary" class="min-h-11 w-full sm:min-h-0 sm:w-auto">Kembalikan ke luring</x-button>
                                 </form>
                             @endif
                             @if ($targetStart->greaterThan($nowTime))
-                                <x-button size="sm" variant="soft" :href="route('keti.meetings.reschedule', ['sesi' => $onlineReschedule->schedule_session_id, 'tanggal' => $origStart->toDateString(), 'pengganti_online' => $onlineReschedule->id])" class="min-h-11 flex-1 sm:min-h-0 sm:flex-none">Pindahkan</x-button>
+                                <x-button size="sm" variant="soft" :href="route('keti.meetings.reschedule', ['sesi' => $onlineReschedule->schedule_session_id, 'tanggal' => $origStart->toDateString(), 'pengganti_online' => $onlineReschedule->id])" class="min-h-11 min-w-[8.5rem] flex-1 sm:min-h-0 sm:min-w-0 sm:flex-none">Pindahkan</x-button>
                             @endif
                         </div>
                     </x-card>

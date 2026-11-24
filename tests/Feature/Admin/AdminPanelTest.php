@@ -20,6 +20,7 @@ use App\Models\User\ClassRepresentative;
 use App\Models\User\KetiApplication;
 use App\Models\User\User;
 use App\Services\Academic\MeetingRescheduleService;
+use App\Services\Account\KetiApprovalService;
 use App\Services\Room\AvailabilityService;
 use App\Services\Room\ReservationService;
 use App\Support\Wita;
@@ -433,18 +434,26 @@ test('menyetujui pengajuan menghubungkan Keti ke kelas dan memberi akses pemesan
     $this->actingAs($applicant->fresh())->get(route('keti.search'))->assertOk();
 });
 
-test('satu kelas tidak boleh punya dua Keti aktif pada tanggal yang sama', function () {
+test('satu kelas maksimal memiliki dua Keti aktif pada tanggal yang sama', function () {
     $classGroup = ClassGroup::factory()->create(['name' => 'Tekom C']);
     User::factory()->approvedKeti($classGroup)->create(['name' => 'Dimas Pratama']);
-    $application = User::factory()->pendingKeti($classGroup)->create()->latestKetiApplication;
+    $secondApplicant = User::factory()->pendingKeti($classGroup)->create(['name' => 'Budi Santoso']);
+    $thirdApplicant = User::factory()->pendingKeti($classGroup)->create(['name' => 'Citra Lestari']);
 
     $this->actingAs($this->admin)
         ->from(route('admin.keti-accounts.index'))
-        ->post(route('admin.keti-accounts.approve', $application))
+        ->post(route('admin.keti-accounts.approve', $secondApplicant->latestKetiApplication))
+        ->assertRedirect(route('admin.keti-accounts.index', ['status' => 'approved']));
+
+    expect($secondApplicant->latestKetiApplication->fresh()->status)->toBe(KetiApplicationStatus::Approved)
+        ->and(ClassRepresentative::query()->whereBelongsTo($classGroup)->activeOn(now())->count())->toBe(2);
+
+    $this->from(route('admin.keti-accounts.index'))
+        ->post(route('admin.keti-accounts.approve', $thirdApplicant->latestKetiApplication))
         ->assertSessionHas('error_code', 'CLASS_ALREADY_REPRESENTED');
 
-    expect($application->fresh()->status)->toBe(KetiApplicationStatus::Pending)
-        ->and(ClassRepresentative::query()->whereBelongsTo($classGroup)->count())->toBe(1);
+    expect($thirdApplicant->latestKetiApplication->fresh()->status)->toBe(KetiApplicationStatus::Pending)
+        ->and(ClassRepresentative::query()->whereBelongsTo($classGroup)->activeOn(now())->count())->toBe(2);
 });
 
 test('minta perbaikan dan tolak wajib beralasan dan alasannya dikirim ke pendaftar', function (string $routeName, KetiApplicationStatus $expected) {
@@ -462,14 +471,48 @@ test('minta perbaikan dan tolak wajib beralasan dan alasannya dikirim ke pendaft
     'tolak' => ['admin.keti-accounts.reject', KetiApplicationStatus::Rejected],
 ]);
 
-test('pengajuan yang sudah diperiksa tidak bisa diperiksa ulang', function () {
+test('pengajuan yang sudah disetujui tidak bisa ditolak atau disetujui ulang', function () {
     $application = KetiApplication::factory()->approved()->create();
 
     $this->actingAs($this->admin)
         ->from(route('admin.keti-accounts.index'))
         ->post(route('admin.keti-accounts.reject', $application), ['reason' => 'Coba tolak'])
         ->assertSessionHas('error_code', 'INVALID_STATUS_TRANSITION');
+
+    $this->from(route('admin.keti-accounts.index'))
+        ->post(route('admin.keti-accounts.approve', $application))
+        ->assertSessionHas('error_code', 'INVALID_STATUS_TRANSITION');
 });
+
+test('admin dapat menyetujui langsung pengajuan yang ditolak atau perlu diperbaiki jika syarat terpenuhi', function (KetiApplicationStatus $initialStatus) {
+    $oldClass = ClassGroup::factory()->create(['name' => 'PTIK A']);
+    $newClass = ClassGroup::factory()->create(['name' => 'PTIK B']);
+    $applicant = User::factory()->create(['name' => 'Rina Sari']);
+    $application = KetiApplication::factory()->for($applicant)->for($oldClass)->create([
+        'status' => $initialStatus,
+        'review_note' => 'Alasan sebelumnya.',
+        'reviewed_by' => $this->admin->id,
+        'reviewed_at' => now()->subDay(),
+    ]);
+
+    $this->actingAs($this->admin)
+        ->post(route('admin.keti-accounts.approve', $application), ['class_group_id' => $newClass->id])
+        ->assertRedirect(route('admin.keti-accounts.index', ['status' => 'approved']));
+
+    expect($application->fresh())
+        ->status->toBe(KetiApplicationStatus::Approved)
+        ->class_group_id->toBe($newClass->id)
+        ->review_note->toBeNull()
+        ->and($applicant->fresh()->isApprovedKeti())->toBeTrue()
+        ->and($applicant->fresh()->activeClassGroup()->id)->toBe($newClass->id)
+        ->and(AppNotification::query()->where('user_id', $applicant->id)->where('type', 'keti_application.approved')->exists())->toBeTrue();
+
+    auth()->logout();
+    $this->actingAs($applicant->fresh())->get(route('keti.search'))->assertOk();
+})->with([
+    'ditolak permanen' => [KetiApplicationStatus::Rejected],
+    'perlu diperbaiki' => [KetiApplicationStatus::NeedsRevision],
+]);
 
 test('menonaktifkan Keti mencabut hak pemesanan tanpa menghapus riwayat', function () {
     $keti = User::factory()->approvedKeti()->create();
@@ -486,19 +529,133 @@ test('menonaktifkan Keti mencabut hak pemesanan tanpa menghapus riwayat', functi
     $this->actingAs($keti->fresh())->get(route('keti.search'))->assertForbidden();
 });
 
-test('tab akun Keti memisahkan pengajuan menunggu, aktif, dan ditolak', function () {
-    User::factory()->pendingKeti()->create(['name' => 'Andi Saputra']);
-    User::factory()->approvedKeti()->create(['name' => 'Dimas Pratama']);
+test('mengaktifkan kembali Keti nonaktif berhasil saat kuota kelas belum penuh', function () {
+    $classGroup = ClassGroup::factory()->create(['name' => 'Tekom A']);
+    $keti = User::factory()->approvedKeti($classGroup)->create(['name' => 'Siti Aminah']);
+
+    $this->actingAs($this->admin)
+        ->post(route('admin.keti-accounts.deactivate', $keti), ['reason' => 'Cuti sementara']);
+
+    $this->post(route('admin.keti-accounts.reactivate', $keti))
+        ->assertRedirect(route('admin.keti-accounts.index', ['status' => 'approved']))
+        ->assertSessionHas('toast.type', 'success');
+
+    $freshKeti = $keti->fresh();
+
+    expect($freshKeti->is_active)->toBeTrue()
+        ->and($freshKeti->isApprovedKeti())->toBeTrue()
+        ->and($freshKeti->activeClassGroup()->id)->toBe($classGroup->id)
+        ->and(ClassRepresentative::query()->whereBelongsTo($freshKeti)->activeOn(now())->count())->toBe(1)
+        ->and(AuditLog::query()->where('action', 'keti.reactivated')->where('auditable_type', $freshKeti->getMorphClass())->where('auditable_id', $freshKeti->id)->exists())->toBeTrue()
+        ->and(AppNotification::query()->where('user_id', $freshKeti->id)->where('type', 'keti.reactivated')->exists())->toBeTrue();
+
+    auth()->logout();
+    $this->actingAs($freshKeti)->get(route('keti.search'))->assertOk();
+});
+
+test('mengaktifkan kembali Keti gagal saat kuota kelas sudah penuh dua Keti aktif', function () {
+    $classGroup = ClassGroup::factory()->create(['name' => 'Tekom B']);
+    $inactiveKeti = User::factory()->approvedKeti($classGroup)->create(['name' => 'Keti Nonaktif']);
+
+    $this->actingAs($this->admin)
+        ->post(route('admin.keti-accounts.deactivate', $inactiveKeti), ['reason' => 'Masa jabatan berakhir']);
+
+    User::factory()->approvedKeti($classGroup)->count(2)->create();
+
+    $this->from(route('admin.keti-accounts.index', ['status' => 'inactive']))
+        ->post(route('admin.keti-accounts.reactivate', $inactiveKeti))
+        ->assertSessionHas('error_code', 'CLASS_ALREADY_REPRESENTED');
+
+    expect($inactiveKeti->fresh()->is_active)->toBeFalse()
+        ->and(ClassRepresentative::query()->whereBelongsTo($classGroup)->activeOn(now())->count())->toBe(2);
+});
+
+test('endpoint aktifkan kembali mengembalikan 404 untuk non-keti dan 403 untuk non-admin', function () {
+    $otherAdmin = User::factory()->admin()->create();
+    $approvedKeti = User::factory()->approvedKeti()->create();
+    $inactiveKeti = User::factory()->approvedKeti()->create();
+
+    $this->actingAs($this->admin)
+        ->post(route('admin.keti-accounts.deactivate', $inactiveKeti), ['reason' => 'Nonaktif']);
+
+    $this->post(route('admin.keti-accounts.reactivate', $otherAdmin))
+        ->assertNotFound();
+
+    auth()->logout();
+    $this->actingAs($approvedKeti)
+        ->post(route('admin.keti-accounts.reactivate', $inactiveKeti))
+        ->assertForbidden();
+
+    auth()->logout();
+    $this->post(route('admin.keti-accounts.reactivate', $inactiveKeti))
+        ->assertRedirect(route('login'));
+});
+
+test('empat tab akun Keti memisahkan menunggu, aktif, nonaktif, dan ditolak beserta kuota kelas', function () {
+    $classA = ClassGroup::factory()->create(['name' => 'PTIK A']);
+    $classB = ClassGroup::factory()->create(['name' => 'PTIK B']);
+    $classFull = ClassGroup::factory()->create(['name' => 'PTIK C']);
+
+    User::factory()->pendingKeti($classA)->create(['name' => 'Andi Saputra']);
+    User::factory()->approvedKeti($classA)->create(['name' => 'Dimas Pratama']);
+    User::factory()->approvedKeti($classFull)->create(['name' => 'Eko Penuh 1']);
+    User::factory()->approvedKeti($classFull)->create(['name' => 'Fajar Penuh 2']);
+
+    $inactiveKeti = User::factory()->approvedKeti($classB)->create(['name' => 'Budi Nonaktif']);
+    app(KetiApprovalService::class)->deactivate($inactiveKeti, $this->admin, 'Pindah kelas');
+
+    $rejectedUser = User::factory()->create(['name' => 'Citra Ditolak']);
+    KetiApplication::factory()->for($rejectedUser)->for($classB)->create([
+        'status' => KetiApplicationStatus::Rejected,
+        'review_note' => 'Tidak memenuhi syarat',
+    ]);
+
+    $revisionUser = User::factory()->create(['name' => 'Deni Revisi']);
+    KetiApplication::factory()->for($revisionUser)->for($classB)->needsRevision()->create();
 
     $this->actingAs($this->admin)
         ->get(route('admin.keti-accounts.index'))
+        ->assertOk()
         ->assertSee('Andi Saputra')
+        ->assertSee('1/2 Keti')
+        ->assertSee('1 pengajuan menunggu pemeriksaan')
         ->assertDontSee('Dimas Pratama')
-        ->assertSee('1 pengajuan menunggu pemeriksaan');
+        ->assertDontSee('Budi Nonaktif')
+        ->assertDontSee('Citra Ditolak')
+        ->assertDontSee('Deni Revisi');
 
     $this->get(route('admin.keti-accounts.index', ['status' => 'approved']))
+        ->assertOk()
         ->assertSee('Dimas Pratama')
-        ->assertDontSee('Andi Saputra');
+        ->assertSee('Eko Penuh 1')
+        ->assertSee('Fajar Penuh 2')
+        ->assertSee('1/2 Keti')
+        ->assertSee('2/2 penuh')
+        ->assertSee('3 akun Keti aktif')
+        ->assertSee('Maksimal 2 Keti aktif per kelas.')
+        ->assertDontSee('Andi Saputra')
+        ->assertDontSee('Budi Nonaktif')
+        ->assertDontSee('Citra Ditolak');
+
+    $this->get(route('admin.keti-accounts.index', ['status' => 'inactive']))
+        ->assertOk()
+        ->assertSee('Budi Nonaktif')
+        ->assertSee('1 akun Keti dinonaktifkan')
+        ->assertSee('Aktifkan kembali')
+        ->assertSee('reactivateUrl')
+        ->assertDontSee('Dimas Pratama')
+        ->assertDontSee('Andi Saputra')
+        ->assertDontSee('Citra Ditolak');
+
+    $this->get(route('admin.keti-accounts.index', ['status' => 'rejected']))
+        ->assertOk()
+        ->assertSee('Citra Ditolak')
+        ->assertSee('Deni Revisi')
+        ->assertSee('2 pengajuan ditolak atau perlu diperbaiki')
+        ->assertSee('Setujui dan aktifkan akun')
+        ->assertDontSee('Andi Saputra')
+        ->assertDontSee('Dimas Pratama')
+        ->assertDontSee('Budi Nonaktif');
 });
 
 test('admin memperbarui profil dan kata sandi', function () {
@@ -661,9 +818,11 @@ test('akun keti mendukung pencarian, filter kelas, dan persetujuan massal', func
     $userA = User::factory()->create(['name' => 'Budi Santoso', 'email_verified_at' => now()]);
     $userB = User::factory()->create(['name' => 'Siti Aminah', 'email_verified_at' => now()]);
     $userC = User::factory()->create(['name' => 'Rizky Pratama', 'email_verified_at' => now()]);
-    $existingRep = User::factory()->create(['name' => 'Ketua Lama C']);
+    $existingRep1 = User::factory()->create(['name' => 'Ketua Lama C 1']);
+    $existingRep2 = User::factory()->create(['name' => 'Ketua Lama C 2']);
 
-    ClassRepresentative::factory()->for($existingRep)->for($classC)->create();
+    ClassRepresentative::factory()->for($existingRep1)->for($classC)->create();
+    ClassRepresentative::factory()->for($existingRep2)->for($classC)->create();
 
     $appA = KetiApplication::factory()->for($userA)->for($classA)->create(['status' => KetiApplicationStatus::Pending]);
     $appB = KetiApplication::factory()->for($userB)->for($classB)->create(['status' => KetiApplicationStatus::Pending]);

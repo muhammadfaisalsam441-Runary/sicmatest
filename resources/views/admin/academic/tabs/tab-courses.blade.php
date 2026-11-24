@@ -243,17 +243,17 @@
                 {{-- MODAL KONFIRMASI HAPUS MATA KULIAH --}}
                 <div x-show="deleteCourseModalOpen" x-cloak role="dialog" aria-modal="true" aria-labelledby="delete-course-modal-title" class="fixed inset-0 z-50 flex items-center justify-center p-4">
                     <div class="absolute inset-0 bg-ink/80 backdrop-blur-sm" @click="deleteCourseModalOpen = false"></div>
-                    <div class="relative w-full max-w-md rounded-2xl bg-surface p-6 shadow-2xl">
+                    <div class="relative max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-2xl bg-surface p-6 shadow-2xl">
                         <div class="flex items-start justify-between border-b border-border pb-3">
                             <h3 id="delete-course-modal-title" class="text-base font-bold text-ink">Hapus mata kuliah?</h3>
-                            <button type="button" @click="deleteCourseModalOpen = false" aria-label="Tutup dialog" class="cursor-pointer rounded-md p-1 text-muted hover:bg-slate-100 hover:text-ink">
+                            <button type="button" @click="deleteCourseModalOpen = false" aria-label="Tutup dialog" class="inline-flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-control text-muted transition hover:bg-slate-100 hover:text-ink">
                                 <i data-lucide="x" class="size-4" aria-hidden="true"></i>
                             </button>
                         </div>
                         <p class="mt-3 text-sm text-muted">
                             Mata kuliah <strong class="text-ink" x-text="deleteCourseName"></strong> akan dihapus permanen dan tindakan ini tidak dapat dibatalkan.
                         </p>
-                        <form method="POST" :action="deleteCourseUrl" class="mt-5 flex justify-end gap-2">
+                        <form method="POST" :action="deleteCourseUrl" class="mt-5 flex flex-wrap items-center justify-end gap-2">
                             @csrf
                             @method('DELETE')
                             <x-button type="button" variant="ghost" @click="deleteCourseModalOpen = false">Batal</x-button>

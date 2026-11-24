@@ -31,7 +31,7 @@
             </span>
             <button type="button"
                     x-on:click="$dispatch('close-modal', '{{ $name }}')"
-                    class="cursor-pointer rounded-control p-1 text-muted transition hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                    class="inline-flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-control text-muted transition hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                     aria-label="Tutup">
                 <i data-lucide="x" aria-hidden="true" class="size-5"></i>
             </button>
@@ -52,7 +52,7 @@
             </x-field>
         @endif
 
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <x-button variant="secondary" x-on:click="$dispatch('close-modal', '{{ $name }}')">{{ $cancel }}</x-button>
             <x-button variant="danger" type="submit" x-bind:disabled="submitting">{{ $confirm }}</x-button>
         </div>

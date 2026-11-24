@@ -317,9 +317,9 @@
                     </x-table-scroll>
 
                     {{-- Footer jika dalam editMode --}}
-                    <div x-show="editMode" x-cloak class="flex items-center justify-between border-t border-border pt-4">
+                    <div x-show="editMode" x-cloak class="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
                         <span class="text-xs text-muted">Simpan setelah selesai mengubah data kelas di atas.</span>
-                        <div class="flex gap-2">
+                        <div class="flex flex-wrap gap-2">
                             <button type="button" @click="cancelEditMode()" class="rounded-control border border-border bg-surface px-4 py-2 text-xs font-semibold text-muted hover:text-ink transition cursor-pointer">
                                 Batal
                             </button>

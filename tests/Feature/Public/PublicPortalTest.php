@@ -76,15 +76,97 @@ test('portal publik tidak menampilkan data pribadi pemesan', function () {
     $room = Room::factory()->create();
     app(ReservationService::class)->create($keti, $room, now(), now()->addHour(), 'Rapat kelas rahasia', 10, 'kunci');
 
-    foreach ([route('home'), route('public.rooms'), route('public.rooms', ['status' => 'digunakan'])] as $url) {
+    $this->get(route('home'))
+        ->assertOk()
+        ->assertDontSee('Nama Pemesan Unik')
+        ->assertDontSee('2509999999')
+        ->assertDontSee('pemesan.unik@sicma.test');
+
+    foreach ([route('public.rooms'), route('public.rooms', ['status' => 'digunakan'])] as $url) {
         $this->get($url)
             ->assertOk()
+            ->assertSee('Rapat kelas rahasia')
+            ->assertSee('Kelas Rahasia')
             ->assertDontSee('Nama Pemesan Unik')
             ->assertDontSee('2509999999')
-            ->assertDontSee('pemesan.unik@sicma.test')
-            ->assertDontSee('Kelas Rahasia')
-            ->assertDontSee('Rapat kelas rahasia');
+            ->assertDontSee('pemesan.unik@sicma.test');
     }
+});
+
+test('portal publik menampilkan mata kuliah dan kelas pada kartu ruang yang sedang digunakan jadwal resmi', function () {
+    $room = Room::factory()->create(['name' => 'AE 107']);
+    $classGroup = ClassGroup::factory()->create(['name' => 'TEKOM C 2025']);
+    meetingSession([$classGroup], [
+        'title' => 'Pemrograman Web',
+        'room_id' => $room->id,
+        'day_of_week' => 3,
+        'start_minute' => 540,
+        'end_minute' => 690,
+    ]);
+
+    foreach ([route('public.rooms'), route('public.rooms', ['status' => 'digunakan'])] as $url) {
+        $this->get($url)
+            ->assertOk()
+            ->assertSeeInOrder(['AE 107', 'Digunakan', 'Pemrograman Web', 'TEKOM C 2025']);
+    }
+});
+
+test('portal publik menampilkan jadwal terdekat saat tutup sebelum jam operasional', function () {
+    $this->travelTo(CarbonImmutable::parse('2026-11-04 06:45'));
+    $room = Room::factory()->create(['name' => 'AE 101']);
+    $classGroup = ClassGroup::factory()->create(['name' => 'TEKOM C 2025']);
+    meetingSession([$classGroup], [
+        'title' => 'Basis Data',
+        'room_id' => $room->id,
+        'day_of_week' => 3,
+        'start_minute' => 450,
+        'end_minute' => 550,
+    ]);
+
+    foreach ([route('public.rooms'), route('public.rooms', ['status' => 'tutup'])] as $url) {
+        $this->get($url)
+            ->assertOk()
+            ->assertSeeInOrder(['AE 101', 'Tutup', 'Jadwal terdekat', '07:30–09:10 WITA', 'Basis Data', 'TEKOM C 2025']);
+    }
+});
+
+test('daftar ruangan mengurutkan ruang tersedia paling atas dan menampilkan jadwal berikutnya atau bebas jadwal', function () {
+    $busyRoom = Room::factory()->create(['name' => 'AE 101']);
+    $freeWithNext = Room::factory()->create(['name' => 'Lab ICT 3']);
+    $freeAllDay = Room::factory()->create(['name' => 'Pasca 1']);
+    $classGroup = ClassGroup::factory()->create(['name' => 'TEKOM C 2025']);
+
+    meetingSession([$classGroup], [
+        'title' => 'Sistem Operasi',
+        'room_id' => $busyRoom->id,
+        'day_of_week' => 3,
+        'start_minute' => 540,
+        'end_minute' => 660,
+    ]);
+    meetingSession([$classGroup], [
+        'title' => 'Kewirausahaan',
+        'room_id' => $freeWithNext->id,
+        'day_of_week' => 3,
+        'start_minute' => 780,
+        'end_minute' => 880,
+    ]);
+
+    $this->get(route('public.rooms'))
+        ->assertOk()
+        ->assertSeeInOrder([
+            'Pasca 1',
+            'Tersedia',
+            'Bebas jadwal hari ini',
+            'Lab ICT 3',
+            'Tersedia',
+            'Jadwal berikutnya',
+            '13:00–14:40 WITA',
+            'Kewirausahaan',
+            'TEKOM C 2025',
+            'AE 101',
+            'Digunakan',
+            'Sistem Operasi',
+        ]);
 });
 
 test('status di portal publik sama dengan AvailabilityService', function () {

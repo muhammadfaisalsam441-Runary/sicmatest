@@ -4,13 +4,13 @@
      @keydown.escape.window="if (closureModalOpen) closureModalOpen = false"
      class="fixed inset-0 z-50 flex items-center justify-center p-4">
     <div class="absolute inset-0 bg-ink/80 backdrop-blur-sm" @click="closureModalOpen = false"></div>
-    <div class="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-surface p-6 shadow-2xl">
+    <div class="relative max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-2xl bg-surface p-6 shadow-2xl">
         <div class="flex items-start justify-between border-b border-border pb-3">
             <div>
                 <span class="text-xs font-semibold text-danger">Pemeliharaan & Penutupan</span>
                 <h3 id="room-closure-title" class="text-lg font-bold text-ink">Tutup Ruang Sementara</h3>
             </div>
-            <button type="button" @click="closureModalOpen = false" aria-label="Tutup modal penutupan ruang" class="cursor-pointer text-muted hover:text-ink">
+            <button type="button" @click="closureModalOpen = false" aria-label="Tutup modal penutupan ruang" class="inline-flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-control text-muted transition hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
                 <i data-lucide="x" class="size-5" aria-hidden="true"></i>
             </button>
         </div>
@@ -71,7 +71,7 @@
             <div x-show="closureMode === 'recurring'" x-cloak class="flex flex-col gap-3 rounded-control border border-border bg-page/60 p-3.5">
                 <div class="flex flex-wrap items-center justify-between gap-2">
                     <span class="text-xs font-semibold text-ink">Jam Tidak Boleh Dipakai <span class="text-danger">*</span></span>
-                    <div class="flex items-center gap-1.5">
+                    <div class="flex flex-wrap items-center gap-1.5">
                         <button type="button" @click="closureStartTime = '07:30'; closureEndTime = '12:00'" class="cursor-pointer rounded border border-border bg-surface px-2 py-0.5 text-[11px] font-medium text-primary hover:bg-primary-soft">Pagi (07:30–12:00)</button>
                         <button type="button" @click="closureStartTime = '13:00'; closureEndTime = '17:30'" class="cursor-pointer rounded border border-border bg-surface px-2 py-0.5 text-[11px] font-medium text-primary hover:bg-primary-soft">Siang (13:00–17:30)</button>
                     </div>
@@ -93,7 +93,7 @@
                 <div>
                     <div class="mb-1.5 flex flex-wrap items-center justify-between gap-2">
                         <span class="text-xs font-medium text-muted">Berlaku Setiap Hari <span class="text-danger">*</span></span>
-                        <div class="flex items-center gap-1.5">
+                        <div class="flex flex-wrap items-center gap-1.5">
                             <button type="button" @click="setClosureDays([1, 2, 3, 4, 5])" class="cursor-pointer rounded border border-border bg-surface px-2 py-0.5 text-[11px] font-medium text-primary hover:bg-primary-soft">Senin–Jumat</button>
                             <button type="button" @click="setClosureDays([1, 2, 3, 4, 5, 6, 7])" class="cursor-pointer rounded border border-border bg-surface px-2 py-0.5 text-[11px] font-medium text-primary hover:bg-primary-soft">Setiap Hari</button>
                         </div>
@@ -166,7 +166,7 @@
                 </div>
             @endif
 
-            <div class="mt-2 flex items-center justify-end gap-2 border-t border-border pt-4">
+            <div class="mt-2 flex flex-wrap items-center justify-end gap-2 border-t border-border pt-4">
                 <x-button variant="secondary" type="button" @click="closureModalOpen = false">Batal</x-button>
                 <x-button variant="danger" type="submit" icon="lock">Tutup Ruang</x-button>
             </div>

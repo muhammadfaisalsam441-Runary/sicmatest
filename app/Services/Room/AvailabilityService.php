@@ -418,10 +418,20 @@ class AvailabilityService
             SearchCriteria::SORT_NAME => $results->sortBy(fn (AvailabilityResult $result): string => $result->room->name, SORT_NATURAL),
             SearchCriteria::SORT_CAPACITY => $results->sortByDesc(fn (AvailabilityResult $result): int => $result->room->capacity ?? -1),
             default => $results->sortBy([
-                fn (AvailabilityResult $a, AvailabilityResult $b): int => ($b->isAvailable() <=> $a->isAvailable()),
+                fn (AvailabilityResult $a, AvailabilityResult $b): int => $this->statusSortRank($a->status) <=> $this->statusSortRank($b->status),
                 fn (AvailabilityResult $a, AvailabilityResult $b): int => ($b->freeUntil?->getTimestamp() ?? 0) <=> ($a->freeUntil?->getTimestamp() ?? 0),
                 fn (AvailabilityResult $a, AvailabilityResult $b): int => strnatcmp($a->room->name, $b->room->name),
             ]),
+        };
+    }
+
+    private function statusSortRank(RoomStatus $status): int
+    {
+        return match ($status) {
+            RoomStatus::Available => 0,
+            RoomStatus::Scheduled, RoomStatus::Booked, RoomStatus::InUse => 1,
+            RoomStatus::Uncertain => 2,
+            RoomStatus::Closed => 3,
         };
     }
 }

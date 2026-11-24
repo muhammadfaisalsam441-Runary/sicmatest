@@ -19,8 +19,8 @@
             </x-info-box>
             <x-button :href="route('keti.application')" class="min-h-11 w-full">Periksa status pengajuan</x-button>
             <x-button variant="secondary" :href="\App\Support\Nav::url('public.rooms')" class="min-h-11 w-full">Lihat ruangan publik</x-button>
-        @elseif (in_array($application?->status, [KetiApplicationStatus::NeedsRevision, KetiApplicationStatus::Rejected], true))
-            <x-auth-heading :title="$application->status === KetiApplicationStatus::Rejected ? 'Pengajuan ditolak' : 'Pengajuan perlu diperbaiki'"
+        @elseif ($application?->status === KetiApplicationStatus::NeedsRevision)
+            <x-auth-heading title="Pengajuan perlu diperbaiki"
                             subtitle="Periksa alasan penolakan, lalu perbaiki data pengajuanmu." />
             <x-info-box title="Alasan pengajuan belum disetujui" variant="danger">
                 <p>{{ $application->review_note ?? 'Admin belum menuliskan alasan.' }}</p>
@@ -43,6 +43,16 @@
                     <x-button type="submit" class="min-h-11 w-full">Ajukan ulang</x-button>
                 </form>
             </div>
+            <x-button variant="secondary" :href="route('home')" class="min-h-11 w-full">Kembali ke beranda</x-button>
+        @elseif ($application?->status === KetiApplicationStatus::Rejected)
+            <x-auth-heading title="Pengajuan ditolak permanen"
+                            subtitle="Pengajuan akun Keti ini tidak memenuhi syarat dan tidak dapat diajukan ulang secara mandiri." />
+            <x-info-box title="Alasan penolakan permanen" variant="danger">
+                <p>{{ $application->review_note ?? 'Admin belum menuliskan alasan.' }}</p>
+            </x-info-box>
+            <x-info-box title="Penolakan bersifat permanen">
+                <p>Formulir pengajuan ulang dinonaktifkan untuk status penolakan permanen. Jika terdapat kekeliruan data, hubungi admin JTIK untuk peninjauan ulang dan aktivasi manual.</p>
+            </x-info-box>
             <x-button variant="secondary" :href="route('home')" class="min-h-11 w-full">Kembali ke beranda</x-button>
         @else
             <x-auth-heading title="Akun belum terhubung ke kelas" subtitle="Hubungi admin JTIK untuk menghubungkan akunmu ke kelas yang diwakili." />

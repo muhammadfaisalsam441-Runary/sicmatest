@@ -176,11 +176,11 @@
                     @foreach ($recommendations as $rec)
                         <div class="sicma-card-enter flex flex-col gap-3 rounded-card border border-border bg-surface p-4 sm:p-5" style="--stagger: {{ $loop->index }}">
                             <div class="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 pb-3">
-                                <div class="flex items-center gap-3">
-                                    <span class="flex size-8 items-center justify-center rounded-lg bg-primary-soft text-primary font-bold text-sm">
+                                <div class="flex min-w-0 items-center gap-3">
+                                    <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary font-bold text-sm">
                                         <i data-lucide="clock" aria-hidden="true" class="size-4"></i>
                                     </span>
-                                    <div>
+                                    <div class="min-w-0">
                                         <h3 class="font-semibold text-base text-foreground">{{ $rec['slot'] }}</h3>
                                         <p class="text-xs text-muted tabular-nums">{{ Wita::range($rec['start'], $rec['end']) }} • Durasi {{ Wita::duration($duration) }}</p>
                                     </div>
@@ -188,7 +188,7 @@
                                 @if ($rec['rooms_count'] > 0)
                                     <x-status-badge variant="success">{{ $rec['rooms_count'] }} ruangan kosong</x-status-badge>
                                 @else
-                                    <x-status-badge variant="primary">Ruangan fisik penuh • Tersedia Online</x-status-badge>
+                                    <x-status-badge variant="primary" class="!whitespace-normal text-left">Ruangan fisik penuh • Tersedia Online</x-status-badge>
                                 @endif
                             </div>
 

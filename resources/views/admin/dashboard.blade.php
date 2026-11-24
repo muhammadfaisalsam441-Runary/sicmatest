@@ -47,9 +47,9 @@
 
         <x-card padding="p-4" x-data="filterDrawer('dashboard-schedule-progress', false)" class="flex flex-col gap-3">
             <div class="flex flex-wrap items-center justify-between gap-2">
-                <div class="flex flex-wrap items-center gap-2">
+                <div class="flex min-w-0 flex-wrap items-center gap-2">
                     <h2 class="text-base font-semibold">Penyusunan jadwal {{ $period?->name ?? 'semester aktif' }}</h2>
-                    <span x-show="!open" class="inline-flex items-center gap-1.5 rounded-full border border-border bg-page px-2.5 py-0.5 text-xs font-medium text-muted">
+                    <span x-show="!open" class="inline-flex max-w-full flex-wrap items-center gap-x-1.5 gap-y-0.5 rounded-2xl border border-border bg-page px-2.5 py-0.5 text-xs font-medium text-muted sm:rounded-full">
                         @if ($progress['official'])
                             <span class="font-semibold text-success">Resmi v{{ $progress['official']->version_no }}</span>
                         @else

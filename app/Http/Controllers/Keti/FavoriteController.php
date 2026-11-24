@@ -19,7 +19,20 @@ class FavoriteController extends Controller
 
         $rooms = $request->user()->favoriteRooms()->with(['building', 'facilities'])->where('is_active', true)->orderBy('name')->get();
         $results = $availability->forRooms($rooms, CarbonImmutable::now());
-        $cards = $results->map(RoomCardPresenter::card(...));
+        $cards = collect(RoomCardPresenter::cards($results))
+            ->sortBy([
+                fn (array $a, array $b): int => match ($a['badge']) {
+                    'Tersedia' => 0,
+                    'Digunakan' => 1,
+                    default => 2,
+                } <=> match ($b['badge']) {
+                    'Tersedia' => 0,
+                    'Digunakan' => 1,
+                    default => 2,
+                },
+                fn (array $a, array $b): int => strnatcmp($a['name'], $b['name']),
+            ])
+            ->values();
 
         $filtered = match ($request->query('status')) {
             'tersedia' => $cards->where('badge', 'Tersedia'),

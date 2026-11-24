@@ -61,6 +61,10 @@ return [
         'resend_cooldown_seconds' => 60,
     ],
 
+    'keti' => [
+        'max_per_class' => 2,
+    ],
+
     'public_portal' => [
         'cache_seconds' => 60,
         // Label di dekat status ruang. Desain memakai "Data simulasi"; ganti lewat .env saat memakai jadwal resmi,

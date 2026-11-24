@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\IssueSeverity;
 use App\Enums\OptimizationJobStatus;
 use App\Enums\ScheduleSource;
 use App\Enums\ScheduleVersionStatus;
@@ -19,6 +20,7 @@ use App\Models\Scheduling\ScheduleSession;
 use App\Models\Scheduling\ScheduleVersion;
 use App\Models\User\User;
 use App\Services\Scheduling\SchedulerService;
+use App\Services\Scheduling\ScheduleValidator;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
@@ -439,4 +441,214 @@ test('kesiapan menolak pembagian fase tanpa kalender UTS dan semester yang telah
     $this->period->update(['end_date' => '2026-10-31']);
     expect($scheduler->readiness($this->period, ['type' => 'semester'])['errors'])
         ->toContain('Rentang semester tidak valid atau sudah berakhir. Periksa kalender semester.');
+});
+
+test('cakupan terdampak menyertakan bentrok ruang dan dosen yang diturunkan menjadi peringatan oleh allow_conflicts dan menghasilkan draf bersih', function () {
+    config(['sicma.scheduler.run_mode' => 'sync']);
+
+    $draftBase = ScheduleVersion::factory()->for($this->period)->create([
+        'version_no' => 3,
+        'status' => ScheduleVersionStatus::Draft,
+        'allow_conflicts' => true,
+        'effective_from' => '2026-09-01',
+        'lock_version' => 0,
+    ]);
+    $sharedLecturer = Lecturer::factory()->create();
+    $otherLecturer = Lecturer::factory()->create();
+    $otherClass = ClassGroup::factory()->create(['student_count' => 25]);
+
+    $first = ScheduleSession::factory()->for($draftBase, 'version')->create([
+        'title' => 'Sistem Operasi',
+        'room_id' => $this->room->id,
+        'day_of_week' => 1,
+        'start_minute' => 450,
+        'end_minute' => 600,
+    ]);
+    $first->participants()->sync([$this->tekomC->id]);
+    $first->lecturers()->sync([$sharedLecturer->id => ['role' => 'lead']]);
+
+    $second = ScheduleSession::factory()->for($draftBase, 'version')->create([
+        'title' => 'Basis Data',
+        'room_id' => $this->room->id,
+        'day_of_week' => 1,
+        'start_minute' => 500,
+        'end_minute' => 650,
+    ]);
+    $second->participants()->sync([$this->ptikB->id]);
+    $second->lecturers()->sync([$sharedLecturer->id => ['role' => 'lead']]);
+
+    $unaffected = ScheduleSession::factory()->for($draftBase, 'version')->create([
+        'title' => 'Jaringan Komputer',
+        'room_id' => $this->room->id,
+        'day_of_week' => 3,
+        'start_minute' => 450,
+        'end_minute' => 600,
+    ]);
+    $unaffected->participants()->sync([$otherClass->id]);
+    $unaffected->lecturers()->sync([$otherLecturer->id => ['role' => 'lead']]);
+
+    app(ScheduleValidator::class)->validate($draftBase);
+    expect($draftBase->issues()->where('severity', IssueSeverity::Error)->count())->toBe(0)
+        ->and($draftBase->issues()->where('severity', IssueSeverity::Warning)->pluck('code')->all())
+        ->toContain('ROOM_CONFLICT', 'LECTURER_CONFLICT');
+
+    $scheduler = app(SchedulerService::class);
+    $readiness = $scheduler->readiness($this->period, ['type' => 'terdampak']);
+
+    expect($readiness['errors'])->toBe([])
+        ->and($readiness['in_scope'])->toBe(2)
+        ->and($readiness['fixed'])->toBe(1);
+
+    $job = $scheduler->start($this->period, ['type' => 'terdampak'], 15, $this->admin);
+    $newDraft = ScheduleVersion::query()->findOrFail($job->result['draft_version_id']);
+    $kept = $newDraft->sessions()->where('title', 'Jaringan Komputer')->sole();
+
+    expect($job->solver_status)->toBe(SolverStatus::Feasible)
+        ->and($job->result['publishable'])->toBeTrue()
+        ->and($newDraft->allow_conflicts)->toBeFalse()
+        ->and($newDraft->issues()->blocking()->count())->toBe(0)
+        ->and($newDraft->issues()->whereIn('code', ['ROOM_CONFLICT', 'LECTURER_CONFLICT', 'CLASS_CONFLICT'])->count())->toBe(0)
+        ->and([$kept->day_of_week, $kept->start_minute, $kept->end_minute, $kept->room_id])->toBe([3, 450, 600, $this->room->id]);
+});
+
+test('cakupan terdampak mendeteksi bentrok ruang, dosen, dan kelas pada draf yang belum pernah divalidasi lalu menatanya ulang tanpa bentrok', function () {
+    config(['sicma.scheduler.run_mode' => 'sync']);
+
+    $unvalidatedDraft = ScheduleVersion::factory()->for($this->period)->create([
+        'version_no' => 3,
+        'status' => ScheduleVersionStatus::Draft,
+        'effective_from' => '2026-09-01',
+        'lock_version' => 0,
+    ]);
+    $secondRoom = Room::factory()->create(['capacity' => 45]);
+    $lecturerA = Lecturer::factory()->create();
+    $lecturerB = Lecturer::factory()->create();
+    $sharedLecturer = Lecturer::factory()->create();
+    $lecturerD = Lecturer::factory()->create();
+    $lecturerE = Lecturer::factory()->create();
+    $lecturerF = Lecturer::factory()->create();
+    $classC = ClassGroup::factory()->create(['student_count' => 25]);
+    $classD = ClassGroup::factory()->create(['student_count' => 25]);
+    $sharedClass = ClassGroup::factory()->create(['student_count' => 25]);
+    $unaffectedClass = ClassGroup::factory()->create(['student_count' => 25]);
+
+    $createSession = function (string $title, int $roomId, int $day, int $start, int $end, int $classId, int $lecturerId) use ($unvalidatedDraft): void {
+        $session = ScheduleSession::factory()->for($unvalidatedDraft, 'version')->create([
+            'title' => $title,
+            'room_id' => $roomId,
+            'day_of_week' => $day,
+            'start_minute' => $start,
+            'end_minute' => $end,
+        ]);
+        $session->participants()->sync([$classId]);
+        $session->lecturers()->sync([$lecturerId => ['role' => 'lead']]);
+    };
+
+    $createSession('Bentrok Ruang 1', $this->room->id, 1, 450, 600, $this->tekomC->id, $lecturerA->id);
+    $createSession('Bentrok Ruang 2', $this->room->id, 1, 500, 650, $this->ptikB->id, $lecturerB->id);
+    $createSession('Bentrok Dosen 1', $this->room->id, 2, 450, 600, $classC->id, $sharedLecturer->id);
+    $createSession('Bentrok Dosen 2', $secondRoom->id, 2, 500, 650, $classD->id, $sharedLecturer->id);
+    $createSession('Bentrok Kelas 1', $this->room->id, 3, 450, 600, $sharedClass->id, $lecturerD->id);
+    $createSession('Bentrok Kelas 2', $secondRoom->id, 3, 500, 650, $sharedClass->id, $lecturerE->id);
+    $createSession('Sesi Aman', $secondRoom->id, 4, 450, 600, $unaffectedClass->id, $lecturerF->id);
+
+    expect($unvalidatedDraft->issues()->count())->toBe(0);
+
+    $scheduler = app(SchedulerService::class);
+    $readiness = $scheduler->readiness($this->period, ['type' => 'terdampak'], $unvalidatedDraft);
+
+    expect($readiness['errors'])->toBe([])
+        ->and($readiness['in_scope'])->toBe(6)
+        ->and($readiness['fixed'])->toBe(1);
+
+    $job = $scheduler->start($this->period, ['type' => 'terdampak'], 15, $this->admin, $unvalidatedDraft);
+    $newDraft = ScheduleVersion::query()->findOrFail($job->result['draft_version_id']);
+    $kept = $newDraft->sessions()->where('title', 'Sesi Aman')->sole();
+
+    expect($job->solver_status)->toBe(SolverStatus::Feasible)
+        ->and($job->result['publishable'])->toBeTrue()
+        ->and($newDraft->issues()->blocking()->count())->toBe(0)
+        ->and($newDraft->issues()->whereIn('code', ['ROOM_CONFLICT', 'LECTURER_CONFLICT', 'CLASS_CONFLICT'])->count())->toBe(0)
+        ->and([$kept->day_of_week, $kept->start_minute, $kept->end_minute, $kept->room_id])->toBe([4, 450, 600, $secondRoom->id]);
+});
+
+test('periksa kesiapan dan mulai penyusunan menolak sesi terkunci yang saling bertabrakan atau bentrok dengan sesi di luar cakupan', function () {
+    $scheduler = app(SchedulerService::class);
+
+    $lockedPairDraft = ScheduleVersion::factory()->for($this->period)->create([
+        'version_no' => 3,
+        'status' => ScheduleVersionStatus::Draft,
+        'effective_from' => '2026-09-01',
+        'lock_version' => 0,
+    ]);
+    $lockedA = ScheduleSession::factory()->for($lockedPairDraft, 'version')->create([
+        'room_id' => $this->room->id,
+        'day_of_week' => 1,
+        'start_minute' => 450,
+        'end_minute' => 600,
+        'is_locked' => true,
+    ]);
+    $lockedA->participants()->sync([$this->tekomC->id]);
+    $lockedB = ScheduleSession::factory()->for($lockedPairDraft, 'version')->create([
+        'room_id' => $this->room->id,
+        'day_of_week' => 1,
+        'start_minute' => 500,
+        'end_minute' => 650,
+        'is_locked' => true,
+    ]);
+    $lockedB->participants()->sync([$this->ptikB->id]);
+
+    $pairError = '2 sesi terkunci saling bertabrakan atau bentrok dengan sesi di luar cakupan. Buka kunci sesi terkait atau perluas cakupan sebelum menyusun jadwal.';
+    expect($scheduler->readiness($this->period, ['type' => 'semester'], $lockedPairDraft)['errors'])->toContain($pairError);
+    expect(fn () => $scheduler->start($this->period, ['type' => 'semester'], 15, $this->admin, $lockedPairDraft))
+        ->toThrow(DomainException::class, $pairError);
+
+    $lockedVsFixedDraft = ScheduleVersion::factory()->for($this->period)->create([
+        'version_no' => 4,
+        'status' => ScheduleVersionStatus::Draft,
+        'effective_from' => '2026-09-01',
+        'lock_version' => 0,
+    ]);
+    $lockedInScope = ScheduleSession::factory()->for($lockedVsFixedDraft, 'version')->create([
+        'room_id' => $this->room->id,
+        'day_of_week' => 1,
+        'start_minute' => 450,
+        'end_minute' => 600,
+        'is_locked' => true,
+    ]);
+    $lockedInScope->participants()->sync([$this->tekomC->id]);
+    $fixedOverlap = ScheduleSession::factory()->for($lockedVsFixedDraft, 'version')->create([
+        'room_id' => $this->room->id,
+        'day_of_week' => 1,
+        'start_minute' => 500,
+        'end_minute' => 650,
+        'is_locked' => false,
+    ]);
+    $fixedOverlap->participants()->sync([$this->ptikB->id]);
+
+    $fixedError = '1 sesi terkunci saling bertabrakan atau bentrok dengan sesi di luar cakupan. Buka kunci sesi terkait atau perluas cakupan sebelum menyusun jadwal.';
+    $classScope = ['type' => 'kelas', 'class_ids' => [$this->tekomC->id]];
+    expect($scheduler->readiness($this->period, $classScope, $lockedVsFixedDraft)['errors'])->toContain($fixedError);
+    expect(fn () => $scheduler->start($this->period, $classScope, 15, $this->admin, $lockedVsFixedDraft))
+        ->toThrow(DomainException::class, $fixedError);
+    expect(OptimizationJob::query()->count())->toBe(0);
+});
+
+test('periksa kesiapan memberi peringatan ketika sesi di luar cakupan sudah saling bentrok', function () {
+    $conflictingFixed = ScheduleSession::factory()->for($this->official, 'version')->create([
+        'room_id' => $this->room->id,
+        'day_of_week' => 2,
+        'start_minute' => 500,
+        'end_minute' => 650,
+    ]);
+    $conflictingFixed->participants()->sync([$this->ptikB->id]);
+
+    $readiness = app(SchedulerService::class)->readiness($this->period, ['type' => 'kelas', 'class_ids' => [$this->tekomC->id]]);
+
+    expect($readiness['errors'])->toBe([])
+        ->and($readiness['in_scope'])->toBe(1)
+        ->and($readiness['fixed'])->toBe(3)
+        ->and($readiness['warnings'])->toContain(
+            'Terdapat 1 bentrok bawaan pada sesi di luar cakupan yang akan terbawa ke draf baru. Gunakan cakupan "Seluruh semester" atau "Bagian terdampak" agar bentrok tersebut ikut ditata ulang.'
+        );
 });

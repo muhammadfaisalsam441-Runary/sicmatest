@@ -88,17 +88,17 @@
                     </span>
                 @endif
             </div>
-            <a href="{{ $profileUrl }}" class="flex items-center gap-2 px-3.5 py-2 text-xs font-medium text-ink transition hover:bg-primary-soft/60 hover:text-primary focus-visible:bg-primary-soft/60 focus-visible:text-primary focus-visible:outline-none" role="menuitem">
+            <a href="{{ $profileUrl }}" class="flex min-h-11 items-center gap-2 px-3.5 py-2.5 text-xs font-medium text-ink transition hover:bg-primary-soft/60 hover:text-primary focus-visible:bg-primary-soft/60 focus-visible:text-primary focus-visible:outline-none sm:min-h-0 sm:py-2" role="menuitem">
                 <i data-lucide="user" aria-hidden="true" class="size-3.5"></i>
                 {{ $isKeti ? 'Profil Keti' : 'Profil Admin' }}
             </a>
             @if ($isKeti)
-                <a href="{{ Nav::url('keti.activity', ['cakupan' => 'saya']) }}" class="flex items-center gap-2 px-3.5 py-2 text-xs font-medium text-ink transition hover:bg-primary-soft/60 hover:text-primary focus-visible:bg-primary-soft/60 focus-visible:text-primary focus-visible:outline-none" role="menuitem">
+                <a href="{{ Nav::url('keti.activity', ['cakupan' => 'saya']) }}" class="flex min-h-11 items-center gap-2 px-3.5 py-2.5 text-xs font-medium text-ink transition hover:bg-primary-soft/60 hover:text-primary focus-visible:bg-primary-soft/60 focus-visible:text-primary focus-visible:outline-none sm:min-h-0 sm:py-2" role="menuitem">
                     <i data-lucide="history" aria-hidden="true" class="size-3.5"></i>
                     Aktivitas Saya
                 </a>
             @endif
-            <a href="{{ $notificationsUrl }}" class="flex items-center justify-between px-3.5 py-2 text-xs font-medium text-ink transition hover:bg-primary-soft/60 hover:text-primary focus-visible:bg-primary-soft/60 focus-visible:text-primary focus-visible:outline-none" role="menuitem">
+            <a href="{{ $notificationsUrl }}" class="flex min-h-11 items-center justify-between px-3.5 py-2.5 text-xs font-medium text-ink transition hover:bg-primary-soft/60 hover:text-primary focus-visible:bg-primary-soft/60 focus-visible:text-primary focus-visible:outline-none sm:min-h-0 sm:py-2" role="menuitem">
                 <span class="flex items-center gap-2">
                     <i data-lucide="bell" aria-hidden="true" class="size-3.5"></i>
                     Notifikasi
@@ -110,7 +110,7 @@
             <div class="my-1 border-t border-border"></div>
             <form method="POST" action="{{ Nav::url('logout') }}" data-native>
                 @csrf
-                <button type="submit" class="flex w-full cursor-pointer items-center gap-2 px-3.5 py-2 text-left text-xs font-semibold text-danger transition hover:bg-danger-soft focus-visible:bg-danger-soft focus-visible:outline-none" role="menuitem">
+                <button type="submit" class="flex min-h-11 w-full cursor-pointer items-center gap-2 px-3.5 py-2.5 text-left text-xs font-semibold text-danger transition hover:bg-danger-soft focus-visible:bg-danger-soft focus-visible:outline-none sm:min-h-0 sm:py-2" role="menuitem">
                     <i data-lucide="log-out" aria-hidden="true" class="size-3.5"></i>
                     Keluar
                 </button>

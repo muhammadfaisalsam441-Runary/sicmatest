@@ -17,9 +17,13 @@
         <x-card padding="px-2.5 py-2" class="w-fit max-w-full"><x-schedule-steps :current="4" /></x-card>
         @include('admin.partials.scheduling-tabs')
         @forelse ($versions as $version)
-            <x-card class="flex flex-wrap items-center justify-between gap-4">
+            @php($isActive = ($activeDraftId ?? null) === $version->id)
+            <x-card class="flex flex-wrap items-center justify-between gap-4 {{ $isActive ? 'border-primary/40 bg-primary-soft/20' : '' }}">
                 <div>
-                    <div class="flex items-center gap-2">
+                    <div class="flex flex-wrap items-center gap-2">
+                        @if ($isActive)
+                            <span class="rounded-md bg-primary px-2 py-0.5 text-xs font-semibold text-white">Draf Aktif</span>
+                        @endif
                         <h2 class="text-lg font-semibold">Draf v{{ $version->version_no }}</h2>
                         <x-status-badge :variant="$version->issues_count === 0 ? 'success' : 'warning'">
                             {{ $version->issues_count === 0 ? '0 masalah wajib' : $version->issues_count.' temuan wajib' }}
@@ -29,6 +33,12 @@
                     <p class="text-xs text-muted">Kesiapan dinilai pada pemeriksaan revisi terbaru.</p>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
+                    @if (! $isActive)
+                        <form method="POST" action="{{ route('admin.drafts.activate', $version) }}">
+                            @csrf
+                            <x-button type="submit" variant="soft" icon="check">Gunakan</x-button>
+                        </form>
+                    @endif
                     <x-button variant="secondary" icon="pencil" :href="route('admin.drafts.show', $version)">Edit Sesi Draf</x-button>
                     <x-button icon="list-checks" :href="route('admin.drafts.inspect', $version)">Buka Pemeriksaan</x-button>
                 </div>

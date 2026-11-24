@@ -76,6 +76,7 @@ Route::post('/draf', [DraftController::class, 'store'])->name('drafts.store');
 Route::get('/pemeriksaan-jadwal', [DraftController::class, 'inspections'])->name('drafts.inspections');
 Route::get('/draf/{version}/pemeriksaan', [DraftController::class, 'show'])->name('drafts.inspect');
 Route::get('/draf/{version}', [DraftController::class, 'show'])->name('drafts.show');
+Route::post('/draf/{version}/gunakan', [DraftController::class, 'activate'])->name('drafts.activate');
 Route::get('/draf/{version}/unduh/excel', [DraftController::class, 'excel'])->name('drafts.excel');
 Route::get('/draf/{version}/unduh/pdf', [DraftController::class, 'pdf'])->name('drafts.pdf');
 Route::put('/draf/{version}/sesi/{session}', [DraftController::class, 'updateSession'])->scopeBindings()->name('drafts.sessions.update');

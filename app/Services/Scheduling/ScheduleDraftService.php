@@ -54,6 +54,8 @@ class ScheduleDraftService
                 'lock_version' => 0,
             ]);
 
+            $period->forceFill(['active_draft_version_id' => $draft->id])->save();
+
             if ($base !== null) {
                 $this->copySessions($base, $draft);
             }
@@ -61,6 +63,29 @@ class ScheduleDraftService
             $this->audit->log('schedule.draft_created', $draft, null, ['version_no' => $versionNo, 'based_on' => $base?->version_no, 'source' => $source->value]);
 
             return $draft;
+        });
+    }
+
+    /**
+     * Tetapkan versi draf sebagai draf aktif pada periodenya.
+     */
+    public function activateDraft(ScheduleVersion $version): ScheduleVersion
+    {
+        $version->loadMissing('period');
+        $this->assertDraft($version);
+
+        return DB::transaction(function () use ($version): ScheduleVersion {
+            $period = Period::query()->whereKey($version->period_id)->lockForUpdate()->firstOrFail();
+            $before = ['active_draft_version_id' => $period->active_draft_version_id];
+
+            $period->forceFill(['active_draft_version_id' => $version->id])->save();
+
+            $this->audit->log('schedule.draft_activated', $version, $before, [
+                'active_draft_version_id' => $version->id,
+                'version_no' => $version->version_no,
+            ]);
+
+            return $version;
         });
     }
 

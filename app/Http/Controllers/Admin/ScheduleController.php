@@ -36,8 +36,8 @@ class ScheduleController extends Controller
         $official = $request->integer('versi') ? $published->firstWhere('id', $request->integer('versi')) : $active;
         abort_if($request->integer('versi') && $official === null, 404);
         $upcoming = $published->filter(fn ($version) => $version->effective_from->toDateString() > $today);
-        $draft = $versions->first(fn ($version): bool => in_array($version->status, [ScheduleVersionStatus::Draft, ScheduleVersionStatus::Ready], true));
         $candidates = $versions->filter(fn ($version) => in_array($version->status, [ScheduleVersionStatus::Draft, ScheduleVersionStatus::Ready], true));
+        $draft = ($period?->active_draft_version_id !== null ? $candidates->firstWhere('id', $period->active_draft_version_id) : null) ?? $candidates->first();
         $candidate = $request->integer('draf') ? $candidates->firstWhere('id', $request->integer('draf')) : null;
         abort_if($request->integer('draf') && $candidate === null, 404);
 

@@ -34,6 +34,7 @@ use App\Services\Academic\TeachingPhasePlanner;
 use App\Services\Scheduling\ScheduleBlockBuilder;
 use App\Services\Scheduling\ScheduleDraftService;
 use App\Services\Scheduling\SchedulePublisher;
+use App\Services\Scheduling\SchedulerService;
 use App\Services\Scheduling\ScheduleValidator;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\UploadedFile;
@@ -1592,4 +1593,143 @@ test('pembaruan kalender semester menyinkronkan blok ruang jadwal resmi', functi
     $blockDates = $official->roomBlocks()->orderBy('start_at')->pluck('start_at')->map->toDateString()->all();
 
     expect($blockDates)->toBe(['2026-11-02', '2026-11-09', '2026-11-16', '2026-11-23']);
+});
+
+test('admin dapat mengganti draf aktif lewat tombol Gunakan dan pembuatan serta penetapan draf memperbarui draf aktif', function () {
+    $draftService = app(ScheduleDraftService::class);
+    $publisherService = app(SchedulePublisher::class);
+    $scheduler = app(SchedulerService::class);
+    $publisher = User::factory()->superAdmin()->create();
+
+    $v1 = $draftService->create($this->period, ScheduleSource::Manual);
+    $room = Room::factory()->create(['name' => 'AE 101', 'capacity' => 50]);
+    $classGroup = ClassGroup::factory()->create(['name' => 'PTIK A 2026', 'student_count' => 30]);
+    $lecturer = Lecturer::factory()->create(['name' => 'Dr. Andi']);
+    $session = ScheduleSession::factory()->for($v1, 'version')->for($room)->create([
+        'title' => 'Algoritma',
+        'day_of_week' => 1,
+        'start_minute' => 480,
+        'end_minute' => 580,
+    ]);
+    $session->participants()->sync([$classGroup->id]);
+    $session->lecturers()->sync([$lecturer->id => ['role' => 'lead']]);
+
+    $v2 = $draftService->create($this->period->fresh(), ScheduleSource::Manual);
+
+    expect($v1->version_no)->toBe(1)
+        ->and($v2->version_no)->toBe(2)
+        ->and($this->period->fresh()->active_draft_version_id)->toBe($v2->id);
+
+    $this->actingAs($this->admin)
+        ->get(route('admin.drafts.inspections'))
+        ->assertOk()
+        ->assertSeeInOrder(['Draf Aktif', 'Draf v2', 'Draf v1', route('admin.drafts.activate', $v1), 'Gunakan'])
+        ->assertDontSee('action="'.route('admin.drafts.activate', $v2).'"', false);
+
+    $this->get(route('admin.scheduler.create'))
+        ->assertOk()
+        ->assertSee('Draf v2 sedang dikerjakan')
+        ->assertSee('Ganti Draf')
+        ->assertDontSee('Draf v1 sedang dikerjakan');
+
+    $this->get(route('admin.schedules.index'))
+        ->assertOk()
+        ->assertSee('Draf v2 sedang disusun')
+        ->assertDontSee('Draf v1 sedang disusun');
+
+    $this->get(route('admin.dashboard'))
+        ->assertOk()
+        ->assertSee('Draf v2')
+        ->assertDontSee('Draf v1');
+
+    $this->post(route('admin.drafts.activate', $v1))
+        ->assertRedirect(route('admin.drafts.inspections'))
+        ->assertSessionHas('toast', fn (array $toast): bool => ($toast['type'] ?? null) === 'success'
+            && ($toast['title'] ?? null) === 'Draf v1 dijadikan draf aktif');
+
+    expect($this->period->fresh()->active_draft_version_id)->toBe($v1->id)
+        ->and($scheduler->baseVersion($this->period->fresh())?->id)->toBe($v1->id);
+
+    $audit = AuditLog::query()
+        ->where('action', 'schedule.draft_activated')
+        ->where('auditable_type', $v1->getMorphClass())
+        ->where('auditable_id', $v1->id)
+        ->sole();
+
+    expect($audit->before)->toBe(['active_draft_version_id' => $v2->id])
+        ->and($audit->after)->toBe(['active_draft_version_id' => $v1->id, 'version_no' => 1]);
+
+    $this->get(route('admin.drafts.inspections'))
+        ->assertOk()
+        ->assertSeeInOrder(['Draf Aktif', 'Draf v1', 'Draf v2', route('admin.drafts.activate', $v2), 'Gunakan'])
+        ->assertDontSee('action="'.route('admin.drafts.activate', $v1).'"', false);
+
+    $this->get(route('admin.scheduler.create'))
+        ->assertOk()
+        ->assertSee('Draf v1 sedang dikerjakan')
+        ->assertSee('Ganti Draf')
+        ->assertDontSee('Draf v2 sedang dikerjakan');
+
+    $this->get(route('admin.schedules.index'))
+        ->assertOk()
+        ->assertSee('Draf v1 sedang disusun')
+        ->assertDontSee('Draf v2 sedang disusun');
+
+    $this->get(route('admin.dashboard'))
+        ->assertOk()
+        ->assertSee('Draf v1')
+        ->assertDontSee('Draf v2');
+
+    $v3 = $draftService->create($this->period->fresh(), ScheduleSource::Manual, $v1);
+
+    expect($this->period->fresh()->active_draft_version_id)->toBe($v3->id);
+
+    $publisherService->publish($v3, $publisher, now(), $v3->lock_version);
+
+    expect($v3->fresh()->status)->toBe(ScheduleVersionStatus::Official)
+        ->and($this->period->fresh()->active_draft_version_id)->toBeNull();
+});
+
+test('pengaktifan draf menolak versi resmi, periode tidak aktif, keti, dan tamu', function () {
+    $activeDraft = ScheduleVersion::factory()->for($this->period)->create([
+        'status' => ScheduleVersionStatus::Draft,
+        'version_no' => 1,
+    ]);
+    $candidateDraft = ScheduleVersion::factory()->for($this->period)->create([
+        'status' => ScheduleVersionStatus::Draft,
+        'version_no' => 2,
+    ]);
+    $this->period->update(['active_draft_version_id' => $activeDraft->id]);
+
+    $official = ScheduleVersion::factory()->official()->for($this->period)->create(['version_no' => 3]);
+    $inactivePeriod = Period::factory()->create(['is_active' => false, 'name' => 'Genap 2025/2026']);
+    $otherPeriodDraft = ScheduleVersion::factory()->for($inactivePeriod)->create(['status' => ScheduleVersionStatus::Draft]);
+
+    $this->actingAs($this->admin)
+        ->from(route('admin.drafts.inspections'))
+        ->post(route('admin.drafts.activate', $official))
+        ->assertRedirect(route('admin.drafts.inspections'))
+        ->assertSessionHas('error_code', 'INVALID_STATUS_TRANSITION');
+
+    expect($this->period->fresh()->active_draft_version_id)->toBe($activeDraft->id)
+        ->and(AuditLog::query()->where('action', 'schedule.draft_activated')->exists())->toBeFalse();
+
+    $this->actingAs($this->admin)
+        ->post(route('admin.drafts.activate', $otherPeriodDraft))
+        ->assertNotFound();
+
+    expect($this->period->fresh()->active_draft_version_id)->toBe($activeDraft->id)
+        ->and($inactivePeriod->fresh()->active_draft_version_id)->toBeNull();
+
+    $this->actingAs(User::factory()->approvedKeti()->create())
+        ->post(route('admin.drafts.activate', $candidateDraft))
+        ->assertForbidden();
+
+    expect($this->period->fresh()->active_draft_version_id)->toBe($activeDraft->id);
+
+    auth()->logout();
+    $this->post(route('admin.drafts.activate', $candidateDraft))
+        ->assertRedirect(route('login'));
+
+    expect($this->period->fresh()->active_draft_version_id)->toBe($activeDraft->id);
 });

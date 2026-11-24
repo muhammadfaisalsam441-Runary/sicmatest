@@ -2,6 +2,7 @@
 
 namespace App\Models\Academic;
 
+use App\Enums\ScheduleVersionStatus;
 use App\Models\Scheduling\ScheduleVersion;
 use App\Models\Scheduling\SchedulingRule;
 use Database\Factories\PeriodFactory;
@@ -10,12 +11,13 @@ use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * Periode/semester akademik, mis. "Ganjil 2026/2027".
  */
-#[Fillable(['name', 'start_date', 'end_date', 'timezone', 'uts_start', 'uts_end', 'uas_start', 'uas_end', 'is_active'])]
+#[Fillable(['name', 'start_date', 'end_date', 'timezone', 'uts_start', 'uts_end', 'uas_start', 'uas_end', 'is_active', 'active_draft_version_id'])]
 class Period extends Model
 {
     /** @use HasFactory<PeriodFactory> */
@@ -36,6 +38,7 @@ class Period extends Model
             'uas_start' => 'date',
             'uas_end' => 'date',
             'is_active' => 'boolean',
+            'active_draft_version_id' => 'integer',
         ];
     }
 
@@ -77,6 +80,36 @@ class Period extends Model
     public function scheduleVersions(): HasMany
     {
         return $this->hasMany(ScheduleVersion::class);
+    }
+
+    /**
+     * @return BelongsTo<ScheduleVersion, $this>
+     */
+    public function activeDraftVersion(): BelongsTo
+    {
+        return $this->belongsTo(ScheduleVersion::class, 'active_draft_version_id');
+    }
+
+    /**
+     * Draf kerja utama yang dipilih untuk periode ini, atau draf terbaru jika belum ditetapkan.
+     */
+    public function resolveActiveDraft(): ?ScheduleVersion
+    {
+        if ($this->active_draft_version_id !== null) {
+            $active = $this->scheduleVersions()
+                ->whereKey($this->active_draft_version_id)
+                ->whereIn('status', [ScheduleVersionStatus::Draft, ScheduleVersionStatus::Ready])
+                ->first();
+
+            if ($active !== null) {
+                return $active;
+            }
+        }
+
+        return $this->scheduleVersions()
+            ->whereIn('status', [ScheduleVersionStatus::Draft, ScheduleVersionStatus::Ready])
+            ->latest('version_no')
+            ->first();
     }
 
     /**

@@ -33,6 +33,7 @@
                     <p class="text-sm text-muted">Kamu bisa langsung mengedit sesi atau memeriksa bentrok pada draf ini tanpa perlu menyusun ulang dari awal.</p>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
+                    <x-button variant="soft" icon="layers" :href="route('admin.drafts.inspections')">Ganti Draf</x-button>
                     <x-button variant="secondary" icon="pencil" :href="route('admin.drafts.show', $base)">Edit Sesi Draf</x-button>
                     <x-button icon="list-checks" :href="route('admin.drafts.inspect', $base)">Buka Pemeriksaan</x-button>
                 </div>

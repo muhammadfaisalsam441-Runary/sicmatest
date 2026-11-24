@@ -75,15 +75,11 @@ class SchedulerService
     ) {}
 
     /**
-     * Versi yang menjadi dasar penyusunan: draf terbaru bila ada, selain itu jadwal resmi.
+     * Versi yang menjadi dasar penyusunan: draf aktif bila ada, selain itu jadwal resmi.
      */
     public function baseVersion(Period $period): ?ScheduleVersion
     {
-        return $period->scheduleVersions()
-            ->whereIn('status', [ScheduleVersionStatus::Draft, ScheduleVersionStatus::Ready])
-            ->latest('version_no')
-            ->first()
-            ?? $period->scheduleVersions()->official()->latest('version_no')->first();
+        return $period->resolveActiveDraft() ?? $period->scheduleVersions()->official()->latest('version_no')->first();
     }
 
     /**

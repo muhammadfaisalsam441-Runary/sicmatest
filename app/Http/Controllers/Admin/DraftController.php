@@ -35,7 +35,7 @@ class DraftController extends Controller
     public function store(ScheduleDraftService $drafts): RedirectResponse
     {
         $period = Period::query()->active()->firstOrFail();
-        $existing = $period->scheduleVersions()->whereIn('status', [ScheduleVersionStatus::Draft, ScheduleVersionStatus::Ready])->latest('version_no')->first();
+        $existing = $period->resolveActiveDraft();
 
         if ($existing !== null) {
             return to_route('admin.drafts.show', $existing)->with('toast', ['type' => 'info', 'title' => "Draf v{$existing->version_no} masih terbuka", 'message' => 'Lanjutkan draf ini atau tetapkan dulu sebelum membuat revisi baru.']);
@@ -49,12 +49,33 @@ class DraftController extends Controller
     public function inspections(): View
     {
         $period = Period::query()->active()->first();
+        $activeDraftId = $period?->resolveActiveDraft()?->id;
+        $versions = ($period?->scheduleVersions()
+            ->whereIn('status', [ScheduleVersionStatus::Draft, ScheduleVersionStatus::Ready])
+            ->withCount(['sessions', 'issues' => fn ($query) => $query->whereNull('resolved_at')->where('severity', 'error')])
+            ->latest('version_no')
+            ->get() ?? collect())
+            ->sort(fn (ScheduleVersion $a, ScheduleVersion $b): int => [($b->id === $activeDraftId ? 1 : 0), $b->version_no] <=> [($a->id === $activeDraftId ? 1 : 0), $a->version_no])
+            ->values();
 
         return view('admin.drafts.inspections', [
             'period' => $period,
-            'versions' => $period?->scheduleVersions()->whereIn('status', [ScheduleVersionStatus::Draft, ScheduleVersionStatus::Ready])
-                ->withCount(['sessions', 'issues' => fn ($query) => $query->whereNull('resolved_at')->where('severity', 'error')])
-                ->latest('version_no')->get() ?? collect(),
+            'versions' => $versions,
+            'activeDraftId' => $activeDraftId,
+        ]);
+    }
+
+    public function activate(ScheduleVersion $version, ScheduleDraftService $drafts): RedirectResponse
+    {
+        $period = Period::query()->active()->first();
+        abort_if($period === null || $version->period_id !== $period->id, 404);
+
+        $drafts->activateDraft($version);
+
+        return to_route('admin.drafts.inspections')->with('toast', [
+            'type' => 'success',
+            'title' => "Draf v{$version->version_no} dijadikan draf aktif",
+            'message' => 'Draf ini sekarang menjadi dasar Susun Otomatis dan draf kerja utama. Jadwal resmi tidak berubah.',
         ]);
     }
 

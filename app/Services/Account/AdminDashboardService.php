@@ -4,7 +4,6 @@ namespace App\Services\Account;
 
 use App\Enums\LecturerProfileStatus;
 use App\Enums\RoomStatus;
-use App\Enums\ScheduleVersionStatus;
 use App\Models\Academic\Period;
 use App\Models\Lecturer\Lecturer;
 use App\Models\Room\Room;
@@ -88,10 +87,7 @@ class AdminDashboardService
         $period = Period::query()->active()->first();
 
         $official = $period?->scheduleVersions()->official()->latest('version_no')->first();
-        $draft = $period?->scheduleVersions()
-            ->whereIn('status', [ScheduleVersionStatus::Draft, ScheduleVersionStatus::Ready])
-            ->latest('version_no')
-            ->first();
+        $draft = $period?->resolveActiveDraft();
 
         $issues = $draft?->issues()->blocking()->pluck('code') ?? collect();
 

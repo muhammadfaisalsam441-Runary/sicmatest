@@ -67,6 +67,10 @@ class SchedulePublisher
                 'lock_version' => $draft->lock_version + 1,
             ])->save();
 
+            if ($draft->period->active_draft_version_id === $draft->id) {
+                $draft->period->forceFill(['active_draft_version_id' => null])->save();
+            }
+
             $count = $this->blocks->rebuild($draft);
 
             AvailabilityCache::bust();

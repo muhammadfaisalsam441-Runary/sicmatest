@@ -633,9 +633,24 @@ class SchedulerService
                 if (in_array($date->toDateString(), $holidays, true)) {
                     continue;
                 }
-                $rows[] = ['room' => $block->room_id, 'date' => $date->toDateString(), 'day' => $date->dayOfWeekIso,
-                    'start' => $block->start_at->lessThan($date) ? 0 : $block->start_at->hour * 60 + $block->start_at->minute,
-                    'end' => $block->end_at->greaterThanOrEqualTo($date->addDay()) ? 1440 : $block->end_at->hour * 60 + $block->end_at->minute];
+                $start = $block->start_at->lessThan($date)
+                    ? 0
+                    : $block->start_at->hour * 60 + $block->start_at->minute;
+                $end = $block->end_at->greaterThanOrEqualTo($date->addDay())
+                    ? 1440
+                    : min(1440, $block->end_at->hour * 60 + $block->end_at->minute + ($block->end_at->second > 0 ? 1 : 0));
+
+                if ($end <= $start) {
+                    continue;
+                }
+
+                $rows[] = [
+                    'room' => $block->room_id,
+                    'date' => $date->toDateString(),
+                    'day' => $date->dayOfWeekIso,
+                    'start' => $start,
+                    'end' => $end,
+                ];
             }
         }
 

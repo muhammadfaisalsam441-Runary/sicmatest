@@ -652,3 +652,32 @@ test('periksa kesiapan memberi peringatan ketika sesi di luar cakupan sudah sali
             'Terdapat 1 bentrok bawaan pada sesi di luar cakupan yang akan terbawa ke draf baru. Gunakan cakupan "Seluruh semester" atau "Bagian terdampak" agar bentrok tersebut ikut ditata ulang.'
         );
 });
+
+test('blok ruang berdurasi kurang dari satu menit atau nol menit tidak menggagalkan generator sebagai MODEL_INVALID', function () {
+    RoomBlock::factory()->for($this->room)->create([
+        'source_type' => 'reservation',
+        'start_at' => '2026-11-09 11:36:00',
+        'end_at' => '2026-11-09 11:36:41',
+    ]);
+    RoomBlock::factory()->for($this->room)->create([
+        'source_type' => 'closure',
+        'start_at' => '2026-11-09 12:00:00',
+        'end_at' => '2026-11-09 12:00:00',
+    ]);
+
+    $scheduler = app(SchedulerService::class);
+    $snapshot = $scheduler->snapshot($this->official, ['type' => 'semester'], 15);
+
+    expect($snapshot['room_blocks'])->toHaveCount(1)
+        ->and($snapshot['room_blocks'][0])->toMatchArray([
+            'room' => $this->room->id,
+            'date' => '2026-11-09',
+            'start' => 696,
+            'end' => 697,
+        ]);
+
+    $job = $scheduler->runNow($scheduler->start($this->period, ['type' => 'semester'], 15, $this->admin));
+
+    expect($job->solver_status)->toBe(SolverStatus::Feasible)
+        ->and($job->result['draft_version_id'] ?? null)->not->toBeNull();
+});

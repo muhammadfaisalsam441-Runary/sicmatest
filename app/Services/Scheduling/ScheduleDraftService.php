@@ -228,10 +228,14 @@ class ScheduleDraftService
                     continue;
                 }
 
-                $blockStart = $block->start_at->lessThan($date) ? 0 : $block->start_at->hour * 60 + $block->start_at->minute;
-                $blockEnd = $block->end_at->greaterThanOrEqualTo($date->addDay()) ? 1440 : $block->end_at->hour * 60 + $block->end_at->minute;
+                $blockStart = $block->start_at->lessThan($date)
+                    ? 0
+                    : $block->start_at->hour * 60 + $block->start_at->minute;
+                $blockEnd = $block->end_at->greaterThanOrEqualTo($date->addDay())
+                    ? 1440
+                    : min(1440, $block->end_at->hour * 60 + $block->end_at->minute + ($block->end_at->second > 0 ? 1 : 0));
 
-                if ($blockStart < $session->end_minute && $blockEnd > $session->start_minute) {
+                if ($blockEnd > $blockStart && $blockStart < $session->end_minute && $blockEnd > $session->start_minute) {
                     $occupied->push($block->room_id);
                     break;
                 }

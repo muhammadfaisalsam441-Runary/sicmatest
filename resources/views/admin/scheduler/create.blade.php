@@ -102,8 +102,8 @@
                 @endphp
 
                 <x-card class="flex flex-col gap-4 border-primary/35 bg-primary-soft/20">
-                    <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                        <div class="flex flex-col gap-1.5">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div class="min-w-0 flex flex-col gap-1.5">
                             <div class="flex flex-wrap items-center gap-2">
                                 <span class="rounded-md bg-primary px-2 py-0.5 text-xs font-semibold text-white">Draf Aktif</span>
                                 <h2 class="text-lg font-semibold text-ink">Draf v{{ $activeCard->version_no }} sedang dikerjakan</h2>
@@ -115,26 +115,11 @@
                                 <button type="button"
                                         x-data
                                         x-on:click="$dispatch('open-label-draft', { versionNo: {{ $activeCard->version_no }}, label: @js($activeCard->label ?? ''), action: @js(route('admin.drafts.label', $activeCard)) }); $dispatch('open-modal', 'label-draft-modal')"
-                                        class="inline-flex size-7 cursor-pointer items-center justify-center rounded-control border border-border bg-surface text-muted transition hover:border-primary/40 hover:bg-primary-soft/60 hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                                        class="inline-flex size-7 cursor-pointer items-center justify-center rounded-control text-muted transition hover:bg-surface hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                                         aria-label="Ubah label Draf v{{ $activeCard->version_no }}"
                                         title="Ubah label draf">
                                     <i data-lucide="pencil" class="size-3.5" aria-hidden="true"></i>
                                 </button>
-                                <x-status-badge :variant="$activeBadgeVariant">{{ $activeBadgeLabel }}</x-status-badge>
-                                @if ($activeMetric)
-                                    <x-status-badge :variant="$activeMetric['variant']" :title="$activeMetric['summary_tooltip']">
-                                        Skor {{ $activeMetric['score'] }}/100
-                                    </x-status-badge>
-                                @endif
-                                @if (($activeMetric['changed_count'] ?? null) !== null)
-                                    <span class="inline-flex items-center rounded-full border border-border bg-surface px-2.5 py-0.5 text-xs font-medium text-muted">
-                                        @if ($activeMetric['changed_count'] === 0)
-                                            Identik dengan v{{ $activeMetric['baseline_version_no'] }}
-                                        @else
-                                            {{ $activeMetric['changed_count'] }} sesi berubah dari v{{ $activeMetric['baseline_version_no'] }}
-                                        @endif
-                                    </span>
-                                @endif
                             </div>
                             <p class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-muted">
                                 <span>{{ $activeCard->source->label() }}</span>
@@ -150,8 +135,27 @@
                             </p>
                         </div>
 
+                        <div class="flex shrink-0 flex-wrap items-center gap-1.5 sm:justify-end">
+                            <x-status-badge :variant="$activeBadgeVariant">{{ $activeBadgeLabel }}</x-status-badge>
+                            @if ($activeMetric)
+                                <x-status-badge :variant="$activeMetric['variant']" :title="$activeMetric['summary_tooltip']">
+                                    Skor {{ $activeMetric['score'] }}/100
+                                </x-status-badge>
+                            @endif
+                            @if (($activeMetric['changed_count'] ?? null) !== null)
+                                <span class="inline-flex items-center rounded-full border border-border bg-surface px-2.5 py-0.5 text-xs font-medium text-muted">
+                                    @if ($activeMetric['changed_count'] === 0)
+                                        Identik dengan v{{ $activeMetric['baseline_version_no'] }}
+                                    @else
+                                        {{ $activeMetric['changed_count'] }} sesi berubah dari v{{ $activeMetric['baseline_version_no'] }}
+                                    @endif
+                                </span>
+                            @endif
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap items-center justify-between gap-2.5 border-t border-primary/15 pt-3.5">
                         <div class="flex flex-wrap items-center gap-2">
-                            <x-draft-download-menu :version="$activeCard" />
                             <x-button variant="secondary" size="sm" icon="pencil" :href="route('admin.drafts.show', $activeCard)">
                                 1. Edit Sesi
                             </x-button>
@@ -163,6 +167,10 @@
                                     3. Tetapkan Jadwal
                                 </x-button>
                             @endif
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-2">
+                            <x-draft-download-menu :version="$activeCard" />
                             <x-button type="button"
                                       variant="danger-outline"
                                       size="sm"
@@ -191,8 +199,8 @@
                                 @php
                                     $metric = $draftMetrics[$version->id] ?? null;
                                 @endphp
-                                <div class="flex flex-wrap items-center justify-between gap-4 px-6 py-4 transition hover:bg-page/40">
-                                    <div class="flex flex-col gap-1">
+                                <div class="flex flex-col gap-3 px-6 py-4 transition hover:bg-page/40 lg:flex-row lg:items-center lg:justify-between">
+                                    <div class="min-w-0 flex flex-col gap-1.5">
                                         <div class="flex flex-wrap items-center gap-2">
                                             <span class="text-base font-semibold text-ink">Draf v{{ $version->version_no }}</span>
                                             @if (filled($version->label))
@@ -203,7 +211,7 @@
                                             <button type="button"
                                                     x-data
                                                     x-on:click="$dispatch('open-label-draft', { versionNo: {{ $version->version_no }}, label: @js($version->label ?? ''), action: @js(route('admin.drafts.label', $version)) }); $dispatch('open-modal', 'label-draft-modal')"
-                                                    class="inline-flex size-7 cursor-pointer items-center justify-center rounded-control border border-border bg-surface text-muted transition hover:border-primary/40 hover:bg-primary-soft/60 hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                                                    class="inline-flex size-6 cursor-pointer items-center justify-center rounded-control text-muted transition hover:bg-page hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                                                     aria-label="Ubah label Draf v{{ $version->version_no }}"
                                                     title="Ubah label draf">
                                                 <i data-lucide="pencil" class="size-3.5" aria-hidden="true"></i>
@@ -216,8 +224,12 @@
                                                     Skor {{ $metric['score'] }}/100
                                                 </x-status-badge>
                                             @endif
+                                        </div>
+                                        <p class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted sm:text-sm">
+                                            <span>{{ $version->source->label() }}</span>
+                                            <span>{{ $version->sessions_count }} sesi</span>
                                             @if (($metric['changed_count'] ?? null) !== null)
-                                                <span class="inline-flex items-center rounded-full border border-border bg-surface px-2.5 py-0.5 text-xs font-medium text-muted">
+                                                <span class="inline-flex items-center rounded-full border border-border/70 bg-page px-2 py-0.5 text-xs font-medium text-muted">
                                                     @if ($metric['changed_count'] === 0)
                                                         Identik dengan v{{ $metric['baseline_version_no'] }}
                                                     @else
@@ -225,15 +237,11 @@
                                                     @endif
                                                 </span>
                                             @endif
-                                        </div>
-                                        <p class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-muted">
-                                            <span>{{ $version->source->label() }}</span>
-                                            <span>{{ $version->sessions_count }} sesi</span>
                                             <span>{{ Wita::stamp($version->created_at) }}</span>
                                         </p>
                                     </div>
 
-                                    <div class="flex flex-wrap items-center gap-2">
+                                    <div class="flex shrink-0 flex-wrap items-center gap-1.5">
                                         <form method="POST" action="{{ route('admin.drafts.activate', $version) }}">
                                             @csrf
                                             <input type="hidden" name="redirect" value="workspace">

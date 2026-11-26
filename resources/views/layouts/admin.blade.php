@@ -101,7 +101,12 @@
 
                         <nav class="flex min-w-0 items-center gap-1.5 text-sm text-muted sm:gap-2" aria-label="Breadcrumb">
                             <a href="{{ Nav::url('admin.dashboard') }}" class="shrink-0 rounded font-medium text-muted transition hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">Admin</a>
-                            @php($headerCrumbs = array_values(array_filter(explode('|', trim($__env->yieldContent('breadcrumb')) ?: trim($__env->yieldContent('title'))))))
+                            @php
+                                $headerCrumbs = array_values(array_filter(array_map(
+                                    fn (string $part): string => trim(html_entity_decode($part, ENT_QUOTES, 'UTF-8')),
+                                    explode('|', trim($__env->yieldContent('breadcrumb')) ?: trim($__env->yieldContent('title')))
+                                )));
+                            @endphp
                             @foreach ($headerCrumbs as $crumb)
                                 <span @class(['shrink-0 text-muted/60', 'hidden sm:inline' => ! $loop->last]) aria-hidden="true">›</span>
                                 <span @class([

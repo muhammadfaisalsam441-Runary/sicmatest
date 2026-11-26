@@ -22,26 +22,40 @@
                 $isActive = ($activeDraftId ?? null) === $version->id;
                 $metric = $draftMetrics[$version->id] ?? null;
             @endphp
-            <x-card class="flex flex-wrap items-center justify-between gap-4 {{ $isActive ? 'border-primary/40 bg-primary-soft/20' : '' }}">
-                <div>
-                    <div class="flex flex-wrap items-center gap-2">
-                        @if ($isActive)
-                            <span class="rounded-md bg-primary px-2 py-0.5 text-xs font-semibold text-white">Draf Aktif</span>
-                        @endif
-                        <h2 class="text-lg font-semibold">Draf v{{ $version->version_no }}</h2>
-                        @if (filled($version->label))
-                            <span class="inline-flex items-center rounded-full border border-primary/25 bg-surface px-2.5 py-0.5 text-xs font-medium text-primary">
-                                {{ $version->label }}
-                            </span>
-                        @endif
-                        <button type="button"
-                                x-data
-                                x-on:click="$dispatch('open-label-draft', { versionNo: {{ $version->version_no }}, label: @js($version->label ?? ''), action: @js(route('admin.drafts.label', $version)) }); $dispatch('open-modal', 'label-draft-modal')"
-                                class="inline-flex size-7 cursor-pointer items-center justify-center rounded-control border border-border bg-surface text-muted transition hover:border-primary/40 hover:bg-primary-soft/60 hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                                aria-label="Ubah label Draf v{{ $version->version_no }}"
-                                title="Ubah label draf">
-                            <i data-lucide="pencil" class="size-3.5" aria-hidden="true"></i>
-                        </button>
+            <x-card class="flex flex-col gap-3.5 {{ $isActive ? 'border-primary/40 bg-primary-soft/20' : '' }}">
+                <div class="flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between">
+                    <div class="min-w-0 flex flex-col gap-1">
+                        <div class="flex flex-wrap items-center gap-2">
+                            @if ($isActive)
+                                <span class="rounded-md bg-primary px-2 py-0.5 text-xs font-semibold text-white">Draf Aktif</span>
+                            @endif
+                            <h2 class="text-lg font-semibold text-ink">Draf v{{ $version->version_no }}</h2>
+                            @if (filled($version->label))
+                                <span class="inline-flex items-center rounded-full border border-primary/25 bg-surface px-2.5 py-0.5 text-xs font-medium text-primary">
+                                    {{ $version->label }}
+                                </span>
+                            @endif
+                            <button type="button"
+                                    x-data
+                                    x-on:click="$dispatch('open-label-draft', { versionNo: {{ $version->version_no }}, label: @js($version->label ?? ''), action: @js(route('admin.drafts.label', $version)) }); $dispatch('open-modal', 'label-draft-modal')"
+                                    class="inline-flex size-7 cursor-pointer items-center justify-center rounded-control text-muted transition hover:bg-surface hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                                    aria-label="Ubah label Draf v{{ $version->version_no }}"
+                                    title="Ubah label draf">
+                                <i data-lucide="pencil" class="size-3.5" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                        <p class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-muted">
+                            <span>{{ $version->source->label() }}</span>
+                            <span>{{ $version->sessions_count }} sesi</span>
+                            <span>{{ $version->issues_count }} temuan wajib tersimpan</span>
+                        </p>
+                        <p class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted">
+                            <span>Dibuat {{ Wita::stamp($version->created_at) }}</span>
+                            <span>Diperbarui {{ Wita::stamp($version->updated_at) }}</span>
+                        </p>
+                    </div>
+
+                    <div class="flex shrink-0 flex-wrap items-center gap-1.5 sm:justify-end">
                         <x-status-badge :variant="$version->issues_count === 0 ? 'success' : 'warning'">
                             {{ $version->issues_count === 0 ? '0 masalah wajib' : $version->issues_count.' temuan wajib' }}
                         </x-status-badge>
@@ -60,33 +74,31 @@
                             </span>
                         @endif
                     </div>
-                    <p class="mt-1 flex flex-wrap gap-x-3 text-sm text-muted">
-                        <span>{{ $version->source->label() }}</span>
-                        <span>{{ $version->sessions_count }} sesi</span>
-                        <span>{{ $version->issues_count }} temuan wajib tersimpan</span>
-                    </p>
-                    <p class="flex flex-wrap gap-x-3 text-xs text-muted">
-                        <span>Dibuat {{ Wita::stamp($version->created_at) }}</span>
-                        <span>Diperbarui {{ Wita::stamp($version->updated_at) }}</span>
-                    </p>
                 </div>
-                <div class="flex flex-wrap items-center gap-2">
-                    @if (! $isActive)
-                        <form method="POST" action="{{ route('admin.drafts.activate', $version) }}">
-                            @csrf
-                            <x-button type="submit" variant="soft" icon="check">Gunakan</x-button>
-                        </form>
-                    @endif
-                    <x-draft-download-menu :version="$version" size="md" />
-                    <x-button variant="secondary" icon="pencil" :href="route('admin.drafts.show', $version)">Edit Sesi Draf</x-button>
-                    <x-button icon="list-checks" :href="route('admin.drafts.inspect', $version)">Buka Pemeriksaan</x-button>
-                    <x-button type="button"
-                              variant="danger-outline"
-                              icon="archive"
-                              x-data
-                              x-on:click="$dispatch('open-archive-draft', { versionNo: {{ $version->version_no }}, action: @js(route('admin.drafts.archive', $version)), isActive: @js($isActive) }); $dispatch('open-modal', 'archive-draft-modal')">
-                        Arsipkan
-                    </x-button>
+
+                <div class="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-3">
+                    <div class="flex flex-wrap items-center gap-2">
+                        @if (! $isActive)
+                            <form method="POST" action="{{ route('admin.drafts.activate', $version) }}">
+                                @csrf
+                                <x-button type="submit" variant="soft" size="sm" icon="check">Gunakan</x-button>
+                            </form>
+                        @endif
+                        <x-button variant="secondary" size="sm" icon="pencil" :href="route('admin.drafts.show', $version)">Edit Sesi Draf</x-button>
+                        <x-button size="sm" icon="list-checks" :href="route('admin.drafts.inspect', $version)">Buka Pemeriksaan</x-button>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-2">
+                        <x-draft-download-menu :version="$version" size="sm" />
+                        <x-button type="button"
+                                  variant="danger-outline"
+                                  size="sm"
+                                  icon="archive"
+                                  x-data
+                                  x-on:click="$dispatch('open-archive-draft', { versionNo: {{ $version->version_no }}, action: @js(route('admin.drafts.archive', $version)), isActive: @js($isActive) }); $dispatch('open-modal', 'archive-draft-modal')">
+                            Arsipkan
+                        </x-button>
+                    </div>
                 </div>
             </x-card>
         @empty

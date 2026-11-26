@@ -165,7 +165,10 @@
                             <p class="text-sm">{{ $issue->message }}</p>
                             @foreach ($sessions->whereIn('id', $issue->session_ids ?? []) as $session)
                                 <div class="flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm">
-                                    <span>{{ $session->title }} • {{ $session->participants->pluck('name')->implode(', ') ?: 'Tanpa kelas' }} • {{ $session->lecturers->pluck('name')->implode(', ') ?: 'Tanpa dosen' }} • {{ $session->room?->name ?? 'Tanpa ruang fisik' }} • {{ $session->day_of_week ? Wita::dayName($session->day_of_week) : 'Tanpa hari' }} {{ $session->start_minute !== null ? $clock($session->start_minute) : '' }}</span>
+                                    <span>
+                                        <span class="font-medium text-ink">{{ $session->title }}</span>
+                                        <span class="text-muted"> — {{ $session->participants->pluck('name')->implode(', ') ?: 'Tanpa kelas' }}, {{ $session->lecturers->pluck('name')->implode(', ') ?: 'Tanpa dosen' }}, {{ $session->room?->name ?? 'Tanpa ruang fisik' }}, {{ $session->day_of_week ? Wita::dayName($session->day_of_week) : 'Tanpa hari' }} {{ $session->start_minute !== null ? $clock($session->start_minute) : '' }}</span>
+                                    </span>
                                     <a class="font-semibold text-primary hover:underline" href="{{ route('admin.drafts.show', [$version, 'tinjau' => $view, 'sesi' => $session->id]) }}">{{ $isDraft ? 'Perbaiki sesi' : 'Lihat sesi' }}</a>
                                 </div>
                             @endforeach

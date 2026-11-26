@@ -5,7 +5,7 @@
 
 @section('content')
     <div class="flex flex-col gap-6">
-        <x-page-header title="Notifikasi" subtitle="Informasi terbaru tentang ruanganmu.">
+        <x-page-header title="Notifikasi">
             @if ($unreadCount > 0)
                 <x-slot:actions>
                     <form method="POST" action="{{ route('keti.notifications.read-all') }}" class="w-full sm:w-auto">
@@ -42,7 +42,7 @@
                         <p class="text-sm leading-relaxed text-muted">{{ $notification->body }}</p>
                         <p class="inline-flex items-center gap-1.5 text-xs text-muted tabular-nums">
                             <i data-lucide="clock" aria-hidden="true" class="size-3.5 shrink-0"></i>
-                            <span>{{ Wita::date($notification->created_at) }} • {{ Wita::clock($notification->created_at, false) }} WITA</span>
+                            <span>{{ Wita::date($notification->created_at) }}, {{ Wita::clock($notification->created_at, false) }} WITA</span>
                         </p>
                     </div>
                 </div>

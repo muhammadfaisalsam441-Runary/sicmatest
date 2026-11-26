@@ -6,7 +6,7 @@
 
 @section('content')
     <div class="flex flex-col gap-4 sm:gap-6">
-        <x-page-header title="My Class" :subtitle="'Jadwal dan perkuliahan Kelas '.$classGroup->name.'.'" />
+        <x-page-header title="My Class" :subtitle="'Kelas '.$classGroup->name" />
 
         @if ($errors->any())
             <x-info-box title="Data belum lengkap" variant="danger" role="alert">
@@ -105,7 +105,7 @@
                                     @if ($meeting['status'] === 'switched_online')
                                         Ruang {{ $session->room?->name }} dilepas untuk kelas lain
                                     @elseif ($session->room)
-                                        {{ ($session->room->building?->name ?? 'Gedung belum didata').' • Lantai '.($session->room->floor ?? '—') }}
+                                        {{ ($session->room->building?->name ?? 'Gedung belum didata').', Lantai '.($session->room->floor ?? '—') }}
                                     @else
                                         Tanpa ruang fisik
                                     @endif

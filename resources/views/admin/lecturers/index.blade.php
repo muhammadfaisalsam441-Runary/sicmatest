@@ -50,7 +50,7 @@
          "
          :data-editing="(editMode || formModalOpen || batchTargetModalOpen || importModalOpen || selectedIds.length > 0) ? 'true' : null"
          @sicma:navigated.document="formModalOpen = false; batchTargetModalOpen = false; importModalOpen = false; editMode = false">
-        <x-page-header title="Data dosen dari jadwal" :subtitle="$period ? 'Periode '.$period->name.' • '.$total.' dosen terdaftar' : $total.' dosen terdaftar'">
+        <x-page-header title="Data dosen dari jadwal" :subtitle="$period ? $period->name.' — '.$total.' dosen terdaftar' : $total.' dosen terdaftar'">
             <x-slot:actions>
                 <x-button variant="secondary" size="sm" icon="download" :href="route('admin.lecturers.export', request()->only(['filter', 'q', 'sort', 'dir']))" download>Unduh CSV</x-button>
                 <x-button variant="secondary" size="sm" icon="upload" @click="importModalOpen = true">Impor spreadsheet</x-button>

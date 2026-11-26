@@ -5,17 +5,17 @@
 
 @section('content')
     <div class="flex flex-col gap-4 sm:gap-6">
-        <x-page-header title="Aktivitas ruangan" subtitle="Siapa saja yang memesan dan memakai ruangan." />
+        <x-page-header title="Aktivitas ruangan" />
 
         <div class="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
             <x-tabs :items="[
                 ['label' => 'Semua pengguna', 'href' => route('keti.activity', ['tanggal' => $date->toDateString()]), 'active' => $scope === 'semua'],
-                ['label' => 'Saya • '.$myCount, 'href' => route('keti.activity', ['cakupan' => 'saya', 'tanggal' => $date->toDateString()]), 'active' => $scope === 'saya'],
+                ['label' => 'Saya', 'count' => $myCount, 'href' => route('keti.activity', ['cakupan' => 'saya', 'tanggal' => $date->toDateString()]), 'active' => $scope === 'saya'],
             ]" scrollable />
             <search>
                 <form method="GET" action="{{ route('keti.activity') }}" class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <input type="hidden" name="cakupan" value="{{ $scope }}">
-                    <span class="text-xs text-muted sm:text-sm">{{ $date->isToday() ? 'Hari ini • ' : '' }}{{ Wita::longDate($date) }}</span>
+                    <span class="text-xs text-muted sm:text-sm">{{ $date->isToday() ? 'Hari ini, ' : '' }}{{ Wita::longDate($date) }}</span>
                     <x-input type="date" name="tanggal" :value="$date->toDateString()" class="w-full py-2 sm:w-44 sm:py-3" aria-label="Tanggal" onchange="this.form.requestSubmit()" />
                 </form>
             </search>
@@ -49,10 +49,10 @@
                                     {{ $item->room->name }}
                                 @endif
                             </td>
-                            <td class="px-3.5 py-3 sm:px-5">{{ $item->purpose }} • {{ $item->classGroup->name }}</td>
+                            <td class="px-3.5 py-3 sm:px-5">{{ $item->purpose }} ({{ $item->classGroup->name }})</td>
                             <td class="px-3.5 py-3 whitespace-nowrap sm:px-5">
                                 @if ($item->status->value === 'in_use')
-                                    Mulai {{ Wita::clock($item->actual_start_at, false) }} • Selesai —
+                                    Mulai {{ Wita::clock($item->actual_start_at, false) }} (berjalan)
                                 @else
                                     {{ Wita::range($item->actual_start_at ?? $item->start_at, $item->actual_end_at ?? $item->end_at) }}
                                 @endif

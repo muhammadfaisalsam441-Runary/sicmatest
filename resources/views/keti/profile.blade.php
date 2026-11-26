@@ -4,14 +4,14 @@
 
 @section('content')
     <div class="flex flex-col gap-6">
-        <x-page-header title="Profil Pengguna" subtitle="Identitas untuk pemesanan dan riwayat ruangan." />
+        <x-page-header title="Profil Pengguna" />
         <div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-[1fr_340px]">
             <x-card padding="p-4 sm:p-6" class="flex flex-col gap-6">
                 <div class="flex items-center gap-4">
                     <span class="flex size-14 shrink-0 items-center justify-center rounded-full bg-primary-soft text-lg font-bold text-primary">{{ $user->initials() }}</span>
                     <div class="flex min-w-0 flex-col">
                         <span class="break-words text-lg font-semibold sm:text-xl">{{ $user->name }}</span>
-                        <span class="text-sm text-muted">Ketua tingkat • {{ $classGroup->study_program }}</span>
+                        <span class="text-sm text-muted">Ketua tingkat {{ $classGroup->study_program }}</span>
                     </div>
                 </div>
                 <dl class="grid grid-cols-1 gap-5 text-sm sm:grid-cols-2">

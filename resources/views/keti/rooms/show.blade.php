@@ -22,7 +22,7 @@
 
         <div class="flex flex-wrap items-center gap-3 sm:gap-5">
             <x-button variant="secondary" :href="url()->previous() !== url()->current() ? url()->previous() : route('keti.search')" class="min-h-11 w-full sm:w-36">Kembali</x-button>
-            <span class="text-sm text-muted">{{ Wita::longDate($current->start) }} • {{ Wita::clock($current->start) }}</span>
+            <span class="text-sm text-muted">{{ Wita::longDate($current->start) }}, {{ Wita::clock($current->start) }}</span>
         </div>
 
         <div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-[1fr_340px]">
@@ -79,17 +79,17 @@
                     @if ($currentAgenda)
                         <div class="flex items-center gap-2.5 rounded-control border border-danger/20 bg-danger-soft/50 px-3.5 py-2.5 text-sm text-ink">
                             <span class="sicma-live-dot size-2 shrink-0 rounded-full bg-danger" aria-hidden="true"></span>
-                            <p>Sedang berlangsung: <span class="font-semibold">{{ $currentAgenda['range'] }}</span> • {{ $currentAgenda['title'] }}{{ $currentAgenda['class'] ? ' • '.$currentAgenda['class'] : '' }}</p>
+                            <p>Sedang berlangsung: <span class="font-semibold">{{ $currentAgenda['range'] }}</span> — {{ $currentAgenda['title'] }}{{ $currentAgenda['class'] ? ' ('.$currentAgenda['class'].')' : '' }}</p>
                         </div>
                     @elseif ($nextAgenda)
                         <div class="flex items-center gap-2.5 rounded-control border border-border bg-page px-3.5 py-2.5 text-sm text-muted">
                             <i data-lucide="clock" aria-hidden="true" class="size-4 shrink-0 text-primary"></i>
-                            <p>Jadwal berikutnya: <span class="font-semibold text-ink">{{ $nextAgenda['range'] }}</span> • {{ $nextAgenda['title'] }}</p>
+                            <p>Jadwal berikutnya: <span class="font-semibold text-ink">{{ $nextAgenda['range'] }}</span> — {{ $nextAgenda['title'] }}</p>
                         </div>
                     @else
                         <div class="flex items-center gap-2.5 rounded-control border border-border bg-page px-3.5 py-2.5 text-sm text-muted">
                             <i data-lucide="calendar-check" aria-hidden="true" class="size-4 shrink-0 text-success"></i>
-                            <p>Tidak ada jadwal lain hari ini.</p>
+                            <p>Tidak ada jadwal lain hari ini</p>
                         </div>
                     @endif
                 </x-card>
@@ -115,7 +115,7 @@
                                         <td class="px-3 py-3 whitespace-nowrap sm:pr-4"><x-status-badge :variant="$item->status->badgeVariant()">{{ $item->status->label() }}</x-status-badge></td>
                                     </tr>
                                 @empty
-                                    <tr><td colspan="4" class="py-6 text-center text-sm text-muted">Belum ada catatan pemakaian hari ini.</td></tr>
+                                    <tr><td colspan="4" class="py-6 text-center text-sm text-muted">Belum ada catatan pemakaian hari ini</td></tr>
                                 @endforelse
                             </tbody>
                         </table>
@@ -128,11 +128,11 @@
                 <h2 class="text-xl font-semibold">{{ $canBook ? 'Gunakan untuk kelasmu' : 'Waktu pilihan belum bisa dipesan' }}</h2>
                 <p class="font-semibold text-primary">Kelas {{ $classGroup->name }}</p>
                 @if ($suggestedStart !== null)
-                    <p class="text-sm text-primary">Slot kosong terdekat dipilihkan: {{ Wita::date($start) }} • {{ Wita::range($start, $end) }}.</p>
+                    <p class="text-sm text-primary">Slot kosong terdekat: {{ Wita::date($start) }}, {{ Wita::range($start, $end) }}</p>
                 @endif
 
                 <div class="flex flex-col gap-1 rounded-control bg-page p-4">
-                    <span class="text-xs text-muted">{{ $isNow ? 'Mulai sekarang' : 'Mulai '.Wita::date($start) }} • Durasi {{ Wita::duration($duration) }}</span>
+                    <span class="text-xs text-muted">{{ $isNow ? 'Mulai sekarang' : 'Mulai '.Wita::date($start) }}, durasi {{ Wita::duration($duration) }}</span>
                     <span class="text-xl font-semibold">{{ Wita::range($start, $end) }}</span>
                 </div>
 

@@ -48,12 +48,12 @@ final class AvailabilityResult
     }
 
     /**
-     * Label lokasi seperti di desain: "AE • Lantai 1" / "Gedung belum didata • Lantai 3" (B16).
+     * Label lokasi: "AE, Lantai 1" / "Gedung belum didata, Lantai 3" (B16).
      */
     public function locationLabel(): string
     {
         $building = $this->room->building?->name ?? 'Gedung belum didata';
 
-        return $building.' • Lantai '.($this->room->floor ?? '—');
+        return $building.', Lantai '.($this->room->floor ?? '—');
     }
 }

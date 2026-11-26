@@ -88,7 +88,7 @@
         </main>
 
         <footer class="sicma-safe-bottom mx-auto flex w-full max-w-[1168px] flex-col items-start justify-between gap-3 px-4 pt-4 pb-8 text-xs text-muted sm:flex-row sm:items-center sm:px-6 sm:pb-10 lg:px-8">
-            <span>SICMA • Jurusan Teknik Informatika dan Komputer</span>
+            <span>SICMA — Jurusan Teknik Informatika dan Komputer</span>
             <div class="flex flex-wrap items-center gap-2.5 sm:gap-3">
                 <button type="button"
                         data-toggle-bg-motion
@@ -104,7 +104,6 @@
                     <i data-lucide="sparkles" aria-hidden="true" class="size-3.5"></i>
                     <span>Animasi Logo 3D</span>
                 </button>
-                <span>Ruangan tepat untuk kelasmu.</span>
             </div>
         </footer>
 

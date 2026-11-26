@@ -60,7 +60,7 @@
                             <h2 class="text-2xl font-semibold text-ink sm:text-3xl">{{ $room->name }}</h2>
                             <p class="inline-flex items-center gap-1.5 text-sm text-muted">
                                 <i data-lucide="map-pin" aria-hidden="true" class="size-4 shrink-0"></i>
-                                <span>{{ ($room->building?->name ?? 'Gedung belum didata').' • Lantai '.($room->floor ?? '—') }}</span>
+                                <span>{{ ($room->building?->name ?? 'Gedung belum didata').', Lantai '.($room->floor ?? '—') }}</span>
                             </p>
                         </div>
                         <x-status-badge :variant="$status->badgeVariant()" :pulse="$status === ReservationStatus::InUse">{{ $status->label() }}</x-status-badge>

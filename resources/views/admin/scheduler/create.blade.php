@@ -19,7 +19,7 @@
 
     <div class="flex flex-col gap-6">
         <x-page-header title="Penyusunan & Draf Jadwal"
-                       :subtitle="($period?->name ?? 'Belum ada semester aktif').' • Kelola draf jadwal, impor Excel/CSV, atau susun otomatis sebelum ditetapkan.'.($official ? ' Jadwal resmi v'.$official->version_no.' tetap dilindungi.' : '')">
+                       :subtitle="($period?->name ?? 'Belum ada semester aktif').($official ? ' — Jadwal resmi v'.$official->version_no.' aktif' : '')">
             @if ($period)
                 <x-slot:actions>
                     <x-button size="sm" icon="sparkles" x-data x-on:click="$dispatch('open-modal', 'auto-scheduler-modal')">
@@ -104,8 +104,10 @@
                                 <h2 class="text-lg font-semibold text-ink">Draf v{{ $activeCard->version_no }} sedang dikerjakan</h2>
                                 <x-status-badge :variant="$activeBadgeVariant">{{ $activeBadgeLabel }}</x-status-badge>
                             </div>
-                            <p class="text-sm text-muted">
-                                {{ $activeCard->source->label() }} • {{ $activeCard->sessions_count }} sesi • Diperbarui {{ Wita::stamp($activeCard->updated_at) }}
+                            <p class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-muted">
+                                <span>{{ $activeCard->source->label() }}</span>
+                                <span>{{ $activeCard->sessions_count }} sesi</span>
+                                <span>Diperbarui {{ Wita::stamp($activeCard->updated_at) }}</span>
                             </p>
                             <p class="text-xs text-muted">
                                 @if ($activeReviewStatus['checked_at'] ?? null)
@@ -149,7 +151,6 @@
                                     {{ $otherVersions->count() }} draf
                                 </span>
                             </div>
-                            <p class="text-xs text-muted">Pilih Gunakan untuk mengganti draf aktif, atau Arsipkan jika tidak dipakai.</p>
                         </div>
 
                         <div class="divide-y divide-border">
@@ -162,8 +163,10 @@
                                                 {{ $version->issues_count === 0 ? '0 masalah wajib' : $version->issues_count.' temuan wajib' }}
                                             </x-status-badge>
                                         </div>
-                                        <p class="text-sm text-muted">
-                                            {{ $version->source->label() }} • {{ $version->sessions_count }} sesi • {{ Wita::stamp($version->created_at) }}
+                                        <p class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-muted">
+                                            <span>{{ $version->source->label() }}</span>
+                                            <span>{{ $version->sessions_count }} sesi</span>
+                                            <span>{{ Wita::stamp($version->created_at) }}</span>
                                         </p>
                                     </div>
 

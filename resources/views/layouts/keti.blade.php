@@ -19,7 +19,6 @@
                             <x-brand-mark size="size-8" />
                             <span>SICMA</span>
                         </a>
-                        <span class="text-xs text-muted">Ruang kelas JTIK</span>
                     </div>
 
                     <nav class="flex flex-col gap-3" aria-label="Menu Portal Keti">
@@ -79,7 +78,7 @@
                 </main>
 
                 <footer class="flex flex-wrap items-center justify-between gap-4 px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] text-xs text-muted sm:px-6 lg:px-8 lg:pb-8">
-                    <span>JTIK • SICMA</span>
+                    <span>SICMA JTIK</span>
                     <div class="flex flex-wrap items-center gap-2.5">
                         <button type="button"
                                 data-toggle-bg-motion

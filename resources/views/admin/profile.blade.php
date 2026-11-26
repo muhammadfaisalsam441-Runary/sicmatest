@@ -9,7 +9,7 @@
 
 @section('content')
     <div class="flex flex-col gap-6">
-        <x-page-header title="Profil admin" subtitle="Kelola informasi akun dan keamanan masuk." />
+        <x-page-header title="Profil admin" />
 
         <div class="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_400px]">
             <x-card class="flex flex-col gap-5">
@@ -17,7 +17,7 @@
                     <span class="flex size-14 items-center justify-center rounded-full bg-primary-soft text-lg font-semibold text-primary">{{ $user->initials() }}</span>
                     <div class="flex flex-col">
                         <h2 class="text-lg font-semibold">Informasi akun</h2>
-                        <span class="text-sm text-muted">{{ $user->role->label() }}{{ $user->can_publish ? ' • Boleh menetapkan jadwal' : '' }}</span>
+                        <span class="text-sm text-muted">{{ $user->role->label() }}{{ $user->can_publish ? ' — Boleh menetapkan jadwal' : '' }}</span>
                     </div>
                 </div>
                 <form method="POST" action="{{ route('admin.profile.update') }}" class="flex flex-col gap-4">

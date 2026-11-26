@@ -12,7 +12,7 @@
     <div class="flex flex-col gap-4 sm:gap-6">
         <div class="flex flex-wrap items-center justify-between gap-2">
             <x-button variant="secondary" size="sm" icon="arrow-left" :href="route('home')" data-prefetch class="w-auto">Kembali ke beranda</x-button>
-            <x-status-badge variant="primary">Akses publik • Hanya lihat</x-status-badge>
+            <x-status-badge variant="primary">Akses publik</x-status-badge>
         </div>
 
         <div class="flex flex-col items-start justify-between gap-2.5 sm:flex-row sm:gap-6">
@@ -53,7 +53,6 @@
         </search>
 
         <div class="flex min-w-0 flex-col gap-1.5 sm:gap-2.5">
-            <span class="text-xs text-muted sm:text-ink">Ringkasan status di semua gedung</span>
             @php
                 $tabs = [
                     ['label' => 'Semua', 'count' => $summary['all'], 'href' => route('public.rooms', $tabQuery(null)), 'active' => $status === null],
@@ -81,8 +80,6 @@
                 @endforeach
             </div>
         @endif
-
-        <p class="text-xs text-muted">Status mengikuti pembaruan data. Pengunjung publik hanya melihat informasi ruang.</p>
 
         <section class="flex flex-col items-start justify-between gap-4 rounded-card border border-border bg-surface p-5 sm:flex-row sm:items-center sm:gap-6 sm:px-6 sm:py-5">
             <p class="min-w-0 text-sm text-ink">Perlu memesan ruangan untuk kelasmu? Gunakan akun Keti yang terdaftar.

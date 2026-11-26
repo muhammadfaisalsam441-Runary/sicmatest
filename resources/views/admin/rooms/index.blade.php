@@ -67,7 +67,7 @@
          :data-editing="(editMode || formModalOpen || closureModalOpen || deleteModalOpen || reopenModalOpen || batchFacilityModalOpen || batchCapacityModalOpen || selectedIds.length > 0) ? 'true' : null"
          @sicma:navigated.document="formModalOpen = false; closureModalOpen = false; deleteModalOpen = false; reopenModalOpen = false; batchFacilityModalOpen = false; batchCapacityModalOpen = false; editMode = false">
         <x-page-header title="Data ruang"
-                       :subtitle="($periodName ? $periodName.' • ' : '').$totalRooms.' ruang terdaftar'">
+                       :subtitle="($periodName ? $periodName.' — ' : '').$totalRooms.' ruang terdaftar'">
             <x-slot:actions>
                 <x-button size="sm" variant="secondary" icon="download" :href="route('admin.rooms.export', request()->only(['filter', 'gedung', 'q', 'sort', 'dir']))" download>Unduh CSV</x-button>
                 <x-button size="sm" variant="secondary" icon="lock" @click="openClosureModal(null)">Tutup ruang</x-button>

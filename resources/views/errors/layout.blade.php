@@ -26,6 +26,6 @@
             </section>
         </main>
 
-        <footer class="mx-auto w-full max-w-[1168px] px-8 pt-4 pb-10 text-xs text-muted">SICMA • Jurusan Teknik Informatika dan Komputer</footer>
+        <footer class="mx-auto w-full max-w-[1168px] px-8 pt-4 pb-10 text-xs text-muted">SICMA — Jurusan Teknik Informatika dan Komputer</footer>
     </body>
 </html>

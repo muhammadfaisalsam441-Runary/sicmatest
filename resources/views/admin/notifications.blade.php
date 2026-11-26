@@ -9,7 +9,7 @@
 
 @section('content')
     <div class="flex flex-col gap-6">
-        <x-page-header title="Pemberitahuan" :subtitle="$unreadCount.' belum dibaca dari '.$totalCount.' notifikasi terbaru.'">
+        <x-page-header title="Pemberitahuan" :subtitle="$unreadCount.' belum dibaca dari '.$totalCount.' notifikasi'">
             @if ($unreadCount > 0)
                 <x-slot:actions>
                     <form method="POST" action="{{ route('admin.notifications.read-all') }}">
@@ -50,7 +50,7 @@
                         @if ($notification->read_at === null)<x-status-badge variant="primary">Baru</x-status-badge>@endif
                     </div>
                     <p class="text-sm text-muted">{{ $notification->body }}</p>
-                    <p class="text-xs text-muted">{{ $notification->created_at->locale('id')->diffForHumans() }} • {{ Wita::stamp($notification->created_at) }}</p>
+                    <p class="text-xs text-muted">{{ $notification->created_at->locale('id')->diffForHumans() }}, {{ Wita::stamp($notification->created_at) }}</p>
                 </div>
                 @if ($notification->read_at === null || $hasTargetLink)
                     <form method="POST" action="{{ route('admin.notifications.read', $notification) }}" class="shrink-0">

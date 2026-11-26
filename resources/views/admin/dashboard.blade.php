@@ -10,12 +10,12 @@
         $byBuilding = collect($summary['by_building']);
         $buildingHint = $byBuilding->except('Gedung belum didata')->map(fn ($count, $name) => "{$count} {$name}")->values()
             ->when($byBuilding->has('Gedung belum didata'), fn ($parts) => $parts->push($byBuilding['Gedung belum didata'].' ruang lainnya'))
-            ->implode(' • ');
+            ->implode(', ');
     @endphp
 
     <div class="flex flex-col gap-4 admin-page-stack">
         <x-page-header title="Ruang JTIK hari ini"
-                       :subtitle="Wita::dayName($now).', '.Wita::date($now).($period ? ' • Jadwal '.$period->name : '').' • Data pukul '.Wita::clock($now)">
+                       :subtitle="Wita::dayName($now).', '.Wita::date($now).($period ? ' — '.$period->name : '').' ('.Wita::clock($now).')'">
             <x-slot:actions>
                 <x-button size="sm" variant="soft" :href="Nav::url('admin.imports.create')">Impor jadwal</x-button>
                 <x-button size="sm" variant="secondary" :href="route('admin.rooms.index', ['tambah' => 1])">Tambah ruang</x-button>
@@ -25,8 +25,8 @@
 
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <x-stat-card label="Total ruang" :value="$summary['all']" :hint="$buildingHint" />
-            <x-stat-card label="Tersedia sekarang" :value="$summary['available']" tone="success" hint="Kosong pada jam ini" />
-            <x-stat-card label="Digunakan sekarang" :value="$summary['busy']" tone="danger" hint="Sedang dipakai kuliah atau reservasi" />
+            <x-stat-card label="Tersedia sekarang" :value="$summary['available']" tone="success" />
+            <x-stat-card label="Digunakan sekarang" :value="$summary['busy']" tone="danger" />
         </div>
 
         @if ($notStarted->isNotEmpty() || $overrunning->isNotEmpty())
@@ -49,20 +49,20 @@
             <div class="flex flex-wrap items-center justify-between gap-2">
                 <div class="flex min-w-0 flex-wrap items-center gap-2">
                     <h2 class="text-base font-semibold">Penyusunan jadwal {{ $period?->name ?? 'semester aktif' }}</h2>
-                    <span x-show="!open" class="inline-flex max-w-full flex-wrap items-center gap-x-1.5 gap-y-0.5 rounded-2xl border border-border bg-page px-2.5 py-0.5 text-xs font-medium text-muted sm:rounded-full">
+                    <span x-show="!open" class="inline-flex max-w-full flex-wrap items-center gap-x-2 gap-y-0.5 rounded-2xl border border-border bg-page px-2.5 py-0.5 text-xs font-medium text-muted sm:rounded-full">
                         @if ($progress['official'])
                             <span class="font-semibold text-success">Resmi v{{ $progress['official']->version_no }}</span>
                         @else
                             <span>Belum ada jadwal resmi</span>
                         @endif
-                        <span>•</span>
+                        <span class="text-border" aria-hidden="true">|</span>
                         @if ($progress['draft'])
                             <span class="font-semibold text-primary">Draf v{{ $progress['draft']->version_no }}</span>
                         @else
                             <span>Tanpa draf</span>
                         @endif
                         @if ($progress['blocking_count'] > 0)
-                            <span>•</span>
+                            <span class="text-border" aria-hidden="true">|</span>
                             <span class="font-semibold text-danger">{{ $progress['blocking_count'] }} masalah wajib</span>
                         @endif
                     </span>
@@ -120,7 +120,7 @@
 
         <x-card padding="p-4" class="admin-table-card flex flex-col gap-3">
             <x-table-scroll max-height="max-h-[420px]">
-                <x-slot:title>Status ruang saat ini • {{ $summary['all'] }} ruang ({{ $summary['available'] }} tersedia, {{ $summary['busy'] }} digunakan)</x-slot:title>
+                <x-slot:title>Status ruang saat ini ({{ $summary['available'] }} tersedia, {{ $summary['busy'] }} digunakan)</x-slot:title>
                 <x-slot:headerActions>
                     <x-table-density-toggle />
                     <a href="{{ route('admin.usage-logs.index') }}" class="text-xs font-semibold text-primary hover:underline">Lihat log lengkap</a>

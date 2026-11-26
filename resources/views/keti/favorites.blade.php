@@ -4,7 +4,7 @@
 
 @section('content')
     <div class="flex min-w-0 flex-col gap-6">
-        <x-page-header title="Ruangan Favorit" subtitle="Buka kembali ruangan yang sering digunakan." />
+        <x-page-header title="Ruangan Favorit" />
 
         @if ($counts['all'] === 0)
             <x-empty-state title="Belum ada ruangan favorit" message="Temukan ruangan dan simpan untuk dibuka kembali." icon="heart">
@@ -48,7 +48,6 @@
                     @endforeach
                 </div>
             @endif
-            <p class="text-xs text-muted">Ruangan favorit tetap mengikuti ketersediaan saat ini. Pilih Detail ruangan untuk melihat waktu kosong dan riwayat pemakaian.</p>
         @endif
     </div>
 @endsection

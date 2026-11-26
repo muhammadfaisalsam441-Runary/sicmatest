@@ -4,7 +4,7 @@
 @section('breadcrumb', 'Pemeriksaan Jadwal')
 @section('content')
     <div class="flex flex-col gap-6">
-        <x-page-header title="Daftar & Pemeriksaan Draf Jadwal" :subtitle="($period?->name ?? 'Belum ada semester aktif').' • Kelola penempatan sesi draf atau periksa kesiapan sebelum ditetapkan menjadi jadwal resmi.'">
+        <x-page-header title="Daftar & Pemeriksaan Draf Jadwal" :subtitle="$period?->name ?? 'Belum ada semester aktif'">
             <x-slot:actions>
                 <x-button variant="secondary" icon="sparkles" :href="route('admin.scheduler.create', ['susun' => 1])">Susun Otomatis</x-button>
                 @if ($period && $versions->isEmpty())
@@ -30,8 +30,15 @@
                             {{ $version->issues_count === 0 ? '0 masalah wajib' : $version->issues_count.' temuan wajib' }}
                         </x-status-badge>
                     </div>
-                    <p class="mt-1 text-sm text-muted">{{ $version->source->label() }} • {{ $version->sessions_count }} sesi • {{ $version->issues_count }} temuan wajib tersimpan</p>
-                    <p class="text-xs text-muted">Dibuat {{ Wita::stamp($version->created_at) }} • Diperbarui {{ Wita::stamp($version->updated_at) }}</p>
+                    <p class="mt-1 flex flex-wrap gap-x-3 text-sm text-muted">
+                        <span>{{ $version->source->label() }}</span>
+                        <span>{{ $version->sessions_count }} sesi</span>
+                        <span>{{ $version->issues_count }} temuan wajib tersimpan</span>
+                    </p>
+                    <p class="flex flex-wrap gap-x-3 text-xs text-muted">
+                        <span>Dibuat {{ Wita::stamp($version->created_at) }}</span>
+                        <span>Diperbarui {{ Wita::stamp($version->updated_at) }}</span>
+                    </p>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
                     @if (! $isActive)

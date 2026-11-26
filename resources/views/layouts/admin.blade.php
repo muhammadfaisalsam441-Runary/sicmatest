@@ -27,7 +27,7 @@
                     <a href="{{ Nav::url('admin.dashboard') }}" class="flex items-center gap-2.5 rounded-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
                         <x-brand-mark size="size-8" />
                         <span class="flex flex-col gap-0.5">
-                            <span class="text-xs font-semibold text-primary">SICMA •</span>
+                            <span class="text-xs font-semibold text-primary">SICMA</span>
                             <span class="text-xl font-medium text-ink">Panel Admin</span>
                         </span>
                     </a>

@@ -42,7 +42,7 @@
         <x-card class="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-muted" padding="px-4 py-2.5">
             <span><strong class="text-ink">{{ $version->source->label() }}</strong> {{ Wita::stamp($version->created_at) }}</span>
             <span><strong class="text-ink">{{ $isDraft ? 'Pemeriksaan:' : 'Status versi:' }}</strong> {{ $isDraft ? $reviewStatus['label'] : $version->status->label() }}</span>
-            <span><strong class="text-ink">Sesi:</strong> {{ $counts['total'] }} total • {{ $counts['timed'] }} terjadwal • {{ $counts['unscheduled'] }} tanpa waktu • {{ $counts['online'] }} online</span>
+            <span><strong class="text-ink">Sesi:</strong> {{ $counts['total'] }} total, {{ $counts['timed'] }} terjadwal, {{ $counts['unscheduled'] }} tanpa waktu, {{ $counts['online'] }} online</span>
             <span><strong class="text-ink">Dikunci:</strong> {{ $counts['locked'] }} sesi</span>
             <span><strong class="text-ink">Berlaku mulai:</strong> {{ Wita::date($version->effective_from) }}</span>
         </x-card>

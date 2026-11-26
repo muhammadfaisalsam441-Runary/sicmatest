@@ -13,7 +13,7 @@
 
 @section('content')
     <div class="flex flex-col gap-4 sm:gap-6">
-        <x-page-header title="Ruangan JTIK" subtitle="{{ $totalRooms }} ruangan terdaftar • {{ \App\Support\Wita::stamp($checkedAt) }}" />
+        <x-page-header title="Ruangan JTIK" subtitle="{{ $totalRooms }} ruangan terdaftar" />
 
         <search x-data="{ filtersOpen: false }">
             <form method="GET" action="{{ route('keti.rooms.index') }}" class="flex flex-col gap-2.5 rounded-card border border-border bg-surface p-3 sm:p-4 lg:flex-row lg:items-center lg:gap-3">
@@ -78,10 +78,7 @@
         </search>
 
         <div class="flex items-center justify-between gap-2">
-            <div class="flex min-w-0 flex-col gap-0.5">
-                <h2 class="text-base font-semibold sm:text-lg">Daftar ruangan</h2>
-                <p class="hidden text-sm text-muted sm:block">Status menunjukkan kondisi saat ini. Kamu tetap bisa mencari dan memesan untuk tanggal dan jam operasional berikutnya.</p>
-            </div>
+            <h2 class="text-base font-semibold sm:text-lg">Daftar ruangan</h2>
             <x-button :href="route('keti.search')" size="sm" icon="search" class="min-h-10 shrink-0 sm:min-h-11 sm:px-5 sm:py-3 sm:text-sm">Cari kosong</x-button>
         </div>
 

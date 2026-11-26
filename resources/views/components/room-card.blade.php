@@ -45,12 +45,11 @@
             <h3 class="sicma-card-title {{ $size === 'large' ? 'text-xl' : 'text-lg' }} min-w-0 truncate font-semibold leading-snug text-ink transition-colors duration-200">{{ $name }}</h3>
             <x-status-badge :variant="$variant" :pulse="$isBusy" class="shrink-0">{{ $badge }}</x-status-badge>
         </div>
-        <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted">
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted">
             <span class="inline-flex min-w-0 items-center gap-1">
                 <i data-lucide="map-pin" aria-hidden="true" class="sicma-card-pin size-3.5 shrink-0 transition-colors duration-200"></i>
                 <span class="truncate">{{ $location }}</span>
             </span>
-            <span aria-hidden="true" class="text-border">•</span>
             <span class="inline-flex shrink-0 items-center gap-1 tabular-nums">
                 <i data-lucide="users" aria-hidden="true" class="size-3.5 shrink-0"></i>
                 <span>{{ $capacityText }}</span>

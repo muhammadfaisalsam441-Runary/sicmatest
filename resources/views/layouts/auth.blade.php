@@ -23,13 +23,12 @@
                 </div>
 
                 <div class="relative z-10 flex max-w-md flex-col gap-2 sm:gap-3 lg:my-auto lg:gap-8">
-                    <h1 class="text-[clamp(1.5rem,1.1rem+2vw,2.75rem)] leading-tight font-bold">Satu akses untuk ruang kelas JTIK.</h1>
+                    <h1 class="text-[clamp(1.5rem,1.1rem+2vw,2.75rem)] leading-tight font-bold">Satu akses untuk ruang kelas JTIK</h1>
                     <p class="text-xs leading-relaxed text-white/90 sm:text-[15px]">Lihat ruangan tanpa akun. Masuk untuk menggunakan ruangan atau mengelola layanan SICMA.</p>
-                    <p class="hidden text-sm font-medium sm:block lg:text-lg">Publik • Keti • Admin</p>
                 </div>
 
                 <div class="relative z-10 hidden flex-wrap items-center justify-between gap-3 pt-6 text-xs text-white/75 lg:flex">
-                    <span>JTIK • Universitas Negeri Makassar</span>
+                    <span>JTIK, Universitas Negeri Makassar</span>
                     <button type="button"
                             data-toggle-bg-motion
                             aria-label="Jeda animasi latar"

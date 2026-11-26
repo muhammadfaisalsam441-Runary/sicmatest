@@ -154,7 +154,7 @@
                     @foreach ($row['windows'] as $window)
                         @php
                             $selectId = 'mulai-'.$row['room']->id.'-'.$loop->index;
-                            $location = ($row['room']->building?->name ?? 'Gedung belum didata').' • Lantai '.($row['room']->floor ?? '—');
+                            $location = ($row['room']->building?->name ?? 'Gedung belum didata').', Lantai '.($row['room']->floor ?? '—');
                             $payloads = collect($window['starts'])->mapWithKeys(fn ($start) => [
                                 $start->format('Y-m-d H:i') => BookingPayload::make($row['room']->id, $row['room']->name, $location, $row['room']->capacity, $start, $duration, isset($filters['orang']) && filled($filters['orang']) ? (int) $filters['orang'] : null),
                             ]);

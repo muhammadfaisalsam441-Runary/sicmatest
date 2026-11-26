@@ -25,8 +25,8 @@
                 @unless ($isDraft)
                     <x-status-badge variant="primary">{{ $version->status->label() }} v{{ $version->version_no }}</x-status-badge>
                 @endunless
-                <x-button variant="secondary" size="sm" icon="download" :href="route('admin.drafts.excel', [$version, 'tinjau' => $view])" download>Unduh Excel</x-button>
-                <x-button variant="secondary" size="sm" icon="download" :href="route('admin.drafts.pdf', [$version, 'tinjau' => $view])" download>Unduh PDF</x-button>
+                <x-button variant="secondary" size="sm" icon="download" :href="route('admin.drafts.excel', [$version, 'tinjau' => $view])" data-native>Unduh Excel</x-button>
+                <x-button variant="secondary" size="sm" icon="download" :href="route('admin.drafts.pdf', [$version, 'tinjau' => $view])" data-native>Unduh PDF</x-button>
                 @if ($isDraft)
                     <x-button size="sm" :href="route('admin.drafts.inspect', $version)">Buka Pemeriksaan</x-button>
                 @endif

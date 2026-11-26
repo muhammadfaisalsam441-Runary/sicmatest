@@ -27,7 +27,7 @@
                 <p class="px-2 pt-0.5 text-[11px] font-semibold tracking-wider text-muted uppercase">Excel (.xlsx)</p>
                 @foreach ($views as $key => $label)
                     <a href="{{ route('admin.drafts.excel', [$version, 'tinjau' => $key]) }}"
-                       download
+                       data-native
                        class="flex items-center justify-between gap-2 rounded-control px-2.5 py-1.5 text-xs font-medium text-ink transition hover:bg-primary-soft/60 hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
                         <span class="inline-flex items-center gap-2">
                             <i data-lucide="file-spreadsheet" aria-hidden="true" class="size-3.5 shrink-0 text-success"></i>
@@ -42,7 +42,7 @@
                 <p class="px-2 text-[11px] font-semibold tracking-wider text-muted uppercase">PDF (.pdf)</p>
                 @foreach ($views as $key => $label)
                     <a href="{{ route('admin.drafts.pdf', [$version, 'tinjau' => $key]) }}"
-                       download
+                       data-native
                        class="flex items-center justify-between gap-2 rounded-control px-2.5 py-1.5 text-xs font-medium text-ink transition hover:bg-primary-soft/60 hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
                         <span class="inline-flex items-center gap-2">
                             <i data-lucide="download" aria-hidden="true" class="size-3.5 shrink-0 text-primary"></i>

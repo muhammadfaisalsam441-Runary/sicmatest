@@ -7,6 +7,7 @@ use App\Models\Academic\ClassGroup;
 use App\Models\Scheduling\ScheduleSession;
 use App\Models\Scheduling\ScheduleVersion;
 use App\Support\Wita;
+use Dompdf\Cpdf;
 use Dompdf\Dompdf;
 use Dompdf\Options;
 use Illuminate\Support\Collection;
@@ -86,7 +87,8 @@ class ScheduleExportService
      *     sks: string,
      *     dosen_pengampu: string,
      *     dosen_mitra: string,
-     *     dosen_mitra_2: string
+     *     dosen_mitra_2: string,
+     *     shaded: bool
      * }>
      */
     public function flatRows(ScheduleVersion $version, string $view, Collection $groups): array
@@ -102,6 +104,8 @@ class ScheduleExportService
         $orderedGroups = $this->sortGroups($view, $groups);
         $rows = [];
         $no = 1;
+        $classBlockIndex = -1;
+        $previousKelas = null;
 
         foreach ($orderedGroups as $groupName => $sessions) {
             $sortedSessions = $sessions
@@ -127,12 +131,18 @@ class ScheduleExportService
                 $raw = is_array($session->source_raw) ? $session->source_raw : [];
                 $kodeMk = trim((string) ($course?->code ?? $raw['course_code'] ?? $raw['kode_mk'] ?? ''));
                 $sksValue = $course?->sks ?? $raw['sks'] ?? null;
+                $kelas = $view === 'kelas' && $groupName !== 'Tanpa kelas'
+                    ? $groupName
+                    : ($session->participants->pluck('name')->implode(' + ') ?: '—');
+
+                if ($kelas !== $previousKelas) {
+                    $classBlockIndex++;
+                    $previousKelas = $kelas;
+                }
 
                 $rows[] = [
                     'no' => $no++,
-                    'kelas' => $view === 'kelas' && $groupName !== 'Tanpa kelas'
-                        ? $groupName
-                        : ($session->participants->pluck('name')->implode(' + ') ?: '—'),
+                    'kelas' => $kelas,
                     'hari' => $session->day_of_week === null ? 'Belum terjadwal' : Wita::dayName($session->day_of_week),
                     'jam' => $this->formatRomanSlots($timeSlots, $session->start_minute, $session->end_minute),
                     'wita' => $this->formatWitaRange($session->start_minute, $session->end_minute),
@@ -147,6 +157,7 @@ class ScheduleExportService
                     'dosen_pengampu' => $lead,
                     'dosen_mitra' => $mitra1,
                     'dosen_mitra_2' => $mitra2,
+                    'shaded' => ($classBlockIndex % 2) === 0,
                 ];
             }
         }
@@ -167,7 +178,8 @@ class ScheduleExportService
      *     sks: string,
      *     dosen_pengampu: string,
      *     dosen_mitra: string,
-     *     dosen_mitra_2: string
+     *     dosen_mitra_2: string,
+     *     shaded?: bool
      * }>  $rows
      */
     public function writeExcel(ScheduleVersion $version, string $view, array $rows): void
@@ -249,7 +261,7 @@ class ScheduleExportService
                 $sheet->setCellValueExplicit([$column + 1, $index], (string) $value, DataType::TYPE_STRING);
             }
 
-            if ($index % 2 === 0) {
+            if ($row['shaded'] ?? false) {
                 $sheet->getStyle("A{$index}:L{$index}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FFF5D6');
             }
 
@@ -323,6 +335,312 @@ class ScheduleExportService
         $canvas->page_text($canvas->get_width() - 118, $canvas->get_height() - 27, 'Halaman {PAGE_NUM} / {PAGE_COUNT}', $font, 8, [0.27, 0.36, 0.45]);
 
         return $document->output();
+    }
+
+    /**
+     * Render PDF jadwal 12 kolom secara langsung memakai Dompdf\Cpdf agar hemat memori dan jauh lebih cepat.
+     *
+     * @param  list<array{
+     *     no: int,
+     *     kelas: string,
+     *     hari: string,
+     *     jam: string,
+     *     wita: string,
+     *     ruang: string,
+     *     kode_mk: string,
+     *     mata_kuliah: string,
+     *     sks: string,
+     *     dosen_pengampu: string,
+     *     dosen_mitra: string,
+     *     dosen_mitra_2: string
+     * }>  $rows
+     */
+    public function renderTablePdf(ScheduleVersion $version, string $view, array $rows): string
+    {
+        $pageWidth = 841.89;
+        $pageHeight = 595.28;
+        $marginX = 24.0;
+        $marginTop = 24.0;
+        $marginBottom = 28.0;
+
+        $columns = [
+            ['key' => 'no', 'label' => 'NO', 'width' => 24.0, 'align' => 'C'],
+            ['key' => 'kelas', 'label' => 'KELAS', 'width' => 78.0, 'align' => 'C'],
+            ['key' => 'hari', 'label' => 'HARI', 'width' => 42.0, 'align' => 'C'],
+            ['key' => 'jam', 'label' => 'JAM', 'width' => 42.0, 'align' => 'C'],
+            ['key' => 'wita', 'label' => 'WITA', 'width' => 66.0, 'align' => 'C'],
+            ['key' => 'ruang', 'label' => 'RUANG', 'width' => 68.0, 'align' => 'C'],
+            ['key' => 'kode_mk', 'label' => 'KODE MK', 'width' => 74.0, 'align' => 'C'],
+            ['key' => 'mata_kuliah', 'label' => 'MATA KULIAH', 'width' => 122.0, 'align' => 'L'],
+            ['key' => 'sks', 'label' => 'SKS', 'width' => 26.0, 'align' => 'C'],
+            ['key' => 'dosen_pengampu', 'label' => 'DOSEN PENGAMPU', 'width' => 102.0, 'align' => 'L'],
+            ['key' => 'dosen_mitra', 'label' => 'DOSEN MITRA', 'width' => 96.0, 'align' => 'L'],
+            ['key' => 'dosen_mitra_2', 'label' => 'DOSEN MITRA 2', 'width' => 53.89, 'align' => 'L'],
+        ];
+
+        $tableWidth = array_sum(array_column($columns, 'width'));
+        $fontSize = 6.6;
+        $lineHeight = 8.2;
+        $padX = 3.0;
+        $padY = 2.4;
+        $minRowHeight = 12.2;
+        $headerFontSize = 6.8;
+        $headerLineHeight = 8.4;
+        $headerHeight = 18.0;
+
+        $cpdf = new Cpdf([0, 0, $pageWidth, $pageHeight], false);
+
+        // Pre-wrap header labels dengan Helvetica-Bold agar lebar terukur akurat.
+        $cpdf->selectFont('Helvetica-Bold');
+        $wrappedHeaders = [];
+        $maxHeaderLines = 1;
+        foreach ($columns as $colIndex => $column) {
+            $lines = $this->wrapPdfText($cpdf, $column['label'], $headerFontSize, $column['width'] - ($padX * 2));
+            $wrappedHeaders[$colIndex] = $lines;
+            $maxHeaderLines = max($maxHeaderLines, count($lines));
+        }
+        $headerHeight = max($headerHeight, ($maxHeaderLines * $headerLineHeight) + ($padY * 2));
+
+        // Pre-wrap seluruh sel isi dengan Helvetica untuk paginasi cepat sebelum menggambar.
+        $cpdf->selectFont('Helvetica');
+        $preparedRows = [];
+        foreach ($rows as $rowIndex => $row) {
+            $cells = [];
+            $maxLines = 1;
+            foreach ($columns as $colIndex => $column) {
+                $rawText = (string) ($row[$column['key']] ?? '');
+                $lines = $this->wrapPdfText($cpdf, $rawText, $fontSize, $column['width'] - ($padX * 2));
+                $cells[$colIndex] = $lines;
+                $maxLines = max($maxLines, count($lines));
+            }
+
+            $preparedRows[] = [
+                'index' => $rowIndex,
+                'shaded' => (bool) ($row['shaded'] ?? false),
+                'cells' => $cells,
+                'height' => max($minRowHeight, ($maxLines * $lineHeight) + ($padY * 2)),
+            ];
+        }
+
+        $titleBlockHeight = $view !== 'kelas' ? 48.0 : 36.0;
+        $pages = [];
+        $currentPageRows = [];
+        $cursorY = $pageHeight - $marginTop - $titleBlockHeight - $headerHeight;
+
+        if ($preparedRows === []) {
+            $pages[] = [];
+        } else {
+            foreach ($preparedRows as $preparedRow) {
+                if ($currentPageRows !== [] && ($cursorY - $preparedRow['height']) < $marginBottom) {
+                    $pages[] = $currentPageRows;
+                    $currentPageRows = [];
+                    $cursorY = $pageHeight - $marginTop - $headerHeight;
+                }
+
+                $currentPageRows[] = $preparedRow;
+                $cursorY -= $preparedRow['height'];
+            }
+
+            if ($currentPageRows !== []) {
+                $pages[] = $currentPageRows;
+            }
+        }
+
+        $totalPages = count($pages);
+        $titleText = $this->encodePdfText($this->documentTitle($version));
+        $departmentText = $this->encodePdfText(self::DEPARTMENT_TITLE);
+        $subtitleText = $view !== 'kelas' ? $this->encodePdfText('Tinjauan Per '.self::GROUP_LABELS[$view]) : null;
+        $emptyText = $this->encodePdfText('Belum ada sesi pada versi ini.');
+
+        foreach ($pages as $pageIndex => $pageRows) {
+            if ($pageIndex > 0) {
+                $cpdf->newPage();
+            }
+
+            $topY = $pageHeight - $marginTop;
+
+            if ($pageIndex === 0) {
+                $cpdf->selectFont('Helvetica-Bold');
+                $cpdf->setColor([0, 0, 0]);
+
+                $titleWidth = $cpdf->getTextWidth(12.5, $titleText);
+                $cpdf->addText(($pageWidth - $titleWidth) / 2, $topY - 12.0, 12.5, $titleText);
+
+                $deptWidth = $cpdf->getTextWidth(11.5, $departmentText);
+                $cpdf->addText(($pageWidth - $deptWidth) / 2, $topY - 26.5, 11.5, $departmentText);
+
+                if ($subtitleText !== null) {
+                    $cpdf->selectFont('Helvetica-Oblique');
+                    $cpdf->setColor([0.27, 0.36, 0.45]);
+                    $subWidth = $cpdf->getTextWidth(8.5, $subtitleText);
+                    $cpdf->addText(($pageWidth - $subWidth) / 2, $topY - 39.0, 8.5, $subtitleText);
+                }
+
+                $topY -= $titleBlockHeight;
+            }
+
+            // Header tabel 12 kolom di setiap halaman.
+            $headerBottomY = $topY - $headerHeight;
+            $cpdf->setLineStyle(0.6);
+            $cpdf->setStrokeColor([0, 0, 0]);
+            $cpdf->setColor([169 / 255, 196 / 255, 226 / 255]);
+            $cpdf->filledRectangle($marginX, $headerBottomY, $tableWidth, $headerHeight);
+
+            $cpdf->selectFont('Helvetica-Bold');
+            $cpdf->setColor([0, 0, 0]);
+            $cellX = $marginX;
+            foreach ($columns as $colIndex => $column) {
+                $cpdf->rectangle($cellX, $headerBottomY, $column['width'], $headerHeight);
+                $lines = $wrappedHeaders[$colIndex];
+                $blockTop = $headerBottomY + (($headerHeight + (count($lines) * $headerLineHeight)) / 2);
+
+                foreach ($lines as $lineIdx => $line) {
+                    $lineTop = $blockTop - ($lineIdx * $headerLineHeight);
+                    $baseline = $lineTop - (($headerLineHeight + ($headerFontSize * 0.72)) / 2);
+                    $textWidth = $cpdf->getTextWidth($headerFontSize, $line);
+                    $textX = $cellX + max($padX, ($column['width'] - $textWidth) / 2);
+                    $cpdf->addText($textX, $baseline, $headerFontSize, $line);
+                }
+
+                $cellX += $column['width'];
+            }
+
+            $currentBottomY = $headerBottomY;
+            $cpdf->setLineStyle(0.5);
+
+            if ($pageRows === []) {
+                $rowBottomY = $currentBottomY - 18.0;
+                $cpdf->setStrokeColor([0, 0, 0]);
+                $cpdf->rectangle($marginX, $rowBottomY, $tableWidth, 18.0);
+                $cpdf->selectFont('Helvetica');
+                $cpdf->setColor([0, 0, 0]);
+                $emptyWidth = $cpdf->getTextWidth($fontSize, $emptyText);
+                $cpdf->addText(($pageWidth - $emptyWidth) / 2, $rowBottomY + 6.5, $fontSize, $emptyText);
+            } else {
+                foreach ($pageRows as $preparedRow) {
+                    $rowHeight = $preparedRow['height'];
+                    $rowBottomY = $currentBottomY - $rowHeight;
+
+                    if ($preparedRow['shaded']) {
+                        $cpdf->setColor([1.0, 245 / 255, 214 / 255]);
+                        $cpdf->filledRectangle($marginX, $rowBottomY, $tableWidth, $rowHeight);
+                    }
+
+                    $cpdf->selectFont('Helvetica');
+                    $cpdf->setColor([0, 0, 0]);
+                    $cpdf->setStrokeColor([0, 0, 0]);
+
+                    $cellX = $marginX;
+                    foreach ($columns as $colIndex => $column) {
+                        $cpdf->rectangle($cellX, $rowBottomY, $column['width'], $rowHeight);
+                        $lines = $preparedRow['cells'][$colIndex];
+                        $blockTop = $rowBottomY + (($rowHeight + (count($lines) * $lineHeight)) / 2);
+
+                        foreach ($lines as $lineIdx => $line) {
+                            if ($line === '') {
+                                continue;
+                            }
+                            $lineTop = $blockTop - ($lineIdx * $lineHeight);
+                            $baseline = $lineTop - (($lineHeight + ($fontSize * 0.72)) / 2);
+
+                            if ($column['align'] === 'C') {
+                                $textWidth = $cpdf->getTextWidth($fontSize, $line);
+                                $textX = $cellX + max($padX, ($column['width'] - $textWidth) / 2);
+                            } else {
+                                $textX = $cellX + $padX;
+                            }
+
+                            $cpdf->addText($textX, $baseline, $fontSize, $line);
+                        }
+
+                        $cellX += $column['width'];
+                    }
+
+                    $currentBottomY = $rowBottomY;
+                }
+            }
+
+            $cpdf->selectFont('Helvetica');
+            $cpdf->setColor([0.27, 0.36, 0.45]);
+            $footerText = $this->encodePdfText('Halaman '.($pageIndex + 1).' / '.$totalPages);
+            $footerWidth = $cpdf->getTextWidth(7.5, $footerText);
+            $cpdf->addText($pageWidth - $marginX - $footerWidth, 14.0, 7.5, $footerText);
+        }
+
+        return $cpdf->output();
+    }
+
+    private function encodePdfText(string $text): string
+    {
+        $normalized = str_replace(['—', '–'], ['-', '-'], $text);
+        $encoded = @iconv('UTF-8', 'Windows-1252//TRANSLIT//IGNORE', $normalized);
+
+        return $encoded !== false ? $encoded : $normalized;
+    }
+
+    /**
+     * Pecah teks sel menjadi beberapa baris agar tidak melewati lebar kolom.
+     *
+     * @return list<string>
+     */
+    private function wrapPdfText(Cpdf $cpdf, string $text, float $fontSize, float $maxWidth): array
+    {
+        $encoded = trim($this->encodePdfText($text));
+        if ($encoded === '') {
+            return [''];
+        }
+
+        $safeMax = max(10.0, $maxWidth);
+        $paragraphs = preg_split('/\R+/', $encoded) ?: [$encoded];
+        $lines = [];
+
+        foreach ($paragraphs as $paragraph) {
+            $words = preg_split('/\s+/', trim($paragraph)) ?: [];
+            if ($words === []) {
+                continue;
+            }
+
+            $current = '';
+            foreach ($words as $word) {
+                $candidate = $current === '' ? $word : $current.' '.$word;
+                if ($cpdf->getTextWidth($fontSize, $candidate) <= $safeMax) {
+                    $current = $candidate;
+
+                    continue;
+                }
+
+                if ($current !== '') {
+                    $lines[] = $current;
+                    $current = '';
+                }
+
+                if ($cpdf->getTextWidth($fontSize, $word) <= $safeMax) {
+                    $current = $word;
+
+                    continue;
+                }
+
+                // Pecah kata/kode yang sangat panjang karakter demi karakter.
+                $chunk = '';
+                $len = strlen($word);
+                for ($i = 0; $i < $len; $i++) {
+                    $char = $word[$i];
+                    if ($chunk !== '' && $cpdf->getTextWidth($fontSize, $chunk.$char) > $safeMax) {
+                        $lines[] = $chunk;
+                        $chunk = $char;
+                    } else {
+                        $chunk .= $char;
+                    }
+                }
+                $current = $chunk;
+            }
+
+            if ($current !== '') {
+                $lines[] = $current;
+            }
+        }
+
+        return $lines !== [] ? $lines : [''];
     }
 
     /**

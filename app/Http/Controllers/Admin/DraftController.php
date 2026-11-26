@@ -180,16 +180,7 @@ class DraftController extends Controller
         [$view, $sessions, $groups] = $this->review($request, $version);
         $version->load(['period.timeSlots']);
         $rows = $exports->flatRows($version, $view, $groups);
-
-        $html = view('admin.drafts.pdf', [
-            'version' => $version,
-            'title' => $exports->documentTitle($version),
-            'department' => ScheduleExportService::DEPARTMENT_TITLE,
-            'view' => $view,
-            'viewLabel' => ScheduleExportService::GROUP_LABELS[$view],
-            'rows' => $rows,
-        ])->render();
-        $pdf = $exports->pdf($html);
+        $pdf = $exports->renderTablePdf($version, $view, $rows);
 
         return response()->streamDownload(
             static function () use ($pdf): void {

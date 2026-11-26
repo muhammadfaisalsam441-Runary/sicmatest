@@ -124,8 +124,8 @@
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2">
-                    <x-button variant="secondary" size="sm" icon="download" :href="route('admin.drafts.excel', [$version, 'tinjau' => $view])" download>Unduh Excel</x-button>
-                    <x-button variant="secondary" size="sm" icon="download" :href="route('admin.drafts.pdf', [$version, 'tinjau' => $view])" download>Unduh PDF</x-button>
+                    <x-button variant="secondary" size="sm" icon="download" :href="route('admin.drafts.excel', [$version, 'tinjau' => $view])" data-native>Unduh Excel</x-button>
+                    <x-button variant="secondary" size="sm" icon="download" :href="route('admin.drafts.pdf', [$version, 'tinjau' => $view])" data-native>Unduh PDF</x-button>
                 </div>
             </div>
 

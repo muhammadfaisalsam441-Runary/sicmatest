@@ -110,8 +110,8 @@
                     </form>
                 @endif
                 @if ($official)
-                    <x-button variant="secondary" size="sm" icon="download" :href="route('admin.drafts.excel', [$official, ...request()->only(['hari', 'prodi', 'angkatan', 'kelas', 'dosen', 'ruang', 'q'])])" download>Excel</x-button>
-                    <x-button variant="secondary" size="sm" icon="download" :href="route('admin.drafts.pdf', [$official, ...request()->only(['hari', 'prodi', 'angkatan', 'kelas', 'dosen', 'ruang', 'q'])])" download>PDF</x-button>
+                    <x-button variant="secondary" size="sm" icon="download" :href="route('admin.drafts.excel', [$official, ...request()->only(['hari', 'prodi', 'angkatan', 'kelas', 'dosen', 'ruang', 'q'])])" data-native>Excel</x-button>
+                    <x-button variant="secondary" size="sm" icon="download" :href="route('admin.drafts.pdf', [$official, ...request()->only(['hari', 'prodi', 'angkatan', 'kelas', 'dosen', 'ruang', 'q'])])" data-native>PDF</x-button>
                 @endif
             </div>
         </x-card>

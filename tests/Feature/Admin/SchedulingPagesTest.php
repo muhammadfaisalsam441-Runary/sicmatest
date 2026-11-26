@@ -40,6 +40,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Http\UploadedFile;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
 
 beforeEach(function () {
     $this->withoutVite();
@@ -2108,7 +2109,14 @@ test('ekspor Excel dan PDF mengikuti format 12 kolom serta urutan angkatan prodi
             ->and($sheet->getCell('B11')->getValue())->toBe('PTIK A 2024')
             ->and($sheet->getCell('B12')->getValue())->toBe('PTIK Pilihan A 2024')
             ->and($sheet->getCell('B13')->getValue())->toBe('PTIK ULANG 2024')
-            ->and($sheet->getCell('B14')->getValue())->toBe('TEKOM ES-A 2024');
+            ->and($sheet->getCell('B14')->getValue())->toBe('TEKOM ES-A 2024')
+            ->and($sheet->getStyle('A5:L5')->getFill()->getFillType())->toBe(Fill::FILL_SOLID)
+            ->and($sheet->getStyle('A5:L5')->getFill()->getStartColor()->getRGB())->toBe('FFF5D6')
+            ->and($sheet->getStyle('A6:L6')->getFill()->getFillType())->toBe(Fill::FILL_SOLID)
+            ->and($sheet->getStyle('A6:L6')->getFill()->getStartColor()->getRGB())->toBe('FFF5D6')
+            ->and($sheet->getStyle('A7:L7')->getFill()->getFillType())->toBe(Fill::FILL_NONE)
+            ->and($sheet->getStyle('A8:L8')->getFill()->getFillType())->toBe(Fill::FILL_SOLID)
+            ->and($sheet->getStyle('A8:L8')->getFill()->getStartColor()->getRGB())->toBe('FFF5D6');
     } finally {
         fclose($file);
     }

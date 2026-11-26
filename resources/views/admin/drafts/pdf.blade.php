@@ -61,7 +61,7 @@
         </thead>
         <tbody>
             @forelse ($rows as $row)
-                <tr @class(['band' => $loop->even])>
+                <tr @class(['band' => $row['shaded'] ?? $loop->odd])>
                     <td class="center">{{ $row['no'] }}</td>
                     <td class="center">{{ $row['kelas'] }}</td>
                     <td class="center">{{ $row['hari'] }}</td>

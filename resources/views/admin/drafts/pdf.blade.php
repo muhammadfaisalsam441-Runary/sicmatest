@@ -2,55 +2,81 @@
 <html lang="id">
 <head>
     <meta charset="utf-8">
-    <title>SICMA - Jadwal {{ $version->period->name }} v{{ $version->version_no }}</title>
+    <title>{{ $title }} — {{ $department }}</title>
     <style>
-        @page { size: A4 landscape; margin: 12mm 12mm 14mm; }
+        @page { size: A4 landscape; margin: 10mm 9mm 12mm; }
         * { box-sizing: border-box; }
-        body { margin: 0; color: #152b43; font: 10pt "DejaVu Sans", Arial, sans-serif; }
-        .heading { border-bottom: 2px solid #245987; margin-bottom: 12pt; padding-bottom: 8pt; }
-        .brand { color: #245987; font-size: 9pt; font-weight: bold; letter-spacing: 1.4pt; }
-        h1 { font-size: 20pt; line-height: 1.2; margin: 3pt 0 4pt; }
-        .subtitle { color: #465c73; margin: 0; }
-        table { border-collapse: collapse; font-size: 8.5pt; line-height: 1.3; table-layout: fixed; width: 100%; }
+        body { margin: 0; color: #000000; font: 7.2pt "DejaVu Sans", Arial, sans-serif; }
+        .heading { margin-bottom: 8pt; text-align: center; }
+        .heading h1 { font-size: 13pt; font-weight: bold; line-height: 1.25; margin: 0; text-transform: uppercase; }
+        .heading h2 { font-size: 12pt; font-weight: bold; line-height: 1.25; margin: 1pt 0 0; text-transform: uppercase; }
+        .heading .sub { color: #465c73; font-size: 8pt; font-style: italic; margin: 3pt 0 0; }
+        table { border-collapse: collapse; font-size: 7pt; line-height: 1.25; table-layout: fixed; width: 100%; }
         thead { display: table-header-group; }
-        th { background: #17395d; color: white; padding: 5pt; text-align: left; }
-        td { border-bottom: 1px solid #dbe5ee; overflow-wrap: break-word; padding: 4pt 5pt; vertical-align: top; }
+        th {
+            background: #a9c4e2;
+            border: 0.75pt solid #000000;
+            color: #000000;
+            font-weight: bold;
+            padding: 4pt 3pt;
+            text-align: center;
+            vertical-align: middle;
+        }
+        td {
+            border: 0.6pt solid #000000;
+            overflow-wrap: break-word;
+            padding: 2.5pt 3.5pt;
+            vertical-align: middle;
+        }
         tr { break-inside: avoid; page-break-inside: avoid; }
-        .group { page-break-after: avoid; }
-        .group td { background: #dbeaf6; color: #17395d; font-weight: bold; }
-        .band td { background: #f2f6fa; }
-        .lecturers { white-space: pre-line; }
+        tbody tr.band td { background: #fff5d6; }
+        .center { text-align: center; }
+        .left { text-align: left; }
     </style>
 </head>
 <body>
     <header class="heading">
-        <div class="brand">SICMA · JADWAL PERKULIAHAN</div>
-        <h1>{{ $version->period->name }}</h1>
-        <p class="subtitle">{{ $subtitle }}</p>
+        <h1>{{ $title }}</h1>
+        <h2>{{ $department }}</h2>
+        @if ($view !== 'kelas')
+            <p class="sub">Tinjauan Per {{ $viewLabel }}</p>
+        @endif
     </header>
     <table>
         <thead>
             <tr>
-                <th scope="col" style="width: 9%">Hari</th>
-                <th scope="col" style="width: 10%">Jam (WITA)</th>
-                <th scope="col" style="width: 20%">Mata Kuliah</th>
-                <th scope="col" style="width: 13%">Kelas Peserta</th>
-                <th scope="col" style="width: 9%">Ruang</th>
-                <th scope="col" style="width: 29%">Tim Pengajar</th>
-                <th scope="col" style="width: 10%">Fase</th>
+                <th scope="col" style="width: 3%">NO</th>
+                <th scope="col" style="width: 10%">KELAS</th>
+                <th scope="col" style="width: 5.5%">HARI</th>
+                <th scope="col" style="width: 5.5%">JAM</th>
+                <th scope="col" style="width: 8.5%">WITA</th>
+                <th scope="col" style="width: 8.5%">RUANG</th>
+                <th scope="col" style="width: 9.5%">KODE MK</th>
+                <th scope="col" style="width: 15.5%">MATA KULIAH</th>
+                <th scope="col" style="width: 3.5%">SKS</th>
+                <th scope="col" style="width: 12.5%">DOSEN PENGAMPU</th>
+                <th scope="col" style="width: 11.5%">DOSEN MITRA</th>
+                <th scope="col" style="width: 6.5%">DOSEN MITRA 2</th>
             </tr>
         </thead>
         <tbody>
-            @forelse ($groups as $group => $rows)
-                <tr class="group"><td colspan="7">{{ $group }} · {{ $rows->count() }} sesi</td></tr>
-                @foreach ($rows as [$day, $time, $course, $classes, $room, $lecturers, $phase])
-                    <tr @class(['band' => $loop->even])>
-                        <td>{{ $day }}</td><td>{{ $time }}</td><td>{{ $course }}</td>
-                        <td>{{ $classes }}</td><td>{{ $room }}</td><td class="lecturers">{{ $lecturers }}</td><td>{{ $phase }}</td>
-                    </tr>
-                @endforeach
+            @forelse ($rows as $row)
+                <tr @class(['band' => $loop->even])>
+                    <td class="center">{{ $row['no'] }}</td>
+                    <td class="center">{{ $row['kelas'] }}</td>
+                    <td class="center">{{ $row['hari'] }}</td>
+                    <td class="center">{{ $row['jam'] }}</td>
+                    <td class="center">{{ $row['wita'] }}</td>
+                    <td class="center">{{ $row['ruang'] }}</td>
+                    <td class="center">{{ $row['kode_mk'] }}</td>
+                    <td class="left">{{ $row['mata_kuliah'] }}</td>
+                    <td class="center">{{ $row['sks'] }}</td>
+                    <td class="left">{{ $row['dosen_pengampu'] }}</td>
+                    <td class="left">{{ $row['dosen_mitra'] }}</td>
+                    <td class="left">{{ $row['dosen_mitra_2'] }}</td>
+                </tr>
             @empty
-                <tr><td colspan="7">Belum ada sesi pada versi ini.</td></tr>
+                <tr><td colspan="12" class="center">Belum ada sesi pada versi ini.</td></tr>
             @endforelse
         </tbody>
     </table>

@@ -163,7 +163,7 @@ test('jadwal resmi dan ekspor Excel mengikuti filter ruang serta versi yang dipi
     try {
         fwrite($file, $download->streamedContent());
         $sheet = IOFactory::createReader('Xlsx')->load(stream_get_meta_data($file)['uri'])->getActiveSheet();
-        expect($sheet->getCell('D5')->getValue())->toBe('Sesi Terpilih')->and($sheet->getHighestDataRow())->toBe(5);
+        expect($sheet->getCell('H5')->getValue())->toBe('Sesi Terpilih')->and($sheet->getHighestDataRow())->toBe(5);
     } finally {
         fclose($file);
     }
@@ -297,13 +297,18 @@ test('admin mengunduh Excel untuk versi dan pengelompokan jadwal yang dibuka', f
         fwrite($file, $download->streamedContent());
         $book = IOFactory::createReader('Xlsx')->load(stream_get_meta_data($file)['uri']);
         $sheet = $book->getActiveSheet();
-        expect($sheet->getCell('A4')->getValue())->toBe('Kelompok Ruang')
-            ->and($sheet->getCell('A5')->getValue())->toBe('AE 107')
-            ->and($sheet->getCell('D5')->getValue())->toBe('=1+1')
-            ->and($sheet->getCell('D5')->getDataType())->toBe(DataType::TYPE_STRING)
-            ->and($sheet->getCell('A6')->getValue())->toBe('Belum terjadwal')
-            ->and($sheet->getCell('D6')->getValue())->toBe('Perancangan VLSI')
-            ->and($sheet->getAutoFilter()->getRange())->toBe('A4:H6');
+        expect($sheet->getCell('A4')->getValue())->toBe('NO')
+            ->and($sheet->getCell('F4')->getValue())->toBe('RUANG')
+            ->and($sheet->getCell('H4')->getValue())->toBe('MATA KULIAH')
+            ->and($sheet->getCell('L4')->getValue())->toBe('DOSEN MITRA 2')
+            ->and($sheet->getCell('A5')->getValue())->toBe('1')
+            ->and($sheet->getCell('F5')->getValue())->toBe('AE 107')
+            ->and($sheet->getCell('H5')->getValue())->toBe('=1+1')
+            ->and($sheet->getCell('H5')->getDataType())->toBe(DataType::TYPE_STRING)
+            ->and($sheet->getCell('A6')->getValue())->toBe('2')
+            ->and($sheet->getCell('F6')->getValue())->toBe('Belum terjadwal')
+            ->and($sheet->getCell('H6')->getValue())->toBe('Perancangan VLSI')
+            ->and($sheet->getAutoFilter()->getRange())->toBe('A4:L6');
     } finally {
         fclose($file);
     }
@@ -1991,4 +1996,126 @@ test('halaman penyusunan dan daftar pemeriksaan menampilkan mode penyusunan, sko
     $this->get(route('admin.drafts.pdf', $draftModified))
         ->assertOk()
         ->assertHeader('Content-Type', 'application/pdf');
+});
+
+test('ekspor Excel dan PDF mengikuti format 12 kolom serta urutan angkatan prodi kelas JTIK', function () {
+    $draft = ScheduleVersion::factory()->for($this->period)->create(['version_no' => 9]);
+    $room = Room::factory()->create(['name' => 'AE 107']);
+
+    $course = Course::factory()->create([
+        'code' => '25B09CKP02111',
+        'name' => 'Pengantar Ilmu Komputer',
+        'sks' => 2,
+    ]);
+
+    $lead = Lecturer::factory()->create(['name' => 'Dr. Fathahillah, S.Pd., M.Eng.']);
+    $mitra1 = Lecturer::factory()->create(['name' => 'Ayu Lestari, S.Pd., M.Pd.']);
+    $mitra2 = Lecturer::factory()->create(['name' => 'Andi Baso Kaswar, S.Pd., M.Kom.']);
+
+    // Sengaja dibuat tidak berurutan untuk menguji pengurutan ekspor JTIK.
+    $classes = [
+        ClassGroup::factory()->create(['name' => 'TEKOM ES-A 2024', 'study_program' => 'TEKOM', 'cohort_year' => 2024]),
+        ClassGroup::factory()->create(['name' => 'PTIK ULANG 2024', 'study_program' => 'PTIK', 'cohort_year' => 2024]),
+        ClassGroup::factory()->create(['name' => 'PTIK Pilihan A 2024', 'study_program' => 'PTIK', 'cohort_year' => 2024]),
+        ClassGroup::factory()->create(['name' => 'PTIK A 2024', 'study_program' => 'PTIK', 'cohort_year' => 2024]),
+        ClassGroup::factory()->create(['name' => 'TEKOM A 2025', 'study_program' => 'TEKOM', 'cohort_year' => 2025]),
+        ClassGroup::factory()->create(['name' => 'PTIK ULANG 2025', 'study_program' => 'PTIK', 'cohort_year' => 2025]),
+        ClassGroup::factory()->create(['name' => 'PTIK A 2025', 'study_program' => 'PTIK', 'cohort_year' => 2025]),
+        ClassGroup::factory()->create(['name' => 'TEKOM A 2026', 'study_program' => 'TEKOM', 'cohort_year' => 2026]),
+        ClassGroup::factory()->create(['name' => 'PTIK A 2026', 'study_program' => 'PTIK', 'cohort_year' => 2026]),
+    ];
+
+    foreach ($classes as $index => $classGroup) {
+        $offering = CourseOffering::factory()->create([
+            'period_id' => $this->period->id,
+            'course_id' => $course->id,
+            'class_group_id' => $classGroup->id,
+        ]);
+
+        $session = ScheduleSession::factory()->for($draft, 'version')->create([
+            'course_offering_id' => $offering->id,
+            'title' => $course->name,
+            'room_id' => $room->id,
+            'day_of_week' => 1,
+            'start_minute' => 555,
+            'end_minute' => 655,
+        ]);
+        $session->participants()->sync([$classGroup->id]);
+        $session->lecturers()->sync([
+            $lead->id => ['role' => 'lead'],
+            $mitra1->id => ['role' => 'partner'],
+            $mitra2->id => ['role' => 'partner'],
+        ]);
+
+        if ($classGroup->name === 'PTIK A 2026') {
+            $secondSession = ScheduleSession::factory()->for($draft, 'version')->create([
+                'course_offering_id' => $offering->id,
+                'title' => 'Pendidikan Kewarganegaraan',
+                'room_id' => $room->id,
+                'day_of_week' => 1,
+                'start_minute' => 790,
+                'end_minute' => 890,
+            ]);
+            $secondSession->participants()->sync([$classGroup->id]);
+            $secondSession->lecturers()->sync([$lead->id => ['role' => 'lead']]);
+        }
+    }
+
+    $excelDownload = $this->actingAs($this->admin)
+        ->get(route('admin.drafts.excel', [$draft, 'tinjau' => 'kelas']))
+        ->assertOk();
+
+    $file = tmpfile();
+    try {
+        fwrite($file, $excelDownload->streamedContent());
+        $sheet = IOFactory::createReader('Xlsx')->load(stream_get_meta_data($file)['uri'])->getActiveSheet();
+
+        expect($sheet->getCell('A1')->getValue())->toBe('JADWAL PERKULIAHAN SEMESTER GANJIL TAHUN AKADEMIK 2026/2027')
+            ->and($sheet->getCell('A2')->getValue())->toBe('JURUSAN TEKNIK INFORMATIKA DAN KOMPUTER')
+            ->and($sheet->rangeToArray('A4:L4')[0])->toBe([
+                'NO',
+                'KELAS',
+                'HARI',
+                'JAM',
+                'WITA',
+                'RUANG',
+                'KODE MK',
+                'MATA KULIAH',
+                'SKS',
+                'DOSEN PENGAMPU',
+                'DOSEN MITRA',
+                'DOSEN MITRA 2',
+            ])
+            ->and($sheet->getCell('A5')->getValue())->toBe('1')
+            ->and($sheet->getCell('B5')->getValue())->toBe('PTIK A 2026')
+            ->and($sheet->getCell('C5')->getValue())->toBe('Senin')
+            ->and($sheet->getCell('D5')->getValue())->toBe('III-IV')
+            ->and($sheet->getCell('E5')->getValue())->toBe('09.15 - 10.55')
+            ->and($sheet->getCell('F5')->getValue())->toBe('AE 107')
+            ->and($sheet->getCell('G5')->getValue())->toBe('25B09CKP02111')
+            ->and($sheet->getCell('H5')->getValue())->toBe('Pengantar Ilmu Komputer')
+            ->and($sheet->getCell('I5')->getValue())->toBe('2')
+            ->and($sheet->getCell('J5')->getValue())->toBe('Dr. Fathahillah, S.Pd., M.Eng.')
+            ->and($sheet->getCell('K5')->getValue())->toBe('Ayu Lestari, S.Pd., M.Pd.')
+            ->and($sheet->getCell('L5')->getValue())->toBe('Andi Baso Kaswar, S.Pd., M.Kom.')
+            ->and($sheet->getCell('B6')->getValue())->toBe('PTIK A 2026')
+            ->and($sheet->getCell('D6')->getValue())->toBe('VII-VIII')
+            ->and($sheet->getCell('E6')->getValue())->toBe('13.10 - 14.50')
+            ->and($sheet->getCell('B7')->getValue())->toBe('TEKOM A 2026')
+            ->and($sheet->getCell('B8')->getValue())->toBe('PTIK A 2025')
+            ->and($sheet->getCell('B9')->getValue())->toBe('PTIK ULANG 2025')
+            ->and($sheet->getCell('B10')->getValue())->toBe('TEKOM A 2025')
+            ->and($sheet->getCell('B11')->getValue())->toBe('PTIK A 2024')
+            ->and($sheet->getCell('B12')->getValue())->toBe('PTIK Pilihan A 2024')
+            ->and($sheet->getCell('B13')->getValue())->toBe('PTIK ULANG 2024')
+            ->and($sheet->getCell('B14')->getValue())->toBe('TEKOM ES-A 2024');
+    } finally {
+        fclose($file);
+    }
+
+    $pdfDownload = $this->get(route('admin.drafts.pdf', [$draft, 'tinjau' => 'kelas']))
+        ->assertOk()
+        ->assertHeader('Content-Type', 'application/pdf');
+
+    expect($pdfDownload->streamedContent())->toStartWith('%PDF-');
 });

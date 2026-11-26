@@ -165,10 +165,11 @@ class DraftController extends Controller
     public function excel(Request $request, ScheduleVersion $version, ScheduleExportService $exports): StreamedResponse
     {
         [$view, $sessions, $groups] = $this->review($request, $version);
-        $version->load('period');
+        $version->load(['period.timeSlots']);
+        $rows = $exports->flatRows($version, $view, $groups);
 
         return response()->streamDownload(
-            fn () => $exports->writeExcel($version, $view, $sessions->count(), $exports->rows($groups)),
+            fn () => $exports->writeExcel($version, $view, $rows),
             $exports->filename($version, $view, 'xlsx'),
             ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
         );
@@ -177,12 +178,16 @@ class DraftController extends Controller
     public function pdf(Request $request, ScheduleVersion $version, ScheduleExportService $exports): StreamedResponse
     {
         [$view, $sessions, $groups] = $this->review($request, $version);
-        $version->load('period');
+        $version->load(['period.timeSlots']);
+        $rows = $exports->flatRows($version, $view, $groups);
 
         $html = view('admin.drafts.pdf', [
             'version' => $version,
-            'subtitle' => $exports->subtitle($version, $view, $sessions->count()),
-            'groups' => $exports->rows($groups),
+            'title' => $exports->documentTitle($version),
+            'department' => ScheduleExportService::DEPARTMENT_TITLE,
+            'view' => $view,
+            'viewLabel' => ScheduleExportService::GROUP_LABELS[$view],
+            'rows' => $rows,
         ])->render();
         $pdf = $exports->pdf($html);
 
@@ -203,7 +208,7 @@ class DraftController extends Controller
         $view = $request->query('tinjau');
         $view = is_string($view) && isset(ScheduleExportService::GROUP_LABELS[$view]) ? $view : 'kelas';
         $sessions = $version->sessions()
-            ->with(['room', 'participants', 'lecturers'])
+            ->with(['room', 'participants', 'lecturers', 'courseOffering.course'])
             ->orderByRaw('day_of_week is null')
             ->orderBy('day_of_week')
             ->orderBy('start_minute')

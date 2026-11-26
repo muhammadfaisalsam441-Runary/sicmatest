@@ -10,6 +10,7 @@ use App\Models\Academic\Period;
 use App\Models\Scheduling\Import;
 use App\Models\Scheduling\OptimizationJob;
 use App\Models\Scheduling\ScheduleVersion;
+use App\Services\Scheduling\ScheduleDraftMetricsService;
 use App\Services\Scheduling\SchedulerService;
 use App\Services\Scheduling\ScheduleValidator;
 use Illuminate\Http\JsonResponse;
@@ -22,13 +23,15 @@ use Illuminate\View\View;
  */
 class SchedulerController extends Controller
 {
-    public function create(Request $request, SchedulerService $scheduler, ScheduleValidator $validator): View
+    public function create(Request $request, SchedulerService $scheduler, ScheduleValidator $validator, ScheduleDraftMetricsService $metrics): View
     {
         $period = Period::query()->active()->first();
         $activeDraft = $period?->resolveActiveDraft();
+        $official = $period?->scheduleVersions()->official()->latest('version_no')->first();
 
         $versions = ($period?->scheduleVersions()
             ->whereIn('status', [ScheduleVersionStatus::Draft, ScheduleVersionStatus::Ready])
+            ->with('basedOn')
             ->withCount(['sessions', 'issues' => fn ($query) => $query->whereNull('resolved_at')->where('severity', 'error')])
             ->latest('version_no')
             ->get() ?? collect())
@@ -38,8 +41,9 @@ class SchedulerController extends Controller
         return view('admin.scheduler.create', [
             'period' => $period,
             'base' => $period ? $scheduler->baseVersion($period) : null,
-            'official' => $period?->scheduleVersions()->official()->latest('version_no')->first(),
+            'official' => $official,
             'versions' => $versions,
+            'draftMetrics' => $metrics->summarizeMany($versions, $official),
             'activeDraft' => $activeDraft,
             'activeDraftId' => $activeDraft?->id,
             'activeReviewStatus' => $activeDraft ? $validator->reviewStatus($activeDraft) : null,
@@ -87,6 +91,8 @@ class SchedulerController extends Controller
             'elapsed' => $job->started_at ? max(0, (int) $job->started_at->diffInSeconds($job->finished_at ?? now())) : 0,
             'time_limit' => $job->time_limit_seconds,
             'progress' => $job->result['progress'] ?? ['stage' => $job->status->label(), 'total' => $job->scope['in_scope'] ?? 0, 'placed' => $job->result['placed'] ?? 0],
+            'no_changes' => (bool) ($job->result['no_changes'] ?? false),
+            'base_version_id' => $job->result['base_version_id'] ?? ($job->scope['base_version_id'] ?? null),
             'draft_version_id' => $draftId,
             'draft_version_no' => $job->result['draft_version_no'] ?? null,
             'inspect_url' => $draftId !== null ? route('admin.drafts.inspect', $draftId) : null,

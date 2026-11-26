@@ -39,6 +39,18 @@ use Throwable;
  */
 class SchedulerService
 {
+    public const STRATEGY_PRESERVE = 'preserve';
+
+    public const STRATEGY_FRESH = 'fresh';
+
+    /**
+     * @var array<string, string>
+     */
+    public const STRATEGIES = [
+        self::STRATEGY_PRESERVE => 'Perbaiki & Pertahankan',
+        self::STRATEGY_FRESH => 'Susun Ulang Segar',
+    ];
+
     /**
      * @var array<string, string>
      */
@@ -85,7 +97,7 @@ class SchedulerService
     /**
      * Periksa kesiapan data & pengaturan sebelum menyusun.
      *
-     * @param  array{type: string, class_ids?: list<int>}  $scope
+     * @param  array{type: string, class_ids?: list<int>, strategy?: string, seed?: int, label?: string|null}  $scope
      * @return array{errors: list<string>, warnings: list<string>, in_scope: int, fixed: int}
      */
     public function readiness(Period $period, array $scope, ?ScheduleVersion $base = null): array
@@ -184,7 +196,7 @@ class SchedulerService
     /**
      * Antrean PHP menjadi mode utama; sync dan manual dipakai untuk pengujian.
      *
-     * @param  array{type: string, class_ids?: list<int>}  $scope
+     * @param  array{type: string, class_ids?: list<int>, strategy?: string, seed?: int, label?: string|null}  $scope
      */
     public function start(Period $period, array $scope, int $timeLimit, User $actor, ?ScheduleVersion $base = null, ?OptimizationJob $retryOf = null): OptimizationJob
     {
@@ -201,7 +213,44 @@ class SchedulerService
             }
 
             $base ??= $this->baseVersion($period);
-            $snapshot = $this->snapshot($base, $scope, $timeLimit);
+            $strategy = in_array($scope['strategy'] ?? null, [self::STRATEGY_PRESERVE, self::STRATEGY_FRESH], true)
+                ? $scope['strategy']
+                : self::STRATEGY_PRESERVE;
+            $label = is_string($scope['label'] ?? null)
+                ? (($trimmed = trim($scope['label'])) !== '' ? mb_substr($trimmed, 0, 120) : null)
+                : null;
+            $classIds = array_values(array_map('intval', $scope['class_ids'] ?? []));
+
+            if ($strategy === self::STRATEGY_FRESH) {
+                $existingFresh = OptimizationJob::query()
+                    ->where('schedule_version_id', $base->id)
+                    ->whereIn('status', [OptimizationJobStatus::Queued, OptimizationJobStatus::Running])
+                    ->get()
+                    ->first(fn (OptimizationJob $job): bool => ($job->scope['type'] ?? null) === $scope['type']
+                        && ($job->scope['strategy'] ?? null) === self::STRATEGY_FRESH
+                        && array_values(array_map('intval', $job->scope['class_ids'] ?? [])) === $classIds);
+
+                if ($existingFresh !== null) {
+                    return $existingFresh;
+                }
+
+                $seed = (isset($scope['seed']) && is_int($scope['seed']) && $scope['seed'] > 0)
+                    ? $scope['seed']
+                    : max(1, (int) OptimizationJob::query()->max('id') + 1);
+            } else {
+                $seed = 0;
+            }
+
+            $normalizedScope = [
+                ...$scope,
+                'type' => $scope['type'],
+                'class_ids' => $classIds,
+                'strategy' => $strategy,
+                'seed' => $seed,
+                'label' => $label,
+            ];
+
+            $snapshot = $this->snapshot($base, $normalizedScope, $timeLimit);
             $json = json_encode($snapshot, JSON_UNESCAPED_UNICODE);
 
             // Klik berulang tidak membuat pekerjaan ganda: masukan yang sama dan masih berjalan dipakai ulang.
@@ -216,7 +265,13 @@ class SchedulerService
 
             $job = OptimizationJob::create([
                 'schedule_version_id' => $base->id,
-                'scope' => [...$scope, 'base_version_id' => $base->id, 'base_version_no' => $base->version_no, 'in_scope' => $readiness['in_scope'], 'retry_of_job_id' => $retryOf?->id],
+                'scope' => [
+                    ...$normalizedScope,
+                    'base_version_id' => $base->id,
+                    'base_version_no' => $base->version_no,
+                    'in_scope' => $readiness['in_scope'],
+                    'retry_of_job_id' => $retryOf?->id,
+                ],
                 'time_limit_seconds' => $timeLimit,
                 'status' => OptimizationJobStatus::Queued,
                 'input_hash' => hash('sha256', $json),
@@ -356,15 +411,29 @@ class SchedulerService
                 $result['unplaced_details'] = array_map(fn (int $id): array => ['id' => $id,
                     'label' => $labels[$id]->title.' — '.$labels[$id]->participants->pluck('name')->implode(' + '),
                     'reason' => $details->get($id)['reason'] ?? 'Belum ditemukan penempatan yang memenuhi aturan.'], $result['unplaced']);
-                $result = [...$result, ...$this->applyToNewDraft($job, $assignments, $result['unplaced'])];
-                $draft = ScheduleVersion::query()->findOrFail($result['draft_version_id']);
-                $this->validator->validate($draft);
-                $result['validation_errors'] = $draft->issues()->whereNull('resolved_at')->where('severity', IssueSeverity::Error)->count();
-                $result['validation_warnings'] = $draft->issues()->whereNull('resolved_at')->where('severity', IssueSeverity::Warning)->count();
-                $result['publishable'] = $result['unplaced'] === [] && $result['validation_errors'] === 0;
-                $solverStatus = $result['publishable'] ? SolverStatus::Feasible : SolverStatus::Unknown;
-                if (! $result['publishable']) {
-                    $result['message'] = count($result['unplaced']).' sesi belum ditempatkan; '.$result['validation_errors'].' masalah wajib perlu diperbaiki sebelum penetapan.';
+
+                if (! $this->hasPlacementChanges($base, $assignments, $result['unplaced'])) {
+                    $result['no_changes'] = true;
+                    $result['placed'] = count($assignments);
+                    $result['changed'] = 0;
+                    $result['base_version_id'] = $base->id;
+                    $result['base_version_no'] = $base->version_no;
+                    $result['validation_errors'] = $base->issues()->whereNull('resolved_at')->where('severity', IssueSeverity::Error)->count();
+                    $result['validation_warnings'] = $base->issues()->whereNull('resolved_at')->where('severity', IssueSeverity::Warning)->count();
+                    $result['publishable'] = $result['unplaced'] === [] && $result['validation_errors'] === 0;
+                    $result['message'] = "Susunan jadwal sudah sama dengan v{$base->version_no}. Tidak ada draf duplikat yang dibuat.";
+                    $solverStatus = $result['publishable'] ? SolverStatus::Feasible : SolverStatus::Unknown;
+                } else {
+                    $result = [...$result, ...$this->applyToNewDraft($job, $assignments, $result['unplaced'])];
+                    $draft = ScheduleVersion::query()->findOrFail($result['draft_version_id']);
+                    $this->validator->validate($draft);
+                    $result['validation_errors'] = $draft->issues()->whereNull('resolved_at')->where('severity', IssueSeverity::Error)->count();
+                    $result['validation_warnings'] = $draft->issues()->whereNull('resolved_at')->where('severity', IssueSeverity::Warning)->count();
+                    $result['publishable'] = $result['unplaced'] === [] && $result['validation_errors'] === 0;
+                    $solverStatus = $result['publishable'] ? SolverStatus::Feasible : SolverStatus::Unknown;
+                    if (! $result['publishable']) {
+                        $result['message'] = count($result['unplaced']).' sesi belum ditempatkan; '.$result['validation_errors'].' masalah wajib perlu diperbaiki sebelum penetapan.';
+                    }
                 }
             } elseif (in_array($solverStatus, [SolverStatus::Optimal, SolverStatus::Feasible], true)) {
                 $solverStatus = SolverStatus::Unknown;
@@ -387,10 +456,14 @@ class SchedulerService
             return $job->fresh();
         }
 
+        $notificationTitle = ! empty($finalized->result['no_changes'])
+            ? 'Penyusunan jadwal selesai (tidak ada perubahan)'
+            : (isset($finalized->result['draft_version_id']) ? 'Penyusunan jadwal selesai' : 'Penyusunan jadwal belum berhasil');
+
         $this->notifications->notify(
             $finalized->creator,
             'optimization.finished',
-            isset($finalized->result['draft_version_id']) ? 'Penyusunan jadwal selesai' : 'Penyusunan jadwal belum berhasil',
+            $notificationTitle,
             $finalized->solver_status->label().'. '.($finalized->result['message'] ?? ''),
             ['optimization_job_id' => $finalized->id, 'schedule_version_id' => $finalized->result['draft_version_id'] ?? null],
         );
@@ -414,7 +487,9 @@ class SchedulerService
 
     public function canRetry(OptimizationJob $job): bool
     {
-        return $job->status === OptimizationJobStatus::Finished && $job->solver_status === SolverStatus::Unknown
+        return $job->status === OptimizationJobStatus::Finished
+            && $job->solver_status === SolverStatus::Unknown
+            && empty($job->result['no_changes'])
             && $job->time_limit_seconds === (int) config('sicma.scheduler.time_limits.seimbang')
             && (! empty($job->result['unplaced']) || empty($job->result['draft_version_id']));
     }
@@ -450,13 +525,18 @@ class SchedulerService
     /**
      * Data masukan worker.
      *
-     * @param  array{type: string, class_ids?: list<int>}  $scope
+     * @param  array{type: string, class_ids?: list<int>, strategy?: string, seed?: int, label?: string|null}  $scope
      * @return array<string, mixed>
      */
     public function snapshot(ScheduleVersion $base, array $scope, int $timeLimit): array
     {
         $period = $base->period()->with(['timeSlots', 'calendarExceptions'])->firstOrFail();
         [$inScope, $fixed] = $this->partition($base, $scope);
+
+        $strategy = in_array($scope['strategy'] ?? null, [self::STRATEGY_PRESERVE, self::STRATEGY_FRESH], true)
+            ? $scope['strategy']
+            : self::STRATEGY_PRESERVE;
+        $seed = isset($scope['seed']) && is_int($scope['seed']) && $scope['seed'] >= 0 ? $scope['seed'] : 0;
 
         $slots = $period->timeSlots->sortBy('start_minute')->values();
         $slotLength = $slots->isNotEmpty() ? $slots->first()->end_minute - $slots->first()->start_minute : 50;
@@ -469,6 +549,8 @@ class SchedulerService
         return [
             'base_lock_version' => $base->lock_version,
             'time_limit' => $timeLimit,
+            'strategy' => $strategy,
+            'seed' => $seed,
             'capacity_blocks_publish' => (bool) config('sicma.scheduler.capacity_blocks_publish'),
             'uts_start' => $period->uts_start?->toDateString(),
             'uts_end' => $period->uts_end?->toDateString(),
@@ -508,7 +590,9 @@ class SchedulerService
                 'students' => $session->participants->pluck('student_count')->contains(null) || $session->participants->isEmpty() ? null : $session->participants->sum('student_count'),
                 'cohort_profile' => $this->cohortProfile($session, $periodYear),
                 'locked' => $session->is_locked && $this->isTimed($session) ? ['day' => $session->day_of_week, 'start' => $session->start_minute, 'room' => $session->room_id] : null,
-                'preferred' => $this->isTimed($session) ? ['day' => $session->day_of_week, 'start' => $session->start_minute, 'room' => $session->room_id] : null,
+                'preferred' => ($strategy === self::STRATEGY_FRESH && ! $session->is_locked)
+                    ? null
+                    : ($this->isTimed($session) ? ['day' => $session->day_of_week, 'start' => $session->start_minute, 'room' => $session->room_id] : null),
             ])->values()->all(),
         ];
     }
@@ -516,7 +600,7 @@ class SchedulerService
     /**
      * Pisahkan sesi dalam cakupan dan sesi tetap (diperhitungkan tetapi tidak dipindahkan).
      *
-     * @param  array{type: string, class_ids?: list<int>}  $scope
+     * @param  array{type: string, class_ids?: list<int>, strategy?: string, seed?: int, label?: string|null}  $scope
      * @return array{0: Collection<int, ScheduleSession>, 1: Collection<int, ScheduleSession>}
      */
     private function partition(ScheduleVersion $base, array $scope): array
@@ -547,6 +631,42 @@ class SchedulerService
     /**
      * @param  list<array{id: int, day: int, start_minute: int, end_minute: int, room_id: int|null}>  $assignments
      * @param  list<int>  $unplaced
+     */
+    private function hasPlacementChanges(ScheduleVersion $base, array $assignments, array $unplaced): bool
+    {
+        $sessions = $base->sessions->keyBy('id');
+
+        foreach ($unplaced as $id) {
+            $session = $sessions->get($id);
+            if ($session !== null && ! $session->is_locked && $this->isTimed($session)) {
+                return true;
+            }
+        }
+
+        foreach ($assignments as $assignment) {
+            $session = $sessions->get($assignment['id']);
+            if ($session === null) {
+                continue;
+            }
+
+            $mode = $session->mode === SessionMode::Online ? SessionMode::Online : SessionMode::Offline;
+            $roomId = $mode === SessionMode::Offline ? $assignment['room_id'] : null;
+
+            if ($session->mode !== $mode
+                || $session->day_of_week !== $assignment['day']
+                || $session->start_minute !== $assignment['start_minute']
+                || $session->end_minute !== $assignment['end_minute']
+                || $session->room_id !== $roomId) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param  list<array{id: int, day: int, start_minute: int, end_minute: int, room_id: int|null}>  $assignments
+     * @param  list<int>  $unplaced
      * @return array{draft_version_id: int, draft_version_no: int, placed: int, changed: int}
      */
     private function applyToNewDraft(OptimizationJob $job, array $assignments, array $unplaced): array
@@ -554,7 +674,14 @@ class SchedulerService
         $base = ScheduleVersion::query()->findOrFail($job->scope['base_version_id']);
         $draft = $this->drafts->create($base->period, ScheduleSource::Generated);
         $map = $this->drafts->copySessions($base, $draft);
-        $draft->forceFill(['based_on_version_id' => $base->id, 'effective_from' => $draft->effective_from->max($base->effective_from)->toDateString()])->save();
+        $label = is_string($job->scope['label'] ?? null) && trim($job->scope['label']) !== ''
+            ? trim($job->scope['label'])
+            : null;
+        $draft->forceFill([
+            'label' => $label,
+            'based_on_version_id' => $base->id,
+            'effective_from' => $draft->effective_from->max($base->effective_from)->toDateString(),
+        ])->save();
 
         $changed = 0;
 

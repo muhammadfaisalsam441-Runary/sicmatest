@@ -13,6 +13,7 @@ use App\Models\Room\Room;
 use App\Models\Scheduling\ScheduleSession;
 use App\Models\Scheduling\ScheduleVersion;
 use App\Services\Account\AuditLogger;
+use App\Services\Scheduling\ScheduleDraftMetricsService;
 use App\Services\Scheduling\ScheduleDraftService;
 use App\Services\Scheduling\ScheduleExportService;
 use App\Services\Scheduling\SchedulePublisher;
@@ -46,22 +47,26 @@ class DraftController extends Controller
         return to_route('admin.drafts.show', $draft)->with('toast', ['type' => 'success', 'title' => "Draf v{$draft->version_no} dibuat", 'message' => 'Jadwal resmi tetap berlaku sampai draf ditetapkan.']);
     }
 
-    public function inspections(): View
+    public function inspections(ScheduleDraftMetricsService $metrics): View
     {
         $period = Period::query()->active()->first();
         $activeDraftId = $period?->resolveActiveDraft()?->id;
         $versions = ($period?->scheduleVersions()
             ->whereIn('status', [ScheduleVersionStatus::Draft, ScheduleVersionStatus::Ready])
+            ->with('basedOn')
             ->withCount(['sessions', 'issues' => fn ($query) => $query->whereNull('resolved_at')->where('severity', 'error')])
             ->latest('version_no')
             ->get() ?? collect())
             ->sort(fn (ScheduleVersion $a, ScheduleVersion $b): int => [($b->id === $activeDraftId ? 1 : 0), $b->version_no] <=> [($a->id === $activeDraftId ? 1 : 0), $a->version_no])
             ->values();
 
+        $official = $period?->scheduleVersions()->official()->latest('version_no')->first();
+
         return view('admin.drafts.inspections', [
             'period' => $period,
             'versions' => $versions,
             'activeDraftId' => $activeDraftId,
+            'draftMetrics' => $metrics->summarizeMany($versions, $official),
         ]);
     }
 
@@ -78,6 +83,28 @@ class DraftController extends Controller
             'type' => 'success',
             'title' => "Draf v{$version->version_no} dijadikan draf aktif",
             'message' => 'Draf ini sekarang menjadi dasar Susun Otomatis dan draf kerja utama. Jadwal resmi tidak berubah.',
+        ]);
+    }
+
+    public function updateLabel(Request $request, ScheduleVersion $version, ScheduleDraftService $drafts): RedirectResponse
+    {
+        $period = Period::query()->active()->first();
+        abort_if($period === null || $version->period_id !== $period->id, 404);
+
+        $validated = $request->validate([
+            'label' => ['nullable', 'string', 'max:120'],
+        ]);
+
+        $updated = $drafts->updateLabel($version, $validated['label'] ?? null);
+
+        $target = $request->input('redirect') === 'inspections' ? 'admin.drafts.inspections' : 'admin.scheduler.create';
+
+        return to_route($target)->with('toast', [
+            'type' => 'success',
+            'title' => $updated->label !== null
+                ? "Label draf v{$updated->version_no} disimpan"
+                : "Label draf v{$updated->version_no} dihapus",
+            'message' => $updated->label !== null ? "Label skenario: {$updated->label}." : null,
         ]);
     }
 

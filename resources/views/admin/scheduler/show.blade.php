@@ -9,12 +9,18 @@
 @php
     $code = 'J-'.$job->created_at->format('Ymd').'-'.str_pad((string) $job->id, 2, '0', STR_PAD_LEFT);
     $scopeLabel = SchedulerService::SCOPES[$job->scope['type'] ?? 'semester'] ?? 'Seluruh semester';
+    $strategyKey = $job->scope['strategy'] ?? 'preserve';
+    $strategyLabel = $strategyKey === 'fresh' ? 'Susun Ulang Segar' : 'Perbaiki & Pertahankan';
     $running = in_array($job->status, [OptimizationJobStatus::Queued, OptimizationJobStatus::Running], true);
     $draftId = $job->result['draft_version_id'] ?? null;
+    $noChanges = ! $running && (bool) ($job->result['no_changes'] ?? false);
+    $baseVersionId = $job->result['base_version_id'] ?? ($job->scope['base_version_id'] ?? null);
+    $baseVersionNo = $job->result['base_version_no'] ?? ($job->scope['base_version_no'] ?? '?');
     $state = match (true) {
         $running => 'running',
         $job->status === OptimizationJobStatus::Cancelled => 'cancelled',
         $job->status === OptimizationJobStatus::Failed => 'failed',
+        $noChanges => 'no_changes',
         $draftId !== null => 'draft',
         $job->solver_status === SolverStatus::Infeasible => 'infeasible',
         $job->solver_status === SolverStatus::ModelInvalid => 'invalid',
@@ -24,6 +30,7 @@
         'running' => ['Sedang menyusun jadwal', 'Proses Penyusunan'],
         'cancelled' => ['Penyusunan dibatalkan', 'Proses Dibatalkan'],
         'failed' => ['Penyusunan gagal dijalankan', 'Proses Gagal'],
+        'no_changes' => ['Tidak ada perubahan diperlukan', 'Susunan Sudah Sama'],
         'draft' => ['Draf hasil penyusunan', 'Hasil Draf'],
         'infeasible' => ['Belum ada susunan yang memenuhi aturan', 'Kendala Penyusunan'],
         'invalid' => ['Data penyusunan perlu diperiksa', 'Data Tidak Valid'],
@@ -40,7 +47,7 @@
 @section('content')
     <div class="flex flex-col gap-6"
         @if ($running) x-data="statusPolling({ url: @js(route('admin.scheduler.status', $job)), interval: 3000, job: true, elapsed: {{ $job->started_at ? max(0, (int) $job->started_at->diffInSeconds(now())) : 0 }}, progress: @js($job->result['progress'] ?? ['stage' => $job->status === OptimizationJobStatus::Queued ? 'Menunggu antrean' : 'Menyiapkan kandidat', 'total' => $job->scope['in_scope'] ?? 0, 'placed' => 0]) })" @endif>
-        <x-page-header :title="$title" :subtitle="'Pekerjaan '.$code.' • '.$scopeLabel.' • dasar v'.($job->scope['base_version_no'] ?? '?').' • '.Wita::stamp($job->created_at)" />
+        <x-page-header :title="$title" :subtitle="'Pekerjaan '.$code.' • '.$scopeLabel.' • '.$strategyLabel.' • dasar v'.$baseVersionNo.' • '.Wita::stamp($job->created_at)" />
         <x-card padding="px-2.5 py-2" class="w-fit max-w-full"><x-schedule-steps :current="3" /></x-card>
         @include('admin.partials.scheduling-tabs')
 
@@ -56,6 +63,23 @@
                     <x-button type="button" variant="secondary" x-show="finished && !inspectUrl" x-cloak x-on:click="window.location.reload()">Lihat Hasil Proses</x-button>
                 </div>
             </x-card>
+        @elseif ($state === 'no_changes')
+            <x-alert variant="info" :title="'Susunan v'.($job->result['base_version_no'] ?? '').' sudah optimal untuk cakupan ini'">
+                {{ $job->result['message'] ?? 'Susunan jadwal sudah sama dengan draf dasar. Tidak ada draf duplikat yang dibuat.' }}
+            </x-alert>
+            <div class="flex flex-wrap gap-3">
+                @if ($baseVersionId)
+                    <x-button icon="list-checks" :href="route('admin.drafts.inspect', $baseVersionId)">
+                        Buka Pemeriksaan v{{ $baseVersionNo }}
+                    </x-button>
+                @endif
+                <x-button variant="secondary" icon="refresh-cw" :href="route('admin.scheduler.create', ['susun' => 1, 'strategy' => 'fresh'])">
+                    Susun Ulang Segar
+                </x-button>
+                <x-button variant="secondary" :href="route('admin.scheduler.create')">
+                    Kembali ke Penyusunan &amp; Draf
+                </x-button>
+            </div>
         @elseif ($state === 'draft')
             <x-alert :variant="($job->result['publishable'] ?? false) ? 'success' : 'info'" :title="'Draf v'.($job->result['draft_version_no'] ?? '').' dibuat • jadwal resmi belum berubah'">
                 {{ $job->result['placed'] ?? 0 }} sesi ditempatkan, {{ $job->result['changed'] ?? 0 }} berpindah dari penempatan sebelumnya.

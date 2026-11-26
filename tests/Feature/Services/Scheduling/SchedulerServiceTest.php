@@ -691,3 +691,119 @@ test('blok ruang berdurasi kurang dari satu menit atau nol menit tidak menggagal
     expect($job->solver_status)->toBe(SolverStatus::Feasible)
         ->and($job->result['draft_version_id'] ?? null)->not->toBeNull();
 });
+
+test('penjaga tanpa perubahan tidak membuat draf duplikat dan menampilkan tautan pemeriksaan versi dasar', function () {
+    $this->unscheduled->delete();
+    $scheduler = app(SchedulerService::class);
+    $beforeVersions = ScheduleVersion::query()->count();
+
+    $job = $scheduler->start($this->period, ['type' => 'semester'], 60, $this->admin);
+    $job = $scheduler->finalize($job, [
+        'status' => 'FEASIBLE',
+        'message' => 'Susunan ditemukan.',
+        'assignments' => [
+            ['id' => $this->leaderSession->id, 'day' => 1, 'start_minute' => 450, 'end_minute' => 600, 'room_id' => $this->room->id],
+            ['id' => $this->otherSession->id, 'day' => 2, 'start_minute' => 450, 'end_minute' => 600, 'room_id' => $this->room->id],
+        ],
+    ]);
+
+    expect($job->result['no_changes'] ?? false)->toBeTrue()
+        ->and($job->result['changed'])->toBe(0)
+        ->and($job->result)->not->toHaveKey('draft_version_id')
+        ->and(ScheduleVersion::query()->count())->toBe($beforeVersions)
+        ->and($scheduler->canRetry($job))->toBeFalse();
+
+    $this->withoutVite()->actingAs($this->admin)
+        ->get(route('admin.scheduler.show', $job))
+        ->assertOk()
+        ->assertSee('Tidak ada perubahan diperlukan')
+        ->assertSee("Susunan v{$this->official->version_no} sudah optimal untuk cakupan ini")
+        ->assertSee(route('admin.drafts.inspect', $this->official), false);
+
+    $this->getJson(route('admin.scheduler.status', $job))
+        ->assertOk()
+        ->assertJson([
+            'no_changes' => true,
+            'base_version_id' => $this->official->id,
+            'draft_version_id' => null,
+        ]);
+
+    // Bahkan ketika masih ada unplaced (status solver UNKNOWN) pada sesi yang memang belum terjadwal,
+    // tanpa perubahan penempatan tidak dibuat draf baru dan canRetry() tetap false.
+    $extraUnscheduled = ScheduleSession::factory()->unscheduled()->for($this->official, 'version')->create();
+    $extraUnscheduled->participants()->sync([$this->ptikB->id]);
+    $this->official->increment('lock_version');
+
+    $partialNoChangeJob = $scheduler->start($this->period, ['type' => 'semester'], 60, $this->admin);
+    $partialNoChangeJob = $scheduler->finalize($partialNoChangeJob, [
+        'status' => 'UNKNOWN',
+        'assignments' => [
+            ['id' => $this->leaderSession->id, 'day' => 1, 'start_minute' => 450, 'end_minute' => 600, 'room_id' => $this->room->id],
+            ['id' => $this->otherSession->id, 'day' => 2, 'start_minute' => 450, 'end_minute' => 600, 'room_id' => $this->room->id],
+        ],
+    ]);
+
+    expect($partialNoChangeJob->result['no_changes'] ?? false)->toBeTrue()
+        ->and($partialNoChangeJob->solver_status)->toBe(SolverStatus::Unknown)
+        ->and(ScheduleVersion::query()->count())->toBe($beforeVersions)
+        ->and($scheduler->canRetry($partialNoChangeJob))->toBeFalse();
+});
+
+test('mode susun ulang segar menghapus preferensi sesi tidak terkunci, menjaga sesi terkunci, menyimpan label draf, dan menghasilkan variasi antar seed', function () {
+    $this->leaderSession->update(['is_locked' => true]);
+    $scheduler = app(SchedulerService::class);
+
+    $freshSnapshot = $scheduler->snapshot($this->official, ['type' => 'semester', 'strategy' => 'fresh', 'seed' => 42], 15);
+    $sessionsById = collect($freshSnapshot['sessions'])->keyBy('id');
+
+    expect($freshSnapshot['strategy'])->toBe('fresh')
+        ->and($freshSnapshot['seed'])->toBe(42)
+        ->and($sessionsById[$this->leaderSession->id]['locked'])->toBe(['day' => 1, 'start' => 450, 'room' => $this->room->id])
+        ->and($sessionsById[$this->leaderSession->id]['preferred'])->toBe(['day' => 1, 'start' => 450, 'room' => $this->room->id])
+        ->and($sessionsById[$this->otherSession->id]['locked'])->toBeNull()
+        ->and($sessionsById[$this->otherSession->id]['preferred'])->toBeNull();
+
+    $jobOne = $scheduler->runNow($scheduler->start($this->period, [
+        'type' => 'semester',
+        'strategy' => 'fresh',
+        'seed' => 11,
+        'label' => '  Opsi Pagi Padat  ',
+    ], 15, $this->admin));
+
+    $draftOne = ScheduleVersion::query()->findOrFail($jobOne->result['draft_version_id']);
+    $lockedCopyOne = $draftOne->sessions()->whereHas('lecturers', fn ($query) => $query->whereKey($this->leader->id))->sole();
+
+    expect($jobOne->solver_status)->toBe(SolverStatus::Feasible)
+        ->and($jobOne->scope['strategy'])->toBe('fresh')
+        ->and($jobOne->scope['seed'])->toBe(11)
+        ->and($draftOne->label)->toBe('Opsi Pagi Padat')
+        ->and([$lockedCopyOne->day_of_week, $lockedCopyOne->start_minute, $lockedCopyOne->end_minute, $lockedCopyOne->room_id])
+        ->toBe([1, 450, 600, $this->room->id]);
+
+    $jobTwo = $scheduler->runNow($scheduler->start($this->period, [
+        'type' => 'semester',
+        'strategy' => 'fresh',
+        'label' => 'Alternatif Kedua',
+    ], 15, $this->admin));
+
+    $draftTwo = ScheduleVersion::query()->findOrFail($jobTwo->result['draft_version_id']);
+
+    expect($jobTwo->scope['seed'])->toBeGreaterThan(0)
+        ->and($jobTwo->scope['seed'])->not->toBe($jobOne->scope['seed'])
+        ->and($draftTwo->label)->toBe('Alternatif Kedua');
+
+    $placements = [];
+    foreach ([1, 2, 3, 5, 7, 11] as $seed) {
+        $candidateJob = $scheduler->runNow($scheduler->start($this->period, [
+            'type' => 'semester',
+            'strategy' => 'fresh',
+            'seed' => $seed,
+        ], 15, $this->admin));
+
+        $candidateDraft = ScheduleVersion::query()->findOrFail($candidateJob->result['draft_version_id']);
+        $movedOther = $candidateDraft->sessions()->where('title', $this->otherSession->title)->sole();
+        $placements[] = "{$movedOther->day_of_week}:{$movedOther->start_minute}:{$movedOther->room_id}";
+    }
+
+    expect(collect($placements)->unique()->count())->toBeGreaterThan(1);
+});

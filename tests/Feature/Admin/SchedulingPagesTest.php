@@ -1846,3 +1846,149 @@ test('pengarsipan draf menolak versi resmi, periode tidak aktif, keti, dan tamu'
 
     expect($draft->fresh()->status)->toBe(ScheduleVersionStatus::Draft);
 });
+
+test('admin dapat memperbarui dan menghapus label draf dengan validasi panjang serta otorisasi periode dan status', function () {
+    $draft = ScheduleVersion::factory()->for($this->period)->create([
+        'status' => ScheduleVersionStatus::Draft,
+        'version_no' => 1,
+        'lock_version' => 3,
+    ]);
+    $official = ScheduleVersion::factory()->official()->for($this->period)->create(['version_no' => 2]);
+    $otherPeriod = Period::factory()->create(['is_active' => false, 'name' => 'Genap 2025/2026']);
+    $otherPeriodDraft = ScheduleVersion::factory()->for($otherPeriod)->create(['status' => ScheduleVersionStatus::Draft]);
+
+    $this->actingAs($this->admin)
+        ->patch(route('admin.drafts.label', $draft), [
+            'label' => '  Opsi Pagi Padat  ',
+            'redirect' => 'inspections',
+        ])
+        ->assertRedirect(route('admin.drafts.inspections'))
+        ->assertSessionHas('toast', fn (array $toast): bool => ($toast['type'] ?? null) === 'success'
+            && ($toast['title'] ?? null) === 'Label draf v1 disimpan');
+
+    expect($draft->fresh()->label)->toBe('Opsi Pagi Padat')
+        ->and($draft->fresh()->lock_version)->toBe(3);
+
+    $savedLog = AuditLog::query()
+        ->where('action', 'schedule.draft_labeled')
+        ->where('auditable_id', $draft->id)
+        ->latest('id')
+        ->firstOrFail();
+
+    expect($savedLog->before)->toBe(['label' => null])
+        ->and($savedLog->after)->toBe(['label' => 'Opsi Pagi Padat', 'version_no' => 1]);
+
+    // Kosongkan label untuk menghapus.
+    $this->patch(route('admin.drafts.label', $draft), [
+        'label' => '   ',
+    ])
+        ->assertRedirect(route('admin.scheduler.create'))
+        ->assertSessionHas('toast', fn (array $toast): bool => ($toast['type'] ?? null) === 'success'
+            && ($toast['title'] ?? null) === 'Label draf v1 dihapus');
+
+    expect($draft->fresh()->label)->toBeNull();
+
+    $clearedLog = AuditLog::query()
+        ->where('action', 'schedule.draft_labeled')
+        ->where('auditable_id', $draft->id)
+        ->latest('id')
+        ->firstOrFail();
+
+    expect($clearedLog->before)->toBe(['label' => 'Opsi Pagi Padat'])
+        ->and($clearedLog->after)->toBe(['label' => null, 'version_no' => 1]);
+
+    // Validasi maksimal 120 karakter.
+    $this->from(route('admin.scheduler.create'))
+        ->patch(route('admin.drafts.label', $draft), ['label' => str_repeat('a', 121)])
+        ->assertRedirect(route('admin.scheduler.create'))
+        ->assertSessionHasErrors('label');
+
+    // Menolak non-draf (jadwal resmi) dan draf dari periode lain.
+    $this->from(route('admin.scheduler.create'))
+        ->patch(route('admin.drafts.label', $official), ['label' => 'Tidak Boleh'])
+        ->assertRedirect(route('admin.scheduler.create'))
+        ->assertSessionHas('error_code', 'INVALID_STATUS_TRANSITION');
+
+    $this->patch(route('admin.drafts.label', $otherPeriodDraft), ['label' => 'Periode Lain'])
+        ->assertNotFound();
+
+    // Keti & tamu ditolak.
+    $this->actingAs(User::factory()->approvedKeti()->create())
+        ->patch(route('admin.drafts.label', $draft), ['label' => 'Keti'])
+        ->assertForbidden();
+
+    auth()->logout();
+    $this->patch(route('admin.drafts.label', $draft), ['label' => 'Tamu'])
+        ->assertRedirect(route('login'));
+});
+
+test('halaman penyusunan dan daftar pemeriksaan menampilkan mode penyusunan, skor mutu, selisih, label draf, dan menu unduh popover yang aksesibel', function () {
+    $official = ScheduleVersion::factory()->official()->for($this->period)->create(['version_no' => 1]);
+    $room = Room::factory()->create(['name' => 'AE 101', 'capacity' => 45]);
+    $classGroup = ClassGroup::factory()->create(['name' => 'PTIK A 2026', 'student_count' => 30]);
+    $lecturer = Lecturer::factory()->create(['name' => 'Dr. Andi']);
+
+    $officialSession = ScheduleSession::factory()->for($official, 'version')->for($room)->create([
+        'title' => 'Algoritma',
+        'day_of_week' => 1,
+        'start_minute' => 450,
+        'end_minute' => 550,
+    ]);
+    $officialSession->participants()->sync([$classGroup->id]);
+    $officialSession->lecturers()->sync([$lecturer->id => ['role' => 'lead']]);
+
+    $draftService = app(ScheduleDraftService::class);
+    $draftIdentical = $draftService->create($this->period, ScheduleSource::Manual, $official, 'Opsi Pagi');
+    $draftModified = $draftService->create($this->period->fresh(), ScheduleSource::Generated, $official, 'Opsi Lab Prioritas');
+    $draftModified->sessions()->sole()->update(['day_of_week' => 2]);
+
+    $workspaceResponse = $this->actingAs($this->admin)
+        ->get(route('admin.scheduler.create'))
+        ->assertOk()
+        ->assertSee('Mode Penyusunan')
+        ->assertSee('Perbaiki & Pertahankan')
+        ->assertSee('Susun Ulang Segar')
+        ->assertSee('name="strategy"', false)
+        ->assertSee('Label skenario (opsional)')
+        ->assertSee('name="label"', false)
+        ->assertSee('Opsi Lab Prioritas')
+        ->assertSee('Opsi Pagi')
+        ->assertSee('Skor 100/100')
+        ->assertSee('1 sesi berubah dari v1')
+        ->assertSee('Identik dengan v1')
+        ->assertSee('popovertarget="draft-download-'.$draftModified->id.'"', false)
+        ->assertSee('popover="auto"', false)
+        ->assertSee(route('admin.drafts.excel', [$draftModified, 'tinjau' => 'kelas']), false)
+        ->assertSee(route('admin.drafts.pdf', [$draftModified, 'tinjau' => 'ruang']), false);
+
+    preg_match('/<button[^>]*popovertarget="draft-download-'.$draftModified->id.'"[\s\S]*?<\/div>\s*<\/div>\s*<\/div>/s', $workspaceResponse->getContent(), $workspacePopover);
+    expect($workspacePopover[0] ?? '')->toContain('popover="auto"')
+        ->not->toContain('role="menu"')
+        ->not->toContain('aria-haspopup');
+
+    $inspectionsResponse = $this->get(route('admin.drafts.inspections'))
+        ->assertOk()
+        ->assertSee('Opsi Lab Prioritas')
+        ->assertSee('Opsi Pagi')
+        ->assertSee('Skor 100/100')
+        ->assertSee('1 sesi berubah dari v1')
+        ->assertSee('Identik dengan v1')
+        ->assertSee('popovertarget="draft-download-'.$draftModified->id.'"', false)
+        ->assertSee('popover="auto"', false)
+        ->assertSee(route('admin.drafts.excel', [$draftModified, 'tinjau' => 'dosen']), false)
+        ->assertSee(route('admin.drafts.pdf', [$draftModified, 'tinjau' => 'kelas']), false);
+
+    preg_match('/<button[^>]*popovertarget="draft-download-'.$draftModified->id.'"[\s\S]*?<\/div>\s*<\/div>\s*<\/div>/s', $inspectionsResponse->getContent(), $inspectionsPopover);
+    expect($inspectionsPopover[0] ?? '')->toContain('popover="auto"')
+        ->not->toContain('role="menu"')
+        ->not->toContain('aria-haspopup');
+
+    // Smoke check endpoint ekspor Excel & PDF mengembalikan 200 OK dengan content-type sesuai.
+    $this->get(route('admin.drafts.excel', $draftModified))
+        ->assertOk()
+        ->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+
+    $this->get(route('admin.drafts.pdf', $draftModified))
+        ->assertOk()
+        ->assertHeader('Content-Type', 'application/pdf');
+});

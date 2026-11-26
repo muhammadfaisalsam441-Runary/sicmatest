@@ -67,9 +67,11 @@ class SchedulePublisher
                 'lock_version' => $draft->lock_version + 1,
             ])->save();
 
-            if ($draft->period->active_draft_version_id === $draft->id) {
+            if ($draft->period->active_draft_version_id !== null) {
                 $draft->period->forceFill(['active_draft_version_id' => null])->save();
             }
+
+            $this->archiveRemainingDrafts($draft);
 
             $count = $this->blocks->rebuild($draft);
 
@@ -151,6 +153,39 @@ class SchedulePublisher
                 ->update(['is_active' => false]);
 
             $this->audit->log('schedule.superseded', $version, ['status' => 'official'], ['status' => 'superseded', 'effective_to' => $version->effective_to->toDateString()]);
+        }
+    }
+
+    /**
+     * Arsipkan seluruh draf terbuka lain pada semester yang sama setelah draf baru resmi ditetapkan.
+     */
+    private function archiveRemainingDrafts(ScheduleVersion $published): void
+    {
+        $remaining = ScheduleVersion::query()
+            ->where('period_id', $published->period_id)
+            ->whereKeyNot($published->id)
+            ->whereIn('status', [ScheduleVersionStatus::Draft, ScheduleVersionStatus::Ready])
+            ->lockForUpdate()
+            ->get();
+
+        foreach ($remaining as $other) {
+            $beforeStatus = $other->status->value;
+
+            $other->forceFill([
+                'status' => ScheduleVersionStatus::Archived,
+                'lock_version' => $other->lock_version + 1,
+            ])->save();
+
+            $this->audit->log(
+                'schedule.draft_archived',
+                $other,
+                ['status' => $beforeStatus],
+                [
+                    'status' => ScheduleVersionStatus::Archived->value,
+                    'version_no' => $other->version_no,
+                    'archived_by_publish_version_no' => $published->version_no,
+                ],
+            );
         }
     }
 

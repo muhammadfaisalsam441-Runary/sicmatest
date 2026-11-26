@@ -93,6 +93,14 @@ class SolverPayloadValidator
             return false;
         }
 
+        if (isset($input['strategy']) && ! in_array($input['strategy'], ['preserve', 'fresh'], true)) {
+            return false;
+        }
+
+        if (isset($input['seed']) && (! is_int($input['seed']) || $input['seed'] < 0)) {
+            return false;
+        }
+
         foreach (['sessions', 'slots', 'days'] as $key) {
             if (! is_array($input[$key] ?? null) || $input[$key] === []) {
                 return false;

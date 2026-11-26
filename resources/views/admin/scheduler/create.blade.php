@@ -9,9 +9,14 @@
 @section('content')
     @php
         $scope = old('scope', 'semester');
+        $strategy = old('strategy', request()->query('strategy', 'preserve'));
+        if (! in_array($strategy, ['preserve', 'fresh'], true)) {
+            $strategy = 'preserve';
+        }
         $openSchedulerModal = $readiness !== null
-            || $errors->hasAny(['scope', 'class_ids', 'class_ids.*', 'time_limit'])
-            || request()->boolean('susun');
+            || $errors->hasAny(['scope', 'class_ids', 'class_ids.*', 'time_limit', 'strategy', 'label'])
+            || request()->boolean('susun')
+            || request()->has('strategy');
         $openImportModal = $errors->hasAny(['period_id', 'file'])
             || request()->boolean('impor');
         $hasRunningJob = $lastJob && in_array($lastJob->status, [OptimizationJobStatus::Queued, OptimizationJobStatus::Running], true);
@@ -84,6 +89,7 @@
                 @php
                     $activeCard = $versions->first();
                     $otherVersions = $versions->slice(1);
+                    $activeMetric = $draftMetrics[$activeCard->id] ?? null;
                     $isReady = $activeReviewStatus['ready'] ?? false;
                     $activeBadgeVariant = $isReady
                         ? 'success'
@@ -101,7 +107,34 @@
                             <div class="flex flex-wrap items-center gap-2">
                                 <span class="rounded-md bg-primary px-2 py-0.5 text-xs font-semibold text-white">Draf Aktif</span>
                                 <h2 class="text-lg font-semibold text-ink">Draf v{{ $activeCard->version_no }} sedang dikerjakan</h2>
+                                @if (filled($activeCard->label))
+                                    <span class="inline-flex items-center rounded-full border border-primary/25 bg-surface px-2.5 py-0.5 text-xs font-medium text-primary">
+                                        {{ $activeCard->label }}
+                                    </span>
+                                @endif
+                                <button type="button"
+                                        x-data
+                                        x-on:click="$dispatch('open-label-draft', { versionNo: {{ $activeCard->version_no }}, label: @js($activeCard->label ?? ''), action: @js(route('admin.drafts.label', $activeCard)) }); $dispatch('open-modal', 'label-draft-modal')"
+                                        class="inline-flex size-7 cursor-pointer items-center justify-center rounded-control border border-border bg-surface text-muted transition hover:border-primary/40 hover:bg-primary-soft/60 hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                                        aria-label="Ubah label Draf v{{ $activeCard->version_no }}"
+                                        title="Ubah label draf">
+                                    <i data-lucide="pencil" class="size-3.5" aria-hidden="true"></i>
+                                </button>
                                 <x-status-badge :variant="$activeBadgeVariant">{{ $activeBadgeLabel }}</x-status-badge>
+                                @if ($activeMetric)
+                                    <x-status-badge :variant="$activeMetric['variant']" :title="$activeMetric['summary_tooltip']">
+                                        Skor {{ $activeMetric['score'] }}/100
+                                    </x-status-badge>
+                                @endif
+                                @if (($activeMetric['changed_count'] ?? null) !== null)
+                                    <span class="inline-flex items-center rounded-full border border-border bg-surface px-2.5 py-0.5 text-xs font-medium text-muted">
+                                        @if ($activeMetric['changed_count'] === 0)
+                                            Identik dengan v{{ $activeMetric['baseline_version_no'] }}
+                                        @else
+                                            {{ $activeMetric['changed_count'] }} sesi berubah dari v{{ $activeMetric['baseline_version_no'] }}
+                                        @endif
+                                    </span>
+                                @endif
                             </div>
                             <p class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-muted">
                                 <span>{{ $activeCard->source->label() }}</span>
@@ -118,6 +151,7 @@
                         </div>
 
                         <div class="flex flex-wrap items-center gap-2">
+                            <x-draft-download-menu :version="$activeCard" />
                             <x-button variant="secondary" size="sm" icon="pencil" :href="route('admin.drafts.show', $activeCard)">
                                 1. Edit Sesi
                             </x-button>
@@ -154,13 +188,43 @@
 
                         <div class="divide-y divide-border">
                             @foreach ($otherVersions as $version)
+                                @php
+                                    $metric = $draftMetrics[$version->id] ?? null;
+                                @endphp
                                 <div class="flex flex-wrap items-center justify-between gap-4 px-6 py-4 transition hover:bg-page/40">
                                     <div class="flex flex-col gap-1">
                                         <div class="flex flex-wrap items-center gap-2">
                                             <span class="text-base font-semibold text-ink">Draf v{{ $version->version_no }}</span>
+                                            @if (filled($version->label))
+                                                <span class="inline-flex items-center rounded-full border border-primary/25 bg-surface px-2.5 py-0.5 text-xs font-medium text-primary">
+                                                    {{ $version->label }}
+                                                </span>
+                                            @endif
+                                            <button type="button"
+                                                    x-data
+                                                    x-on:click="$dispatch('open-label-draft', { versionNo: {{ $version->version_no }}, label: @js($version->label ?? ''), action: @js(route('admin.drafts.label', $version)) }); $dispatch('open-modal', 'label-draft-modal')"
+                                                    class="inline-flex size-7 cursor-pointer items-center justify-center rounded-control border border-border bg-surface text-muted transition hover:border-primary/40 hover:bg-primary-soft/60 hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                                                    aria-label="Ubah label Draf v{{ $version->version_no }}"
+                                                    title="Ubah label draf">
+                                                <i data-lucide="pencil" class="size-3.5" aria-hidden="true"></i>
+                                            </button>
                                             <x-status-badge :variant="$version->issues_count === 0 ? 'success' : 'warning'">
                                                 {{ $version->issues_count === 0 ? '0 masalah wajib' : $version->issues_count.' temuan wajib' }}
                                             </x-status-badge>
+                                            @if ($metric)
+                                                <x-status-badge :variant="$metric['variant']" :title="$metric['summary_tooltip']">
+                                                    Skor {{ $metric['score'] }}/100
+                                                </x-status-badge>
+                                            @endif
+                                            @if (($metric['changed_count'] ?? null) !== null)
+                                                <span class="inline-flex items-center rounded-full border border-border bg-surface px-2.5 py-0.5 text-xs font-medium text-muted">
+                                                    @if ($metric['changed_count'] === 0)
+                                                        Identik dengan v{{ $metric['baseline_version_no'] }}
+                                                    @else
+                                                        {{ $metric['changed_count'] }} sesi berubah dari v{{ $metric['baseline_version_no'] }}
+                                                    @endif
+                                                </span>
+                                            @endif
                                         </div>
                                         <p class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-muted">
                                             <span>{{ $version->source->label() }}</span>
@@ -175,6 +239,7 @@
                                             <input type="hidden" name="redirect" value="workspace">
                                             <x-button type="submit" variant="soft" size="sm" icon="check">Gunakan</x-button>
                                         </form>
+                                        <x-draft-download-menu :version="$version" />
                                         <x-button variant="secondary" size="sm" icon="pencil" :href="route('admin.drafts.show', $version)">Edit</x-button>
                                         <x-button variant="secondary" size="sm" icon="list-checks" :href="route('admin.drafts.inspect', $version)">Periksa</x-button>
                                         <x-button type="button"
@@ -215,7 +280,7 @@
                     </div>
                 @endif
 
-                <form method="POST" action="{{ route('admin.scheduler.store') }}" class="flex flex-col gap-5" x-data="{ scope: @js($scope) }">
+                <form method="POST" action="{{ route('admin.scheduler.store') }}" class="flex flex-col gap-5" x-data="{ scope: @js($scope), strategy: @js($strategy) }">
                     @csrf
 
                     <div class="flex flex-col gap-3">
@@ -415,6 +480,41 @@
                         @enderror
                     </div>
 
+                    <div class="flex flex-col gap-3">
+                        <p class="text-sm font-semibold text-ink">Mode Penyusunan</p>
+                        <div class="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                            @foreach ([
+                                'preserve' => [
+                                    'title' => 'Perbaiki & Pertahankan',
+                                    'desc' => 'Pertahankan slot yang sudah bagus; hanya pindahkan sesi yang bentrok atau belum terjadwal.',
+                                ],
+                                'fresh' => [
+                                    'title' => 'Susun Ulang Segar',
+                                    'desc' => 'Buat alternatif susunan baru untuk sesi yang tidak terkunci. Sesi terkunci tetap dipertahankan.',
+                                ],
+                            ] as $strategyKey => $strategyOption)
+                                <label class="flex cursor-pointer items-start gap-3 rounded-control border px-3.5 py-3 transition"
+                                       :class="strategy === @js($strategyKey) ? 'border-primary bg-primary-soft/60 text-ink ring-1 ring-primary/30' : 'border-border bg-surface hover:border-primary/40'">
+                                    <input type="radio" name="strategy" value="{{ $strategyKey }}" x-model="strategy" class="mt-0.5 accent-primary">
+                                    <span class="flex flex-col gap-0.5">
+                                        <span class="text-sm font-semibold text-ink">{{ $strategyOption['title'] }}</span>
+                                        <span class="text-xs leading-relaxed text-muted">{{ $strategyOption['desc'] }}</span>
+                                    </span>
+                                </label>
+                            @endforeach
+                        </div>
+                        @error('strategy')
+                            <p class="text-xs font-medium text-danger">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <x-field label="Label skenario (opsional)" name="label" for="scheduler-draft-label">
+                        <x-input name="label"
+                                 id="scheduler-draft-label"
+                                 maxlength="120"
+                                 placeholder="Contoh: Opsi Pagi Padat, Lab Prioritas" />
+                    </x-field>
+
                     <x-info-box title="Pencarian otomatis maksimal 60 detik" />
 
                     <div class="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
@@ -545,6 +645,59 @@
                 <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <x-button type="button" variant="secondary" x-on:click="$dispatch('close-modal', 'archive-draft-modal')">Batal</x-button>
                     <x-button type="submit" variant="danger" x-bind:disabled="submitting">Ya, arsipkan</x-button>
+                </div>
+            </form>
+        </x-modal>
+
+        <x-modal name="label-draft-modal" width="max-w-md" labelled-by="label-draft-modal-title">
+            <form method="POST"
+                  x-data="{ versionNo: null, label: '', action: '', submitting: false }"
+                  x-on:open-label-draft.window="versionNo = $event.detail.versionNo; label = $event.detail.label ?? ''; action = $event.detail.action; submitting = false; $nextTick(() => $refs.labelInput?.focus())"
+                  x-bind:action="action"
+                  x-on:submit="if (!action || submitting) { $event.preventDefault(); return; } submitting = true"
+                  x-on:sicma:form-error.window="submitting = false"
+                  x-on:sicma:form-complete.window="submitting = false"
+                  class="flex flex-col gap-5">
+                @csrf
+                @method('PATCH')
+                <input type="hidden" name="redirect" value="workspace">
+
+                <div class="flex items-start justify-between gap-4">
+                    <span class="flex size-12 items-center justify-center rounded-control bg-primary-soft text-primary">
+                        <i data-lucide="pencil" aria-hidden="true" class="size-5"></i>
+                    </span>
+                    <button type="button"
+                            x-on:click="$dispatch('close-modal', 'label-draft-modal')"
+                            class="inline-flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-control text-muted transition hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                            aria-label="Tutup">
+                        <i data-lucide="x" aria-hidden="true" class="size-5"></i>
+                    </button>
+                </div>
+
+                <div class="flex flex-col gap-1.5">
+                    <h2 id="label-draft-modal-title" class="text-xl font-semibold text-ink">
+                        Label Draf v<span x-text="versionNo"></span>
+                    </h2>
+                    <p class="text-sm leading-relaxed text-muted">
+                        Beri nama singkat agar skenario draf mudah dibandingkan. Kosongkan untuk menghapus label.
+                    </p>
+                </div>
+
+                <div class="flex flex-col gap-2">
+                    <label for="label-draft-workspace-input" class="text-sm font-medium text-ink">Label skenario</label>
+                    <input type="text"
+                           id="label-draft-workspace-input"
+                           name="label"
+                           x-model="label"
+                           x-ref="labelInput"
+                           maxlength="120"
+                           placeholder="Contoh: Opsi Pagi Padat, Lab Prioritas"
+                           class="w-full rounded-control border border-muted/75 bg-surface px-4 py-3 text-base sm:text-sm min-h-11 text-ink placeholder:text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15">
+                </div>
+
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <x-button type="button" variant="secondary" x-on:click="$dispatch('close-modal', 'label-draft-modal')">Batal</x-button>
+                    <x-button type="submit" x-bind:disabled="submitting">Simpan</x-button>
                 </div>
             </form>
         </x-modal>

@@ -12,16 +12,31 @@ class SolverCostCalculator
      *
      * @param  array<string, mixed>  $session
      */
-    public function cost(array $session, int $day, int $start, ?int $room): int
-    {
+    public function cost(
+        array $session,
+        int $day,
+        int $start,
+        ?int $room,
+        ?int $roomCapacity = null,
+        bool $freshMode = false,
+    ): int {
         $preferred = $session['preferred'] ?? null;
         $pattern = ($preferred === null || $preferred['start'] !== $start)
             ? $this->slotPatternCost((int) ($session['duration'] ?? 0), $day, $start)
                 + $this->cohortPatternCost($session['cohort_profile'] ?? null, $start)
             : 0;
 
-        return ($preferred === null ? $day : (int) ($preferred['day'] !== $day) * 6
-            + (int) ($preferred['start'] !== $start) * 3 + (int) ($preferred['room'] !== $room) * 2) + $pattern;
+        $preferenceCost = $preferred === null
+            ? ($freshMode ? 0 : $day)
+            : (int) ($preferred['day'] !== $day) * 6
+                + (int) ($preferred['start'] !== $start) * 3
+                + (int) ($preferred['room'] !== $room) * 2;
+
+        $wastePenalty = ($room !== null && $roomCapacity !== null && ($session['students'] ?? null) !== null && $roomCapacity >= $session['students'])
+            ? min(4, intdiv($roomCapacity - $session['students'], 15))
+            : 0;
+
+        return $preferenceCost + $pattern + $wastePenalty;
     }
 
     /**

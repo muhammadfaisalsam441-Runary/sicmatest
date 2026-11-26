@@ -19,7 +19,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /**
  * Versi jadwal. Hanya status official yang dibaca portal (B09).
  */
-#[Fillable(['period_id', 'version_no', 'status', 'source', 'allow_conflicts', 'based_on_version_id', 'effective_from', 'effective_to', 'published_by', 'published_at', 'lock_version'])]
+#[Fillable(['period_id', 'version_no', 'status', 'source', 'label', 'allow_conflicts', 'based_on_version_id', 'effective_from', 'effective_to', 'published_by', 'published_at', 'lock_version'])]
 class ScheduleVersion extends Model
 {
     /** @use HasFactory<ScheduleVersionFactory> */

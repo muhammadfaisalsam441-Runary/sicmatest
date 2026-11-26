@@ -34,9 +34,11 @@ class ScheduleDraftService
     /**
      * Versi baru berstatus draf, menyalin seluruh sesi (beserta peserta & pengajar) dari $base bila ada.
      */
-    public function create(Period $period, ScheduleSource $source, ?ScheduleVersion $base = null): ScheduleVersion
+    public function create(Period $period, ScheduleSource $source, ?ScheduleVersion $base = null, ?string $label = null): ScheduleVersion
     {
-        return DB::transaction(function () use ($period, $source, $base): ScheduleVersion {
+        $normalizedLabel = $this->normalizeLabel($label);
+
+        return DB::transaction(function () use ($period, $source, $base, $normalizedLabel): ScheduleVersion {
             $versionNo = (int) $period->scheduleVersions()->lockForUpdate()->max('version_no') + 1;
 
             $effectiveFrom = now()->startOfDay()->max($period->start_date);
@@ -49,6 +51,7 @@ class ScheduleDraftService
                 'version_no' => $versionNo,
                 'status' => ScheduleVersionStatus::Draft,
                 'source' => $source,
+                'label' => $normalizedLabel,
                 'based_on_version_id' => $base?->id,
                 'effective_from' => $effectiveFrom->toDateString(),
                 'lock_version' => 0,
@@ -60,9 +63,41 @@ class ScheduleDraftService
                 $this->copySessions($base, $draft);
             }
 
-            $this->audit->log('schedule.draft_created', $draft, null, ['version_no' => $versionNo, 'based_on' => $base?->version_no, 'source' => $source->value]);
+            $this->audit->log('schedule.draft_created', $draft, null, [
+                'version_no' => $versionNo,
+                'based_on' => $base?->version_no,
+                'source' => $source->value,
+                'label' => $normalizedLabel,
+            ]);
 
             return $draft;
+        });
+    }
+
+    /**
+     * Perbarui atau hapus label skenario pada draf tanpa membatalkan status tinjauan sesi.
+     */
+    public function updateLabel(ScheduleVersion $version, ?string $label): ScheduleVersion
+    {
+        $this->assertDraft($version);
+
+        return DB::transaction(function () use ($version, $label): ScheduleVersion {
+            $version = ScheduleVersion::query()->whereKey($version->id)->lockForUpdate()->firstOrFail();
+            $this->assertDraft($version);
+
+            $beforeLabel = $version->label;
+            $normalizedLabel = $this->normalizeLabel($label);
+
+            $version->forceFill(['label' => $normalizedLabel])->save();
+
+            $this->audit->log(
+                'schedule.draft_labeled',
+                $version,
+                ['label' => $beforeLabel],
+                ['label' => $normalizedLabel, 'version_no' => $version->version_no],
+            );
+
+            return $version;
         });
     }
 
@@ -389,5 +424,20 @@ class ScheduleDraftService
         if (! in_array($version->status, [ScheduleVersionStatus::Draft, ScheduleVersionStatus::Ready], true)) {
             throw new DomainException('INVALID_STATUS_TRANSITION', 'Jadwal resmi tidak diubah langsung. Buat draf revisi lebih dulu.');
         }
+    }
+
+    private function normalizeLabel(?string $label): ?string
+    {
+        if ($label === null) {
+            return null;
+        }
+
+        $normalized = trim($label);
+
+        if ($normalized === '') {
+            return null;
+        }
+
+        return mb_substr($normalized, 0, 120);
     }
 }

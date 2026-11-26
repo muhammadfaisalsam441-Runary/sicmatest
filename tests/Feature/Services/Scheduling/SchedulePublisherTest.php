@@ -217,3 +217,53 @@ test('admin berwenang dapat mengaktifkan toleransi khusus satu draf lalu menetap
 
     expect($this->draft->fresh()->status)->toBe(ScheduleVersionStatus::Official);
 });
+
+test('menetapkan satu draf otomatis mengarsipkan draf dan versi siap lain di semester sama tanpa menyentuh semester lain', function () {
+    $draftService = app(ScheduleDraftService::class);
+    $otherDraft = $draftService->create($this->period, ScheduleSource::Generated, $this->official, 'Alternatif 1');
+    $readyDraft = $draftService->create($this->period, ScheduleSource::Manual, $this->official, 'Alternatif Siap');
+    $readyDraft->forceFill(['status' => ScheduleVersionStatus::Ready])->save();
+
+    $otherPeriod = Period::factory()->create(['is_active' => false, 'name' => 'Genap 2026/2027']);
+    $otherPeriodDraft = ScheduleVersion::factory()->for($otherPeriod)->create([
+        'status' => ScheduleVersionStatus::Draft,
+        'version_no' => 1,
+    ]);
+    $otherPeriodReady = ScheduleVersion::factory()->for($otherPeriod)->create([
+        'status' => ScheduleVersionStatus::Ready,
+        'version_no' => 2,
+    ]);
+
+    expect($this->period->fresh()->active_draft_version_id)->toBe($readyDraft->id);
+
+    app(SchedulePublisher::class)->publish(
+        $this->draft->fresh(),
+        $this->publisher,
+        CarbonImmutable::parse('2026-11-09'),
+        $this->draft->fresh()->lock_version,
+        'Tetapkan draf terpilih',
+    );
+
+    expect($this->draft->fresh()->status)->toBe(ScheduleVersionStatus::Official)
+        ->and($otherDraft->fresh()->status)->toBe(ScheduleVersionStatus::Archived)
+        ->and($readyDraft->fresh()->status)->toBe(ScheduleVersionStatus::Archived)
+        ->and($this->period->fresh()->active_draft_version_id)->toBeNull()
+        ->and($otherPeriodDraft->fresh()->status)->toBe(ScheduleVersionStatus::Draft)
+        ->and($otherPeriodReady->fresh()->status)->toBe(ScheduleVersionStatus::Ready);
+
+    $archivedLogs = AuditLog::query()
+        ->where('action', 'schedule.draft_archived')
+        ->where('auditable_type', $otherDraft->getMorphClass())
+        ->get()
+        ->keyBy('auditable_id');
+
+    expect($archivedLogs)->toHaveCount(2)
+        ->and($archivedLogs->keys()->all())->toEqualCanonicalizing([$otherDraft->id, $readyDraft->id])
+        ->and($archivedLogs[$otherDraft->id]->before)->toBe(['status' => ScheduleVersionStatus::Draft->value])
+        ->and($archivedLogs[$otherDraft->id]->after)->toMatchArray([
+            'status' => ScheduleVersionStatus::Archived->value,
+            'version_no' => $otherDraft->version_no,
+            'archived_by_publish_version_no' => $this->draft->version_no,
+        ])
+        ->and($archivedLogs[$readyDraft->id]->before)->toBe(['status' => ScheduleVersionStatus::Ready->value]);
+});

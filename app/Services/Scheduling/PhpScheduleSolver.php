@@ -63,6 +63,8 @@ class PhpScheduleSolver
             return $this->result('MODEL_INVALID', $started, 'Data sesi, slot, hari, ruang, atau ketersediaan tidak valid.');
         }
         $this->deadline = $started + (float) ($input['time_limit'] ?? 15);
+        $strategy = (string) ($input['strategy'] ?? 'preserve');
+        $seed = (int) ($input['seed'] ?? 0);
         $slots = $input['slots'] ?? [];
         usort($slots, fn (array $a, array $b): int => $a['start'] <=> $b['start']);
 
@@ -123,7 +125,13 @@ class PhpScheduleSolver
                         if ($shortage > 0 && ($input['capacity_blocks_publish'] ?? false)) {
                             continue;
                         }
-                        $candidate = [$day, $start, $end, $room['id'], $this->costCalculator->cost($session, $day, $start, $room['id']) + $shortage];
+                        $candidate = [
+                            $day,
+                            $start,
+                            $end,
+                            $room['id'],
+                            $this->costCalculator->cost($session, $day, $start, $room['id'], $room['capacity'] ?? null, $strategy === 'fresh') + $shortage,
+                        ];
                         if ($this->blockers($id, $candidate) === [] && ! $this->roomBlocked($session, $candidate, $input)) {
                             $options[] = $candidate;
                         }
@@ -133,7 +141,12 @@ class PhpScheduleSolver
                     }
                 }
             }
-            usort($options, fn (array $a, array $b): int => [$a[4], $a[0], $a[1], $a[3]] <=> [$b[4], $b[0], $b[1], $b[3]]);
+            if ($seed > 0) {
+                usort($options, fn (array $a, array $b): int => [intdiv($a[4], 2), crc32($seed.':'.$id.':'.$a[0].':'.$a[1].':'.($a[3] ?? 0)), $a[4], $a[0], $a[1], $a[3]]
+                    <=> [intdiv($b[4], 2), crc32($seed.':'.$id.':'.$b[0].':'.$b[1].':'.($b[3] ?? 0)), $b[4], $b[0], $b[1], $b[3]]);
+            } else {
+                usort($options, fn (array $a, array $b): int => [$a[4], $a[0], $a[1], $a[3]] <=> [$b[4], $b[0], $b[1], $b[3]]);
+            }
             $this->domains[$id] = $options;
             if ($this->expired()) {
                 return $this->result('UNKNOWN', $started, 'Batas pencarian tercapai saat menyiapkan kandidat.');
@@ -141,8 +154,13 @@ class PhpScheduleSolver
         }
 
         $order = array_keys($this->sessions);
-        usort($order, fn (int $a, int $b): int => [isset($this->sessions[$a]['locked']) ? 0 : 1, count($this->domains[$a]), -$this->sessions[$a]['duration'], $a]
-            <=> [isset($this->sessions[$b]['locked']) ? 0 : 1, count($this->domains[$b]), -$this->sessions[$b]['duration'], $b]);
+        if ($seed > 0) {
+            usort($order, fn (int $a, int $b): int => [isset($this->sessions[$a]['locked']) ? 0 : 1, count($this->domains[$a]), -$this->sessions[$a]['duration'], crc32($seed.':ord:'.$a), $a]
+                <=> [isset($this->sessions[$b]['locked']) ? 0 : 1, count($this->domains[$b]), -$this->sessions[$b]['duration'], crc32($seed.':ord:'.$b), $b]);
+        } else {
+            usort($order, fn (int $a, int $b): int => [isset($this->sessions[$a]['locked']) ? 0 : 1, count($this->domains[$a]), -$this->sessions[$a]['duration'], $a]
+                <=> [isset($this->sessions[$b]['locked']) ? 0 : 1, count($this->domains[$b]), -$this->sessions[$b]['duration'], $b]);
+        }
         $best = [];
         $bestCost = PHP_INT_MAX;
         $this->stage = 'Mencari susunan';

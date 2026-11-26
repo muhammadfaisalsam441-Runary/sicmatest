@@ -849,10 +849,10 @@ body[data-portal="public"] > header {
 
 .sicma-room-card:hover,
 .sicma-room-card:focus-within {
-    border-color: color-mix(in oklab, var(--card-accent) 34%, var(--color-border));
+    border-color: color-mix(in oklab, var(--card-accent) 28%, var(--color-border));
     box-shadow:
-        0 14px 28px -10px color-mix(in oklab, var(--card-accent) 22%, transparent),
-        0 4px 10px -4px rgb(16 34 60 / 0.06);
+        0 10px 22px -10px color-mix(in oklab, var(--card-accent) 18%, transparent),
+        0 3px 8px -4px rgb(16 34 60 / 0.05);
 }
 
 .sicma-room-card[data-spot-active="true"] .sicma-card-spotlight,
@@ -868,10 +868,9 @@ body[data-portal="public"] > header {
     transform: scaleX(1);
 }
 
-.sicma-room-card:hover .sicma-card-meta-box,
-.sicma-room-card:focus-within .sicma-card-meta-box {
-    background-color: color-mix(in oklab, var(--card-accent) 6%, var(--color-page));
-    border-color: color-mix(in oklab, var(--card-accent) 18%, transparent);
+.sicma-room-card:hover .sicma-card-agenda,
+.sicma-room-card:focus-within .sicma-card-agenda {
+    border-color: color-mix(in oklab, var(--card-accent) 22%, var(--color-border));
 }
 
 .sicma-room-card:hover .sicma-card-title {
@@ -884,7 +883,7 @@ body[data-portal="public"] > header {
 
 @media (prefers-reduced-motion: no-preference) {
     .sicma-room-card.sicma-card-interactive:hover {
-        transform: translateY(-4px);
+        transform: translateY(-2px);
     }
 }
 

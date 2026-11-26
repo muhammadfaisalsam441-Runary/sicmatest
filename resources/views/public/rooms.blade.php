@@ -72,12 +72,12 @@
                 <x-button variant="soft" :href="route('public.rooms')">Tampilkan semua ruangan</x-button>
             </x-empty-state>
         @else
-            <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                 @foreach ($rooms as $room)
                     <x-room-card :name="$room['name']" :badge="$room['badge']" :location="$room['location']" :capacity="$room['capacity']" :facilities="$room['facilities'] ?? []"
                                  :time-label="$room['time_label']" :time="$room['time']" :remaining="$room['remaining'] ?? null" :note="$room['note']"
                                  :agenda-title="$room['agenda_title'] ?? null" :agenda-class="$room['agenda_class'] ?? null" :agenda-range="$room['agenda_range'] ?? null" :agenda-is-upcoming="$room['agenda_is_upcoming'] ?? false"
-                                 style="--stagger: {{ $loop->index }}" />
+                                 style="--stagger: {{ $loop->index }}" class="h-full" />
                 @endforeach
             </div>
         @endif

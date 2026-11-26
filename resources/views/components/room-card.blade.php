@@ -20,6 +20,7 @@
 @php
     $isAvailable = $badge === 'Tersedia';
     $isBusy = $badge === 'Digunakan';
+    $isClosed = $badge === 'Tutup';
     $variant = match ($badge) {
         'Tersedia' => 'success',
         'Digunakan' => 'danger',
@@ -28,91 +29,104 @@
     $capacityText = $capacity === null ? '—' : $capacity.' kursi';
     $visibleFacilities = array_slice($facilities, 0, 3);
     $extraFacilities = max(0, count($facilities) - 3);
+    $hasAgendaBlock = filled($agendaTitle) || $isAvailable || filled($note);
+    $hasFooter = $href || $booking || $slot->isNotEmpty() || ($remaining && ! $timeLabel);
 @endphp
 
 <article data-room-card
          data-status-tone="{{ $variant }}"
-         {{ $attributes->merge(['class' => 'sicma-room-card sicma-card-interactive sicma-card-enter relative flex flex-col gap-3.5 overflow-hidden rounded-card border border-border bg-surface '.($size === 'large' ? 'p-5 sm:p-6' : 'p-4')]) }}>
+         {{ $attributes->merge(['class' => 'sicma-room-card sicma-card-interactive sicma-card-enter relative flex flex-col gap-3 overflow-hidden rounded-card border border-border bg-surface '.($size === 'large' ? 'p-5 sm:p-6' : 'p-4 sm:p-5')]) }}>
     <span aria-hidden="true" class="sicma-card-spotlight"></span>
     <span aria-hidden="true" class="sicma-card-accent"></span>
-    <div class="flex items-start justify-between gap-3">
-        <div class="flex min-w-0 flex-col gap-1">
-            <h3 class="sicma-card-title {{ $size === 'large' ? 'text-xl' : 'text-lg' }} font-semibold leading-snug text-ink transition-colors duration-200">{{ $name }}</h3>
-            <p class="inline-flex items-center gap-1.5 text-xs text-muted">
+
+    {{-- Tier 1: Judul, status, dan metadata lokasi + kapasitas sebaris --}}
+    <div class="flex flex-col gap-1">
+        <div class="flex items-start justify-between gap-3">
+            <h3 class="sicma-card-title {{ $size === 'large' ? 'text-xl' : 'text-lg' }} min-w-0 truncate font-semibold leading-snug text-ink transition-colors duration-200">{{ $name }}</h3>
+            <x-status-badge :variant="$variant" :pulse="$isBusy" class="shrink-0">{{ $badge }}</x-status-badge>
+        </div>
+        <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted">
+            <span class="inline-flex min-w-0 items-center gap-1">
                 <i data-lucide="map-pin" aria-hidden="true" class="sicma-card-pin size-3.5 shrink-0 transition-colors duration-200"></i>
                 <span class="truncate">{{ $location }}</span>
-            </p>
+            </span>
+            <span aria-hidden="true" class="text-border">•</span>
+            <span class="inline-flex shrink-0 items-center gap-1 tabular-nums">
+                <i data-lucide="users" aria-hidden="true" class="size-3.5 shrink-0"></i>
+                <span>{{ $capacityText }}</span>
+            </span>
         </div>
-        <x-status-badge :variant="$variant" :pulse="$isBusy">{{ $badge }}</x-status-badge>
     </div>
 
-    <dl class="sicma-card-meta-box grid grid-cols-2 items-start gap-3 rounded-control border border-transparent bg-page px-3.5 py-2.5 text-sm transition-colors duration-200">
-        <div class="flex min-w-0 flex-col gap-0.5">
-            <dt class="text-[11px] font-medium text-muted">Kapasitas</dt>
-            <dd class="inline-flex items-center gap-1.5 font-semibold text-ink tabular-nums">
-                <i data-lucide="users" aria-hidden="true" class="size-3.5 shrink-0 text-muted"></i>
-                <span>{{ $capacityText }}</span>
-            </dd>
-        </div>
-        @if ($timeLabel)
-            <div class="flex min-w-0 flex-col items-end gap-0.5 text-right">
-                <dt class="text-[11px] font-medium text-muted">{{ $timeLabel }}</dt>
-                <dd @class([
-                    'font-semibold tabular-nums',
+    {{-- Tier 2: Ringkasan waktu ketersediaan / selesai --}}
+    @if ($timeLabel)
+        <div class="flex items-center justify-between gap-3 border-t border-border/70 pt-3">
+            <span class="text-xs font-medium text-muted">{{ $timeLabel }}</span>
+            <div class="flex flex-col items-end text-right">
+                <span @class([
+                    'text-sm font-bold leading-tight tabular-nums',
                     'text-success' => $isAvailable,
-                    'text-ink' => $badge === 'Tutup',
-                    'text-primary' => ! $isAvailable && $badge !== 'Tutup',
-                ])>{{ $time ?? '—' }}</dd>
+                    'text-ink' => $isClosed,
+                    'text-primary' => ! $isAvailable && ! $isClosed,
+                ])>{{ $time ?? '—' }}</span>
                 @if ($remaining)
-                    <dd class="text-[11px] text-muted tabular-nums">{{ $remaining }}</dd>
+                    <span class="mt-0.5 text-[11px] leading-tight text-muted tabular-nums">{{ $remaining }}</span>
                 @endif
             </div>
-        @endif
-    </dl>
+        </div>
+    @endif
 
+    {{-- Tier 3: Satu permukaan agenda / status hari ini --}}
     @if (filled($agendaTitle))
-        <div class="flex flex-col gap-2 rounded-control border border-border/80 bg-page px-3.5 py-2.5">
-            <div class="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 border-b border-border/60 pb-1.5 text-[11px]">
+        <div @class([
+            'sicma-card-agenda mt-auto rounded-lg border px-3 py-2.5 transition-colors duration-200',
+            'border-danger/15 bg-danger-soft/30' => ! $agendaIsUpcoming,
+            'border-border/80 bg-page/80' => $agendaIsUpcoming,
+        ])>
+            <div class="flex items-center justify-between gap-2 text-[11px]">
                 <span class="inline-flex min-w-0 items-center gap-1.5 font-medium text-muted">
-                    <span class="size-1.5 shrink-0 rounded-full {{ $agendaIsUpcoming ? ($isAvailable ? 'bg-success' : 'bg-primary') : 'bg-danger' }}" aria-hidden="true"></span>
-                    <span>{{ $agendaIsUpcoming ? ($isAvailable ? 'Jadwal berikutnya' : 'Jadwal terdekat') : 'Sedang berlangsung' }}</span>
+                    <span @class([
+                        'size-1.5 shrink-0 rounded-full',
+                        'bg-success' => $agendaIsUpcoming && $isAvailable,
+                        'bg-primary' => $agendaIsUpcoming && ! $isAvailable,
+                        'bg-danger' => ! $agendaIsUpcoming,
+                    ]) aria-hidden="true"></span>
+                    <span class="truncate">{{ $agendaIsUpcoming ? ($isAvailable ? 'Jadwal berikutnya' : 'Jadwal terdekat') : 'Sedang berlangsung' }}</span>
                 </span>
                 @if (filled($agendaRange))
                     <span class="shrink-0 font-semibold text-ink tabular-nums">{{ $agendaRange }} WITA</span>
                 @endif
             </div>
-            <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
-                <div class="flex min-w-[11rem] flex-1 items-center gap-2">
-                    <span class="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary" aria-hidden="true">
-                        <i data-lucide="{{ $agendaIsUpcoming ? 'clock' : 'book-open' }}" class="size-3.5"></i>
-                    </span>
-                    <span class="min-w-0 text-xs font-semibold leading-snug text-ink">{{ $agendaTitle }}</span>
-                </div>
+            <div class="mt-1.5 flex items-center justify-between gap-2">
+                <p class="min-w-0 flex-1 truncate text-[13px] font-semibold leading-snug text-ink" title="{{ $agendaTitle }}">{{ $agendaTitle }}</p>
                 @if (filled($agendaClass))
-                    <span class="inline-flex max-w-full shrink-0 items-center rounded-lg bg-primary-soft px-2.5 py-0.5 text-[11px] font-semibold text-primary ring-1 ring-primary/15">
+                    <span class="shrink-0 whitespace-nowrap rounded-md bg-surface px-2 py-0.5 text-[11px] font-semibold text-primary ring-1 ring-primary/15">
                         {{ $agendaClass }}
                     </span>
                 @endif
             </div>
         </div>
     @elseif ($isAvailable)
-        <div class="flex flex-col gap-2 rounded-control border border-success/20 bg-success-soft/35 px-3.5 py-2.5">
-            <div class="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 border-b border-success/15 pb-1.5 text-[11px]">
+        <div class="sicma-card-agenda mt-auto rounded-lg border border-success/20 bg-success-soft/35 px-3 py-2.5 transition-colors duration-200">
+            <div class="flex items-center justify-between gap-2 text-[11px]">
                 <span class="inline-flex min-w-0 items-center gap-1.5 font-medium text-success">
                     <span class="size-1.5 shrink-0 rounded-full bg-success" aria-hidden="true"></span>
-                    <span>Bebas jadwal hari ini</span>
+                    <span class="truncate">Bebas jadwal hari ini</span>
                 </span>
                 @if (filled($time))
                     <span class="shrink-0 font-semibold text-success tabular-nums">s.d. {{ $time }}</span>
                 @endif
             </div>
-            <div class="flex items-center gap-2">
-                <span class="flex size-7 shrink-0 items-center justify-center rounded-lg bg-success-soft text-success" aria-hidden="true">
-                    <i data-lucide="circle-check" class="size-3.5"></i>
-                </span>
-                <span class="min-w-0 text-xs font-medium leading-snug text-ink">Tidak ada jadwal kuliah tersisa hari ini</span>
-            </div>
+            <p class="mt-1.5 truncate text-[13px] font-medium leading-snug text-ink/80">Tidak ada jadwal kuliah tersisa hari ini</p>
         </div>
+    @elseif ($note)
+        <div class="sicma-card-agenda mt-auto rounded-lg border border-border/80 bg-page/80 px-3 py-2.5 transition-colors duration-200">
+            <p class="text-xs leading-relaxed text-muted">{{ $note }}</p>
+        </div>
+    @endif
+
+    @if ($note && filled($agendaTitle) && $isClosed)
+        <p class="text-xs leading-relaxed text-muted">{{ $note }}</p>
     @endif
 
     @if ($visibleFacilities !== [])
@@ -131,12 +145,11 @@
         </div>
     @endif
 
-    @if ($note)
-        <p class="text-xs leading-relaxed text-muted">{{ $note }}</p>
-    @endif
-
-    @if ($href || $booking || $slot->isNotEmpty() || ($remaining && ! $timeLabel))
-        <div class="mt-auto flex flex-wrap items-center justify-between gap-3 border-t border-border/60 pt-3">
+    @if ($hasFooter)
+        <div @class([
+            'flex flex-wrap items-center justify-between gap-3 border-t border-border/60 pt-3',
+            'mt-auto' => ! $hasAgendaBlock,
+        ])>
             @if ($remaining && ! $timeLabel)
                 <span class="text-xs font-medium text-muted">{{ $remaining }}</span>
             @endif

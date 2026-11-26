@@ -12,7 +12,7 @@
 
 @section('content')
     <div class="flex flex-col gap-6">
-        <x-page-header title="Riwayat penyusunan otomatis" subtitle="Status dan hasil setiap proses dapat dibuka kembali. Status solver disimpan terpisah dari status proses." />
+        <x-page-header title="Riwayat penyusunan otomatis" />
 
         <x-card padding="px-2.5 py-2" class="w-fit max-w-full">
             <x-schedule-steps :current="3" />

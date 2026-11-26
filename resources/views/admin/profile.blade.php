@@ -52,7 +52,7 @@
                         <x-field label="Kata sandi saat ini" name="current_password">
                             <x-password-input name="current_password" autocomplete="current-password" placeholder="Masukkan kata sandi saat ini" required />
                         </x-field>
-                        <x-field label="Kata sandi baru" name="password" hint="Gunakan kombinasi huruf dan angka agar sulit ditebak.">
+                        <x-field label="Kata sandi baru" name="password">
                             <x-password-input name="password" autocomplete="new-password" placeholder="Minimal 8 karakter" required />
                         </x-field>
                         <x-field label="Ulangi kata sandi baru" name="password_confirmation">

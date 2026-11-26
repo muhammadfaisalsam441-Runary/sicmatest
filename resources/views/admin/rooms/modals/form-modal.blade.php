@@ -70,7 +70,6 @@
                         <option value="{{ $b->name }}"></option>
                     @endforeach
                 </datalist>
-                <p class="mt-1 text-[11px] text-muted">Kosongkan bila gedung belum didata (akan ditandai Perlu Verifikasi).</p>
                 @if ($isRoomFormError) @error('building') <p class="mt-1 text-xs font-medium text-danger">{{ $message }}</p> @enderror @endif
             </div>
 

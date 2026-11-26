@@ -118,7 +118,6 @@
             <fieldset x-show="formLecturer.id" :disabled="!formLecturer.id" class="rounded-control border border-border p-3">
                 <legend class="px-1 text-sm font-semibold text-ink">Mata kuliah yang bisa diampu</legend>
                 <input type="hidden" name="course_selection_present" value="1">
-                <p class="mb-3 text-xs text-muted">Mata kuliah dari spreadsheet dan jadwal semester aktif sudah tercentang. Centang pilihan tambahan agar dosen tersedia di Pembagian Mengajar.</p>
                 <p class="mb-2 text-sm font-medium text-ink"><span x-text="selectedCourseIds.length"></span> MK dipilih</p>
                 <template x-for="id in formLecturer.course_ids" :key="id">
                     <input type="hidden" name="course_ids[]" :value="id">

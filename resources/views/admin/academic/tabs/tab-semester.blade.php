@@ -29,7 +29,6 @@
                                 <x-field label="Mulai UAS" name="uas_start"><x-input type="date" name="uas_start" :value="old('uas_start', $period->uas_start?->toDateString())" /></x-field>
                                 <x-field label="Selesai UAS" name="uas_end"><x-input type="date" name="uas_end" :value="old('uas_end', $period->uas_end?->toDateString())" /></x-field>
                             </div>
-                            <p class="text-xs text-muted">Zona waktu WITA. Tanggal UTS/UAS menentukan sesi "sebelum UTS" dan "setelah UTS". Perubahan berlaku pada draf berikutnya yang ditetapkan.</p>
                             <div class="flex justify-end"><x-button type="submit">Simpan kalender</x-button></div>
                         </form>
                     </x-card>

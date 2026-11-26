@@ -7,7 +7,6 @@
                 </span>
                 <div>
                     <h2 class="text-sm font-bold text-ink">Aturan Pembatasan Jam Ruang Berulang</h2>
-                    <p class="text-xs text-muted">Ruangan otomatis diblokir pada jam &amp; hari tertentu tanpa menutup jam lainnya.</p>
                 </div>
             </div>
             <x-button size="sm" variant="secondary" icon="plus" @click="openClosureModal(null, 'recurring')">Tambah Aturan</x-button>

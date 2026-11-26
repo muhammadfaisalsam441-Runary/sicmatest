@@ -250,11 +250,11 @@
 @push('dialogs')
     @if ($isDraft && $editing)
         <x-modal name="edit-session" title="Ubah jadwal" :show="true" width="max-w-[520px]">
-            <p class="-mt-3 mb-4 text-sm text-muted">{{ $editing->participants->pluck('name')->implode(' + ') }} • {{ $editing->title }}. Perubahan masuk ke draf v{{ $version->version_no }}; jadwal resmi tidak berubah sampai draf ditetapkan.</p>
+            <p class="-mt-3 mb-4 text-sm text-muted">{{ $editing->participants->pluck('name')->implode(' + ') }} — {{ $editing->title }}</p>
             <form method="POST" action="{{ route('admin.drafts.sessions.update', [$version, $editing, 'tinjau' => $view]) }}" class="flex flex-col gap-4" x-data="{ mode: @js(old('mode', $editing->mode->value)) }">
                 @csrf
                 @method('PUT')
-                <x-field label="Mode perkuliahan" name="mode" hint="Online tidak memesan ruang; waktu dosen dan kelas tetap diperiksa.">
+                <x-field label="Mode perkuliahan" name="mode">
                     <x-select name="mode" x-model="mode" :options="['offline' => 'Tatap muka', 'online' => 'Online', 'unscheduled' => 'Belum terjadwal']" :value="$editing->mode->value" />
                 </x-field>
                 <div class="grid grid-cols-1 gap-3 sm:grid-cols-3" x-show="mode !== 'unscheduled'">

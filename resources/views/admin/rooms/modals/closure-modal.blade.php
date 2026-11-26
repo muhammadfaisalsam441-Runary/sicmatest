@@ -15,8 +15,6 @@
             </button>
         </div>
 
-        <p class="mt-2 text-xs text-muted">Atur penutupan ruang sekali jalan atau berulang pada jam dan hari tertentu.</p>
-
         <form method="POST" action="{{ route('admin.closures.store') }}" class="mt-4 flex flex-col gap-4">
             @csrf
             <input type="hidden" name="form" value="closure">
@@ -158,7 +156,6 @@
                             </div>
                         @endforeach
                     </div>
-                    <p class="mt-1 text-[11px] text-muted">Kelas terdampak akan diberi notifikasi secara otomatis.</p>
                     <label class="mt-1 flex cursor-pointer items-center gap-2 font-medium text-ink">
                         <input type="checkbox" name="confirm_impact" value="1" class="size-4 cursor-pointer rounded accent-danger" required>
                         Saya mengerti dan tetap menutup ruang

@@ -18,8 +18,7 @@
     @endphp
 
     <div class="flex flex-col gap-6">
-        <x-page-header title="Penyusunan & Draf Jadwal"
-                       :subtitle="($period?->name ?? 'Belum ada semester aktif').($official ? ' — Jadwal resmi v'.$official->version_no.' aktif' : '')">
+        <x-page-header title="Penyusunan & Draf Jadwal">
             @if ($period)
                 <x-slot:actions>
                     <x-button size="sm" icon="sparkles" x-data x-on:click="$dispatch('open-modal', 'auto-scheduler-modal')">
@@ -416,14 +415,7 @@
                         @enderror
                     </div>
 
-                    <p class="text-sm text-muted">
-                        Cakupan menentukan bagian yang boleh diubah. Dasar penyusunan: {{ $base ? ($base->status->value === 'official' ? 'jadwal resmi' : 'draf').' v'.$base->version_no : 'belum ada' }}. Sesi yang dikunci di draf tidak dipindahkan.
-                    </p>
-
-                    <x-info-box title="Pencarian otomatis maksimal 60 detik">
-                        <p>Proses selesai lebih cepat jika susunan lengkap ditemukan. Jika hasil belum lengkap, kamu dapat mencoba pencarian 180 detik dari halaman hasil. Semua aturan wajib tetap dipenuhi.</p>
-                        <p>Sesi di luar cakupan, pimpinan yang tidak boleh hari Kamis, jeda Jumat pukul 12.00–13.10 WITA (tidak ada perkuliahan), ketersediaan dosen, dan kapasitas ruang tetap diperiksa. Hasil selalu masuk sebagai draf baru; jadwal resmi tidak berubah sampai ditetapkan.</p>
-                    </x-info-box>
+                    <x-info-box title="Pencarian otomatis maksimal 60 detik" />
 
                     <div class="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
                         <x-button variant="ghost" :href="route('admin.academic.index', ['tab' => 'aturan'])">Atur aturan</x-button>
@@ -464,10 +456,6 @@
                             <input type="file" id="import-schedule-file" name="file" accept=".xlsx,.xls,.csv" class="mt-2 max-w-full text-sm" x-on:change="fileName = $event.target.files[0]?.name ?? ''" required>
                         </label>
                     </x-field>
-
-                    <x-info-box title="Tidak ada yang tersimpan sebelum kamu memeriksa hasilnya">
-                        <p>Hasil impor diperiksa lebih dulu lalu masuk sebagai draf baru. Jadwal resmi tetap aman.</p>
-                    </x-info-box>
 
                     <div class="flex justify-end gap-2.5 border-t border-border pt-4">
                         <x-button type="button" variant="secondary" x-on:click="$dispatch('close-modal', 'import-schedule-modal')">Batal</x-button>

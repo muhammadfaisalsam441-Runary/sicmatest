@@ -5,7 +5,7 @@
 
 @section('content')
     <div class="flex flex-col gap-5">
-        <x-page-header title="Pratinjau Pembagian Beban Dosen" :subtitle="$period->name.' · Seluruh program studi pada semester aktif'">
+        <x-page-header title="Pratinjau Pembagian Beban Dosen" :subtitle="$period->name">
             <x-slot:actions>
                 <x-button variant="secondary" :href="route('admin.teaching.index')">Kembali</x-button>
                 <x-button variant="secondary" icon="refresh-cw" :href="route('admin.teaching.allocation.preview')" data-native>Hitung Ulang</x-button>
@@ -25,8 +25,6 @@
         <x-card>
             <h2 class="font-semibold text-ink">{{ count($plan['moves']) }} penugasan kelas diusulkan pindah dosen</h2>
             <p class="mt-2 text-sm font-medium text-ink">Dosen melebihi maksimum {{ collect($plan['loads'])->filter(fn ($load) => $load['max'] !== null && $load['before'] > $load['max'])->count() }} saat ini, menjadi {{ collect($plan['loads'])->filter(fn ($load) => $load['max'] !== null && $load['after'] > $load['max'])->count() }} setelah usulan diterapkan.</p>
-            <p class="mt-2 text-sm text-muted">Sistem mendahulukan pengurangan beban yang melebihi maksimum, kemudian mendekatkan beban ke target. Kelayakan mengajar mengikuti mata kuliah yang tercatat di SICMA dan spreadsheet semester ini.</p>
-            <p class="mt-2 text-sm text-muted">Dosen penerima harus aktif, terverifikasi, memiliki target serta maksimum SKS yang valid, dan memiliki kapasitas untuk penugasan tersebut. Penugasan terkunci dipertahankan.</p>
             @if ($plan['affected_sessions'] > 0)
                 <p class="mt-2 text-sm text-muted">Penerapan akan membuat draf jadwal baru dari v{{ $plan['base_version_no'] }} untuk memperbarui tim pada {{ $plan['affected_sessions'] }} sesi terkait. Tinjau bentrok jadwal pada draf tersebut sebelum menetapkannya.</p>
             @endif

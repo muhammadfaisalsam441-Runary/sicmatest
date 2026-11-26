@@ -33,7 +33,6 @@
                 <li>Jika ada dua mitra, keduanya mengajar pada pertemuan 8–14.</li>
                 <li>Setiap pertemuan memakai SKS penuh sesuai mata kuliah.</li>
             </ul>
-            <p class="mt-2 text-sm text-muted">Rekap menampilkan hasil perkalian ini di kolom SKS × Pertemuan. Target dan maksimum memakai SKS Semester, yaitu bobot mata kuliah untuk setiap kelas yang diajar.</p>
         </x-card>
 
         <x-card>

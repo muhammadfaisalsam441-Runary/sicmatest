@@ -290,8 +290,6 @@
             @endif
         </x-card>
 
-        <p class="text-sm text-muted">Pendaftaran publik hanya untuk Keti. Akun admin diberikan oleh pengelola yang berwenang.</p>
-
         @if ($tab === 'pending')
             <div x-show="selectedIds.length > 0"
                  x-cloak
@@ -355,7 +353,7 @@
                             </template>
                             <form method="POST" :action="activeApp.approveUrl" class="flex flex-col gap-4">
                                 @csrf
-                                <x-field label="Kelas yang ditetapkan" name="class_group_id" hint="Persetujuan mengaktifkan akses Keti untuk kelas ini.">
+                                <x-field label="Kelas yang ditetapkan" name="class_group_id">
                                     <x-select name="class_group_id" :options="$classGroups" x-model="activeApp.classGroupId" />
                                 </x-field>
                                 <x-button type="submit" icon="check" x-bind:disabled="!activeApp.emailVerified">Setujui dan aktifkan akun</x-button>
@@ -418,7 +416,7 @@
                             </template>
                             <form method="POST" :action="activeApp.approveUrl" class="flex flex-col gap-4">
                                 @csrf
-                                <x-field label="Kelas yang ditetapkan" name="class_group_id" for="reapprove-class-group-id" hint="Admin dapat menyetujui dan mengaktifkan akun ini secara langsung untuk kelas yang dipilih.">
+                                <x-field label="Kelas yang ditetapkan" name="class_group_id" for="reapprove-class-group-id">
                                     <x-select id="reapprove-class-group-id" name="class_group_id" :options="$classGroups" x-model="activeApp.classGroupId" />
                                 </x-field>
                                 <x-button type="submit" icon="check" x-bind:disabled="!activeApp.emailVerified">Setujui dan aktifkan akun</x-button>

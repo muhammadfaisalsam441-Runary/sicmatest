@@ -85,8 +85,6 @@
                 <x-input id="course-form-name" name="name" x-model="course.name" placeholder="Contoh: Pemrograman Web" required />
             </x-field>
 
-            <p class="text-xs text-muted">Kode MK digunakan sebagai acuan unik jadwal perkuliahan dan penawaran kelas.</p>
-
             <div class="flex justify-end gap-3 pt-2 border-t border-border">
                 <x-button type="button" variant="secondary" x-on:click="$dispatch('close-modal', 'course-form')">Batal</x-button>
                 <x-button type="submit"><span x-text="isEdit ? 'Simpan Perubahan' : 'Tambah Mata Kuliah'"></span></x-button>

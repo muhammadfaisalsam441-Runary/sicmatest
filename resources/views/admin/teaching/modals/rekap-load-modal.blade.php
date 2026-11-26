@@ -8,7 +8,6 @@
             <div>
                 <span class="text-xs font-semibold text-primary">Semester Aktif</span>
                 <h3 id="rekap-load-modal-title" class="text-xl font-bold text-ink">Rekap Beban SKS Dosen</h3>
-                <p class="text-xs text-muted">Target dan maksimum memakai SKS Semester, dihitung satu kali per mata kuliah di setiap kelas. SKS × Pertemuan mengikuti jumlah pertemuan setiap pengajar.</p>
             </div>
             <button type="button" @click="rekapModalOpen = false" aria-label="Tutup" class="cursor-pointer rounded p-1 text-muted hover:text-ink">
                 <i data-lucide="x" class="size-5" aria-hidden="true"></i>

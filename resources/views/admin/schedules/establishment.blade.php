@@ -21,7 +21,6 @@
                              :min="max(now()->toDateString(), $candidate->period?->start_date?->toDateString() ?? now()->toDateString())" :max="$candidate->period?->end_date?->toDateString()" x-bind:readonly="confirming" required />
                 </x-field>
                 <x-field label="Catatan revisi (opsional)" name="note"><x-input name="note" maxlength="255" x-bind:readonly="confirming" placeholder="Catatan penetapan jadwal" /></x-field>
-                <p class="text-sm text-muted">Sistem memeriksa ulang data terbaru dan reservasi sebelum menyimpan. Perubahan serentak atau masalah wajib akan menghentikan penetapan.</p>
                 @if ($reviewStatus['warnings'] > 0)
                     <x-alert title="Peringatan perlu ditinjau">{{ $reviewStatus['warnings'] }} peringatan tersimpan. Tinjau rinciannya pada Pemeriksaan Jadwal sebelum melanjutkan.</x-alert>
                 @endif
@@ -37,7 +36,6 @@
             <p class="text-sm text-muted">Akun ini tidak memiliki izin menetapkan jadwal.</p>
         @endif
     @else
-        <p class="text-sm text-muted">Pilih draf yang sudah ditinjau. Kesiapan diperiksa pada halaman Pemeriksaan Jadwal.</p>
         @forelse ($candidates as $item)
             <div class="flex flex-wrap items-center justify-between gap-3 rounded-control border border-border p-4">
                 <span>Draf v{{ $item->version_no }} • {{ $item->source->label() }}</span>

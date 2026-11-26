@@ -49,10 +49,6 @@
                 <h2 class="text-lg font-semibold" x-text="finished && inspectUrl ? ('Draf v' + (draftVersionNo ?? '') + ' siap diperiksa') : progress.stage">{{ $job->status === OptimizationJobStatus::Queued ? 'Menunggu antrean' : 'Menyiapkan kandidat' }}</h2>
                 <p class="text-sm text-muted">{{ $job->scope['in_scope'] ?? 0 }} sesi dalam cakupan • batas {{ $job->time_limit_seconds }} detik • berjalan <span x-text="elapsed">0</span> detik</p>
                 <p class="text-sm" aria-live="polite"><strong x-text="progress.placed">0</strong> dari <strong x-text="progress.total">{{ $job->scope['in_scope'] ?? 0 }}</strong> sesi berhasil ditempatkan pada kandidat terbaik sejauh ini.</p>
-                <p class="text-xs text-muted">Jumlah ini menunjukkan hasil pencarian, bukan persentase waktu. Semua hasil diperiksa sebelum disimpan sebagai draf.</p>
-                <x-info-box title="Satu permintaan, satu proses">
-                    <p>Klik berulang tidak membuat pekerjaan ganda. Jadwal resmi dan sesi terkunci tetap dilindungi. Proses tetap berjalan saat kamu membuka menu lain.</p>
-                </x-info-box>
                 <div class="flex flex-wrap items-center gap-3">
                     <x-button type="button" variant="danger-outline" x-show="!finished" x-on:click="$dispatch('open-modal', 'cancel-scheduler-job')">Batalkan proses</x-button>
                     <x-button href="#" icon="list-checks" x-show="finished && inspectUrl" x-cloak x-bind:href="inspectUrl">Buka Pemeriksaan Draf</x-button>
@@ -74,7 +70,6 @@
                         <tr><td class="py-3 font-medium">Waktu proses</td><td class="py-3">{{ $job->result['wall_time'] ?? '—' }} detik</td><td class="py-3 text-muted">Batas {{ $job->time_limit_seconds }} detik</td></tr>
                     </tbody>
                 </table>
-                <p class="text-xs text-muted">Bentrok dengan reservasi pada tanggal terkait diperiksa ulang di draf dan saat penetapan.</p>
             </x-card>
             @if (! empty($job->result['unplaced_details']))
                 <x-card class="flex flex-col gap-3">
@@ -98,7 +93,6 @@
                 <p>• Buka kunci sesi draf yang membatasi kandidat, atau perluas cakupan.</p>
                 <p>• Periksa kapasitas ruang dan jumlah mahasiswa kelas.</p>
                 <p>• Periksa ketersediaan dosen dan aturan pimpinan hari Kamis.</p>
-                <p class="text-muted">Aturan wajib tidak dilonggarkan otomatis. Jadwal resmi tetap aktif.</p>
             </x-card>
             <x-button :href="route('admin.scheduler.create')">Atur cakupan & kunci</x-button>
         @elseif ($state === 'invalid')
@@ -119,7 +113,6 @@
         @if ($canRetry)
             <x-card class="flex flex-col gap-3">
                 <h2 class="text-lg font-semibold">Susunan belum lengkap</h2>
-                <p class="text-sm text-muted">Coba pekerjaan baru selama maksimal 180 detik dengan data dasar, cakupan, dan kunci yang sama. Draf sebelumnya tetap tersimpan. Jika data berubah, periksa kesiapan kembali.</p>
                 <div class="flex flex-wrap gap-3">
                     <form method="POST" action="{{ route('admin.scheduler.retry', $job) }}">@csrf<x-button type="submit">Coba Pencarian 180 Detik</x-button></form>
                     <x-button variant="secondary" :href="$draftId ? route('admin.drafts.inspect', $draftId) : route('admin.scheduler.create')">Periksa Kendala</x-button>

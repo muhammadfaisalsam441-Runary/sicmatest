@@ -10,7 +10,7 @@
 
 @section('content')
     <div class="flex flex-col gap-6">
-        <x-page-header title="Impor jadwal perkuliahan" subtitle="Unggah jadwal dalam bentuk Excel atau CSV. Hasilnya diperiksa dulu sebelum disimpan." />
+        <x-page-header title="Impor jadwal perkuliahan" />
 
         <x-card padding="px-2.5 py-2" class="w-fit max-w-full">
             <x-schedule-steps :current="3" />
@@ -37,9 +37,6 @@
                             <input type="file" name="file" accept=".xlsx,.xls,.csv" class="mt-2 max-w-full text-sm" x-on:change="fileName = $event.target.files[0]?.name ?? ''" required>
                         </label>
                     </x-field>
-                    <x-info-box title="Tidak ada yang tersimpan sebelum kamu memeriksa hasilnya">
-                        <p>Hasil impor masuk sebagai draf baru. Jadwal resmi dan riwayat versi tetap disimpan.</p>
-                    </x-info-box>
                     <div class="flex justify-end gap-3">
                         <x-button variant="secondary" :href="route('admin.schedules.index')">Batal</x-button>
                         <x-button type="submit">Lanjut periksa hasil</x-button>
@@ -50,7 +47,6 @@
             <div class="flex flex-col gap-6">
                 <x-card class="flex flex-col gap-3">
                     <h2 class="font-semibold">Belum punya templat?</h2>
-                    <p class="text-sm text-muted">Templat Excel resmi memuat format kolom lengkap (WITA, SKS, Dosen Pengampu & Mitra), contoh data, serta lembar daftar ruang dan kelas terdaftar.</p>
                     <div class="flex items-center gap-2">
                         <x-button variant="soft" icon="download" :href="route('admin.schedules.template')">Unduh templat (.xlsx)</x-button>
                         <a href="{{ route('admin.schedules.template', ['format' => 'csv']) }}" class="text-xs text-muted hover:text-primary transition underline">Versi CSV</a>

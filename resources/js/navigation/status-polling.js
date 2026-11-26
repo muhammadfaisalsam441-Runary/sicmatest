@@ -2,6 +2,9 @@ export function registerStatusPolling(Alpine, navigation) {
     Alpine.data('statusPolling', (options) => ({
         elapsed: options.elapsed ?? 0,
         progress: options.progress ?? { stage: 'Menunggu antrean', total: 0, placed: 0 },
+        finished: false,
+        inspectUrl: null,
+        draftVersionNo: null,
         timer: null,
         controller: null,
         realtimeHandler: null,
@@ -28,10 +31,30 @@ export function registerStatusPolling(Alpine, navigation) {
                     ? !['queued', 'running'].includes(data.status)
                     : data.lock_version !== options.version || data.status !== options.status;
                 if (changed && !controller.signal.aborted) {
-                    options.version = data.lock_version ?? options.version;
-                    options.status = data.status ?? options.status;
-                    if (navigation) await navigation.refresh();
-                    else location.reload();
+                    if (options.job) {
+                        clearInterval(this.timer);
+                        this.timer = null;
+                        this.finished = true;
+                        this.inspectUrl = data.inspect_url ?? null;
+                        this.draftVersionNo = data.draft_version_no ?? null;
+                        if (data.inspect_url) {
+                            if (typeof navigation?.navigate === 'function') {
+                                await navigation.navigate(data.inspect_url);
+                            } else {
+                                globalThis.location?.assign?.(data.inspect_url);
+                            }
+                        } else {
+                            const refreshed = navigation ? await navigation.refresh() : false;
+                            if (refreshed === false) {
+                                globalThis.location?.reload?.();
+                            }
+                        }
+                    } else {
+                        options.version = data.lock_version ?? options.version;
+                        options.status = data.status ?? options.status;
+                        if (navigation) await navigation.refresh();
+                        else location.reload();
+                    }
                 }
             } catch {
                 // A later poll retries without interrupting the current edit.

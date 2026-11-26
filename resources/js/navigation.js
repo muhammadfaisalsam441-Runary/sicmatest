@@ -491,5 +491,10 @@ export function installPortalNavigation(Alpine, renderIcons) {
         if (pendingRealtimeRefresh) triggerRealtimeRefresh(120);
     }, true);
 
-    return { refresh, triggerRealtimeRefresh };
+    function navigate(url) {
+        if (!url) return false;
+        return visit(url, {});
+    }
+
+    return { refresh, triggerRealtimeRefresh, navigate };
 }

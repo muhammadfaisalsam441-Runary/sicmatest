@@ -79,6 +79,7 @@ class SchedulerController extends Controller
     public function status(OptimizationJob $job, SchedulerService $scheduler): JsonResponse
     {
         $job = $scheduler->poll($job);
+        $draftId = $job->result['draft_version_id'] ?? null;
 
         return response()->json([
             'status' => $job->status->value,
@@ -86,6 +87,9 @@ class SchedulerController extends Controller
             'elapsed' => $job->started_at ? max(0, (int) $job->started_at->diffInSeconds($job->finished_at ?? now())) : 0,
             'time_limit' => $job->time_limit_seconds,
             'progress' => $job->result['progress'] ?? ['stage' => $job->status->label(), 'total' => $job->scope['in_scope'] ?? 0, 'placed' => $job->result['placed'] ?? 0],
+            'draft_version_id' => $draftId,
+            'draft_version_no' => $job->result['draft_version_no'] ?? null,
+            'inspect_url' => $draftId !== null ? route('admin.drafts.inspect', $draftId) : null,
         ]);
     }
 

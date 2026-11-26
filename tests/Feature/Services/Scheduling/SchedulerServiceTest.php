@@ -288,10 +288,20 @@ test('status pekerjaan menyediakan kemajuan nyata dan waktu selesai tidak terus 
     $this->travel(4)->seconds();
 
     $this->actingAs($this->admin)->getJson(route('admin.scheduler.status', $job))
-        ->assertOk()->assertJsonPath('progress.placed', 1)->assertJsonPath('progress.total', 3)->assertJsonPath('elapsed', 4);
-    $job->update(['status' => OptimizationJobStatus::Finished, 'finished_at' => now(), 'solver_status' => SolverStatus::Unknown, 'result' => ['placed' => 1, 'unplaced' => [2, 3]]]);
+        ->assertOk()
+        ->assertJsonPath('progress.placed', 1)
+        ->assertJsonPath('progress.total', 3)
+        ->assertJsonPath('elapsed', 4)
+        ->assertJsonPath('draft_version_id', null)
+        ->assertJsonPath('inspect_url', null);
+    $job->update(['status' => OptimizationJobStatus::Finished, 'finished_at' => now(), 'solver_status' => SolverStatus::Unknown, 'result' => ['placed' => 1, 'unplaced' => [2, 3], 'draft_version_id' => 99, 'draft_version_no' => 7]]);
     $this->travel(20)->seconds();
-    $this->getJson(route('admin.scheduler.status', $job))->assertJsonPath('elapsed', 4)->assertJsonPath('progress.stage', 'Selesai');
+    $this->getJson(route('admin.scheduler.status', $job))
+        ->assertJsonPath('elapsed', 4)
+        ->assertJsonPath('progress.stage', 'Selesai')
+        ->assertJsonPath('draft_version_id', 99)
+        ->assertJsonPath('draft_version_no', 7)
+        ->assertJsonPath('inspect_url', route('admin.drafts.inspect', 99));
 });
 
 test('Keti dan tamu tidak dapat meminta pencarian ulang', function () {

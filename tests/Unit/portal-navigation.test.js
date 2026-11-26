@@ -373,3 +373,81 @@ test('morphNode mempertahankan backdrop ambient yang memiliki varian sama agar a
     morphNode(current, next, false, null);
     assert.equal(replaced, false);
 });
+
+test('statusPolling job otomatis menavigasi ke inspect_url saat selesai dan fallback reload jika refresh gagal tanpa draf', async () => {
+    const originals = {
+        fetch: globalThis.fetch,
+        document: globalThis.document,
+        setInterval: globalThis.setInterval,
+        clearInterval: globalThis.clearInterval,
+        location: globalThis.location,
+    };
+    const listeners = new Map();
+    let factory;
+    const cleared = [];
+    const navigated = [];
+    let reloads = 0;
+
+    try {
+        globalThis.document = {
+            visibilityState: 'visible',
+            addEventListener: (event, handler) => listeners.set(event, handler),
+            removeEventListener: (event, handler) => {
+                if (listeners.get(event) === handler) listeners.delete(event);
+            },
+        };
+        globalThis.setInterval = () => 88;
+        globalThis.clearInterval = (id) => cleared.push(id);
+        globalThis.location = { reload: () => { reloads++; } };
+
+        globalThis.fetch = async () => ({
+            ok: true,
+            json: async () => ({
+                status: 'finished',
+                draft_version_id: 14,
+                draft_version_no: 14,
+                inspect_url: '/admin/draf/14/pemeriksaan',
+                progress: { stage: 'Selesai', total: 10, placed: 10 },
+            }),
+        });
+
+        registerStatusPolling(
+            { data: (_, provider) => { factory = provider; } },
+            {
+                refresh: async () => false,
+                navigate: async (url) => { navigated.push(url); },
+            },
+        );
+
+        const jobWithDraft = factory({ url: '/status', interval: 3000, job: true });
+        jobWithDraft.init();
+        await jobWithDraft.poll();
+
+        assert.deepEqual(cleared, [88]);
+        assert.equal(jobWithDraft.finished, true);
+        assert.equal(jobWithDraft.inspectUrl, '/admin/draf/14/pemeriksaan');
+        assert.equal(jobWithDraft.draftVersionNo, 14);
+        assert.deepEqual(navigated, ['/admin/draf/14/pemeriksaan']);
+        assert.equal(reloads, 0);
+
+        globalThis.fetch = async () => ({
+            ok: true,
+            json: async () => ({
+                status: 'failed',
+                draft_version_id: null,
+                inspect_url: null,
+                progress: { stage: 'Gagal', total: 10, placed: 0 },
+            }),
+        });
+
+        const failedJob = factory({ url: '/status', interval: 3000, job: true });
+        failedJob.init();
+        await failedJob.poll();
+
+        assert.equal(failedJob.finished, true);
+        assert.equal(failedJob.inspectUrl, null);
+        assert.equal(reloads, 1);
+    } finally {
+        Object.assign(globalThis, originals);
+    }
+});
